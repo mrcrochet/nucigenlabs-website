@@ -1,0 +1,209 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    cursor: none;
+  }
+
+  body {
+    @apply antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  a, button, input, textarea, select {
+    cursor: none;
+  }
+}
+
+@layer utilities {
+  @keyframes glow-pulse {
+    0%, 100% {
+      opacity: 0.3;
+      transform: scale(1) translate(-50%, -50%);
+    }
+    50% {
+      opacity: 0.5;
+      transform: scale(1.05) translate(-50%, -50%);
+    }
+  }
+
+  @keyframes glow-drift {
+    0%, 100% {
+      transform: translate(0, 0);
+      opacity: 0.25;
+    }
+    50% {
+      transform: translate(40px, -25px);
+      opacity: 0.4;
+    }
+  }
+
+  @keyframes glow-drift-reverse {
+    0%, 100% {
+      transform: translate(0, 0);
+      opacity: 0.15;
+    }
+    50% {
+      transform: translate(-25px, 30px);
+      opacity: 0.3;
+    }
+  }
+
+  @keyframes data-flow {
+    0% {
+      opacity: 0.3;
+      transform: translateX(0);
+    }
+    50% {
+      opacity: 0.6;
+    }
+    100% {
+      opacity: 0.3;
+      transform: translateX(100px);
+    }
+  }
+
+  @keyframes data-flow-slow {
+    0% {
+      opacity: 0.2;
+      transform: translateX(0);
+    }
+    50% {
+      opacity: 0.4;
+    }
+    100% {
+      opacity: 0.2;
+      transform: translateX(80px);
+    }
+  }
+
+  @keyframes data-flow-fast {
+    0% {
+      opacity: 0.25;
+      transform: translateX(0);
+    }
+    50% {
+      opacity: 0.5;
+    }
+    100% {
+      opacity: 0.25;
+      transform: translateX(120px);
+    }
+  }
+
+  @keyframes flow-slow {
+    0%, 100% {
+      transform: translateX(0) translateY(0);
+    }
+    50% {
+      transform: translateX(-50px) translateY(-20px);
+    }
+  }
+
+  @keyframes flow-medium {
+    0%, 100% {
+      transform: translateX(0) translateY(0);
+    }
+    50% {
+      transform: translateX(-30px) translateY(-30px);
+    }
+  }
+
+  @keyframes flow-fast {
+    0%, 100% {
+      transform: translateX(0) translateY(0);
+    }
+    50% {
+      transform: translateX(-20px) translateY(-40px);
+    }
+  }
+
+  .animate-glow-pulse {
+    animation: glow-pulse 10s ease-in-out infinite;
+  }
+
+  .animate-glow-drift {
+    animation: glow-drift 18s ease-in-out infinite;
+  }
+
+  .animate-glow-drift-reverse {
+    animation: glow-drift-reverse 22s ease-in-out infinite;
+  }
+
+  .animate-data-flow {
+    animation: data-flow 12s ease-in-out infinite;
+  }
+
+  .animate-data-flow-slow {
+    animation: data-flow-slow 18s ease-in-out infinite;
+  }
+
+  .animate-data-flow-fast {
+    animation: data-flow-fast 9s ease-in-out infinite;
+  }
+
+  .animate-flow-slow {
+    animation: flow-slow 30s ease-in-out infinite;
+  }
+
+  .animate-flow-medium {
+    animation: flow-medium 25s ease-in-out infinite;
+  }
+
+  .animate-flow-fast {
+    animation: flow-fast 20s ease-in-out infinite;
+  }
+
+  .bg-gradient-radial {
+    background-image: radial-gradient(var(--tw-gradient-stops));
+  }
+
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-20px);
+    }
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (max-width: 768px) {
+    * {
+      cursor: auto !important;
+    }
+  }
+}
