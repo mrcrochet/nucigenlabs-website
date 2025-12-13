@@ -4,8 +4,24 @@ export default function CustomCursor() {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isPointer, setIsPointer] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   useEffect(() => {
+    // Check for reduced motion preference
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mediaQuery.matches);
+    
+    const handleChange = (e: MediaQueryListEvent) => {
+      setPrefersReducedMotion(e.matches);
+    };
+    
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  useEffect(() => {
+    // Don't show custom cursor if user prefers reduced motion or doesn't have a mouse
+    if (prefersReducedMotion) return;
     const updateCursor = (e: MouseEvent) => {
       setPosition({ x: e.clientX, y: e.clientY });
 
@@ -32,9 +48,9 @@ export default function CustomCursor() {
       document.removeEventListener('mouseleave', hideCursor);
       document.removeEventListener('mouseenter', showCursor);
     };
-  }, []);
+  }, [prefersReducedMotion]);
 
-  if (isHidden) return null;
+  if (isHidden || prefersReducedMotion) return null;
 
   return (
     <>
@@ -44,7 +60,9 @@ export default function CustomCursor() {
           left: `${position.x}px`,
           top: `${position.y}px`,
           transform: `translate(-50%, -50%) scale(${isPointer ? 1.5 : 1})`,
+          willChange: 'transform',
         }}
+        aria-hidden="true"
       >
         <div className="w-2 h-2 bg-white rounded-full"></div>
       </div>
@@ -55,7 +73,9 @@ export default function CustomCursor() {
           left: `${position.x}px`,
           top: `${position.y}px`,
           transform: `translate(-50%, -50%) scale(${isPointer ? 2 : 1})`,
+          willChange: 'transform',
         }}
+        aria-hidden="true"
       >
         <div className={`w-8 h-8 border border-white/30 rounded-full ${isPointer ? 'bg-white/5' : ''}`}></div>
       </div>
@@ -67,7 +87,9 @@ export default function CustomCursor() {
             left: `${position.x}px`,
             top: `${position.y}px`,
             transform: 'translate(-50%, -50%)',
+            willChange: 'transform',
           }}
+          aria-hidden="true"
         >
           <div className="w-16 h-16 bg-gradient-to-br from-red-500/20 to-orange-500/20 rounded-full blur-xl"></div>
         </div>

@@ -4,9 +4,9 @@ export default function AnimatedBackground() {
       <div className="absolute inset-0 bg-[#0A0A0A]"></div>
 
       <div className="absolute inset-0">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[700px] bg-gradient-to-br from-rose-600/25 via-pink-700/15 to-transparent rounded-full blur-3xl animate-glow-pulse"></div>
-        <div className="absolute top-1/3 left-1/3 w-[700px] h-[700px] bg-gradient-to-tl from-orange-600/15 via-red-600/10 to-transparent rounded-full blur-3xl animate-glow-drift"></div>
-        <div className="absolute bottom-1/3 right-1/3 w-[600px] h-[600px] bg-gradient-to-br from-slate-700/10 via-slate-800/5 to-transparent rounded-full blur-3xl animate-glow-drift-reverse"></div>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[700px] bg-gradient-to-br from-rose-600/25 via-pink-700/15 to-transparent rounded-full blur-3xl animate-glow-pulse" style={{ willChange: 'transform, opacity' }}></div>
+        <div className="absolute top-1/3 left-1/3 w-[700px] h-[700px] bg-gradient-to-tl from-orange-600/15 via-red-600/10 to-transparent rounded-full blur-3xl animate-glow-drift" style={{ willChange: 'transform, opacity' }}></div>
+        <div className="absolute bottom-1/3 right-1/3 w-[600px] h-[600px] bg-gradient-to-br from-slate-700/10 via-slate-800/5 to-transparent rounded-full blur-3xl animate-glow-drift-reverse" style={{ willChange: 'transform, opacity' }}></div>
       </div>
 
       <svg className="absolute inset-0 w-full h-full opacity-[0.08]" xmlns="http://www.w3.org/2000/svg">

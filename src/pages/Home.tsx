@@ -47,7 +47,8 @@ export default function Home() {
 
           <button
             onClick={() => setShowAccessModal(true)}
-            className="group inline-flex items-center gap-3 px-10 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-150 hover:scale-105 hover:shadow-[0_0_35px_rgba(225,70,62,0.4)] text-base tracking-wide mb-6"
+            className="group inline-flex items-center gap-3 px-10 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-150 hover:scale-105 hover:shadow-[0_0_35px_rgba(225,70,62,0.4)] text-base tracking-wide mb-6 focus:outline-none focus:ring-2 focus:ring-[#E1463E] focus:ring-offset-2 focus:ring-offset-[#0A0A0A]"
+            aria-label="Join early access to Nucigen Labs"
           >
             Join Early Access
             <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />

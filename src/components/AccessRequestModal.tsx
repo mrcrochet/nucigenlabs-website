@@ -83,21 +83,28 @@ export default function AccessRequestModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+    <div 
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+      aria-describedby="modal-description"
+    >
       <div
         className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={onClose}
+        aria-hidden="true"
       />
 
       <div className="relative w-full max-w-2xl backdrop-blur-2xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-2xl shadow-2xl animate-in zoom-in-95 fade-in duration-300">
         <div className="flex items-center justify-between p-8 border-b border-white/[0.08]">
           <div>
-            <h2 className="text-2xl font-light text-white tracking-tight mb-2">Request Clearance</h2>
-            <p className="text-sm text-slate-400 font-light">All applications are reviewed manually.</p>
+            <h2 id="modal-title" className="text-2xl font-light text-white tracking-tight mb-2">Request Clearance</h2>
+            <p id="modal-description" className="text-sm text-slate-400 font-light">All applications are reviewed manually.</p>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white transition-colors p-2 hover:bg-white/[0.05] rounded-lg"
+            className="text-slate-400 hover:text-white transition-colors p-2 hover:bg-white/[0.05] rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50"
             aria-label="Close modal"
           >
             <X size={20} />
@@ -193,14 +200,15 @@ export default function AccessRequestModal({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="flex-1 px-6 py-3 border border-white/20 hover:border-white/40 hover:bg-white/[0.05] rounded-lg text-white text-sm font-light transition-all disabled:opacity-50"
+              className="flex-1 px-6 py-3 border border-white/20 hover:border-white/40 hover:bg-white/[0.05] rounded-lg text-white text-sm font-light transition-all disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-white/50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 px-6 py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-150 hover:scale-105 hover:shadow-[0_0_25px_rgba(225,70,62,0.35)] text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="flex-1 px-6 py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-150 hover:scale-105 hover:shadow-[0_0_25px_rgba(225,70,62,0.35)] text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 focus:outline-none focus:ring-2 focus:ring-[#E1463E] focus:ring-offset-2 focus:ring-offset-black"
+              aria-label={isSubmitting ? 'Submitting request...' : 'Submit access request'}
             >
               {isSubmitting ? 'Submitting...' : 'Submit Request'}
             </button>

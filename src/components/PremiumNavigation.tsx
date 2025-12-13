@@ -31,12 +31,14 @@ export default function PremiumNavigation() {
           ? 'bg-black/60 backdrop-blur-2xl border-b border-white/[0.08] shadow-[0_1px_0_0_rgba(255,255,255,0.02)]'
           : 'bg-transparent'
       }`}
+      role="banner"
     >
-      <nav className="max-w-7xl mx-auto px-6 py-4">
+      <nav className="max-w-7xl mx-auto px-6 py-4" aria-label="Main navigation">
         <div className="flex items-center justify-between">
           <Link
             to="/"
             className="group flex items-center gap-2 text-white font-light text-xl tracking-tight"
+            aria-label="Nucigen Labs - Home"
           >
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 to-orange-500/20 blur-lg group-hover:blur-xl transition-all duration-300"></div>
@@ -60,11 +62,12 @@ export default function PremiumNavigation() {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`group relative px-4 py-2 rounded-lg transition-all duration-300 ${
+                  className={`group relative px-4 py-2 rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 focus:ring-offset-2 focus:ring-offset-black ${
                     isActive
                       ? 'text-white'
                       : 'text-slate-400 hover:text-white'
                   }`}
+                  aria-current={isActive ? 'page' : undefined}
                 >
                   <div className="flex items-center gap-2">
                     <Icon
@@ -90,7 +93,10 @@ export default function PremiumNavigation() {
             })}
           </div>
 
-          <button className="group relative px-6 py-2 bg-gradient-to-r from-red-600/90 to-red-500/90 hover:from-red-500 hover:to-red-400 text-white rounded-lg text-sm font-light tracking-wide transition-all duration-300 overflow-hidden">
+          <button 
+            className="group relative px-6 py-2 bg-gradient-to-r from-red-600/90 to-red-500/90 hover:from-red-500 hover:to-red-400 text-white rounded-lg text-sm font-light tracking-wide transition-all duration-300 overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#E1463E] focus:ring-offset-2 focus:ring-offset-black"
+            aria-label="Request access to Nucigen Labs"
+          >
             <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
             <span className="relative">Request Access</span>
           </button>
