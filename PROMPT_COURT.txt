@@ -1,0 +1,41 @@
+Je veux implémenter un design system cohérent dans mon projet. Voici les spécifications :
+
+PALETTE DE COULEURS :
+- Primaire : #E1463E (rouge signature)
+- Fond : #0A0A0A (presque noir)
+- Texte : #FFFFFF (blanc), rgba(148, 163, 184, 1) (slate-400), rgba(100, 116, 139, 1) (slate-500)
+
+TYPOGRAPHIE :
+- Police : 'Inter', system-ui, sans-serif
+- Poids : font-light (300) et font-extralight (200)
+- Letter spacing : tracking-[0.15em] à tracking-[0.25em] pour labels
+
+GLASS MORPHISM (effet principal) :
+backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-2xl
+
+COMPOSANTS :
+- Badge : inline-block backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/10 to-[#E1463E]/5 border border-[#E1463E]/20 rounded-full px-6 py-2 text-sm text-[#E1463E] font-light tracking-[0.15em]
+- Button Primary : bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal px-10 py-4 rounded-lg transition-all duration-150 hover:scale-105 hover:shadow-[0_0_35px_rgba(225,70,62,0.4)] focus:outline-none focus:ring-2 focus:ring-[#E1463E]
+- Card : backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] rounded-2xl p-12 hover:border-white/[0.15] hover:shadow-2xl hover:-translate-y-1 transition-all duration-500
+
+ANIMATIONS :
+- Durées : 150ms (fast), 300ms (medium), 500ms (slow)
+- Hover : hover:scale-105 pour boutons
+- GPU : will-change: transform, opacity
+
+ESPACEMENTS :
+- Sections : py-24 (vertical), px-6 (horizontal)
+- Containers : max-w-5xl (principal), max-w-7xl (navigation)
+
+PRINCIPES :
+1. Minimalisme élégant (espaces blancs généreux, typo légère)
+2. Glass morphism pour profondeur
+3. Interactivité subtile (hover discrets)
+4. Performance (GPU acceleration, lazy loading)
+5. Accessibilité (focus states, ARIA labels, prefers-reduced-motion)
+
+INSTRUCTIONS :
+Quand je demande de créer/modifier des composants, suis strictement ce design system. Utilise toujours le glass morphism pour containers/cards, typographie Inter light, animations subtiles, et respecte l'accessibilité.
+
+Les fichiers DESIGN_SYSTEM.md, QUICK_REFERENCE.md, et CODE_EXAMPLES.md contiennent plus de détails si nécessaire.
+

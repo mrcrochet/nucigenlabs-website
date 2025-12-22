@@ -10,7 +10,6 @@ import WhoThisIsFor from '../components/WhoThisIsFor';
 import WaitingListSection from '../components/WaitingListSection';
 import Mission from '../components/Mission';
 import AdvancedFeatures from '../components/AdvancedFeatures';
-import TerminalDemo from '../components/TerminalDemo';
 
 export default function Home() {
   const [showAccessModal, setShowAccessModal] = useState(false);
@@ -62,23 +61,25 @@ export default function Home() {
 
       <LiveNewsFeed />
 
-      <FourLevels />
+      <div className="section-light">
+        <FourLevels />
+      </div>
 
       <AdvancedFeatures />
 
-      <TerminalDemo />
-
-      <WhoThisIsFor />
+      <div className="section-light">
+        <WhoThisIsFor />
+      </div>
 
       <section className="relative px-6 py-24">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-light text-white mb-12">
+            <h2 className="text-4xl md:text-5xl font-light mb-12">
               What Nucigen Labs is NOT
             </h2>
           </div>
 
-          <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.02] to-white/[0.01] border border-white/[0.08] rounded-xl p-10 mb-10">
+          <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-10 mb-10">
             <div className="grid md:grid-cols-2 gap-6">
               {[
                 'Not a signal group',
@@ -87,17 +88,17 @@ export default function Home() {
                 'Not a get-rich-quick platform'
               ].map((item, idx) => (
                 <div key={idx} className="flex items-center gap-3">
-                  <XCircle size={20} className="text-red-500/70 flex-shrink-0" />
+                  <XCircle size={20} className="text-[#E1463E]/70 flex-shrink-0" />
                   <p className="text-base text-slate-400 font-light">{item}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.12] rounded-xl p-10">
+          <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-10">
             <div className="text-center">
               <p className="text-sm text-slate-500 font-light mb-3">WHAT NUCIGEN LABS IS</p>
-              <p className="text-xl text-white font-light">
+              <p className="text-xl font-light">
                 A strategic information-to-decision platform.
               </p>
             </div>
@@ -105,7 +106,9 @@ export default function Home() {
         </div>
       </section>
 
-      <WaitingListSection />
+      <div className="section-light">
+        <WaitingListSection />
+      </div>
 
       <Mission />
 

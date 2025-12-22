@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { submitInstitutionalRequest } from '../lib/supabase';
 
 interface InstitutionalAccessModalProps {
   isOpen: boolean;
@@ -57,28 +57,16 @@ export default function InstitutionalAccessModal({
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase
-        .from('institutional_requests')
-        .insert([{
-          name: formData.name.trim(),
-          email: formData.email.toLowerCase().trim(),
-          role: formData.role || null,
-          sector: formData.sector || null,
-          country: formData.country || null,
-          capital_size: formData.capital_size || null,
-          timeline: formData.timeline || null,
-          interests: formData.interests || null,
-          status: 'pending',
-        }])
-        .select()
-        .maybeSingle();
-
-      if (error) {
-        if (error.code === '23505') {
-          throw new Error('This email has already been submitted');
-        }
-        throw new Error(error.message || 'Failed to submit request');
-      }
+      await submitInstitutionalRequest({
+        name: formData.name.trim(),
+        email: formData.email.toLowerCase().trim(),
+        role: formData.role || undefined,
+        sector: formData.sector || undefined,
+        country: formData.country || undefined,
+        capital_size: formData.capital_size || undefined,
+        timeline: formData.timeline || undefined,
+        interests: formData.interests || undefined,
+      });
 
       onSuccess('Request submitted. You will be contacted if shortlisted.');
       setFormData({

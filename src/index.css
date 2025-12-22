@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -10,8 +10,71 @@
     cursor: none;
   }
 
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', serif;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+  }
+
+  .font-serif {
+    font-family: 'Playfair Display', serif;
+  }
+
+  /* Section alternance - Fond clair avec teinte chaude (harmonie avec thème rouge) */
+  .section-light {
+    background-color: #1A1515;
+    color: #E5E5E5;
+  }
+
+  .section-light h1,
+  .section-light h2,
+  .section-light h3,
+  .section-light h4,
+  .section-light h5,
+  .section-light h6 {
+    color: #E5E5E5;
+  }
+
+  .section-light p,
+  .section-light span,
+  .section-light div {
+    color: #B8B8B8;
+  }
+
+  .section-light .text-white {
+    color: #E5E5E5 !important;
+  }
+
+  .section-light .text-slate-300 {
+    color: #C8C8C8;
+  }
+
+  .section-light .text-slate-400 {
+    color: #A8A8A8;
+  }
+
+  .section-light .text-slate-500 {
+    color: #888888;
+  }
+
+  .section-light .text-slate-600 {
+    color: #707070;
+  }
+
+  /* Section sombre (défaut) */
+  .section-dark {
+    background-color: #0A0A0A;
+    color: #FFFFFF;
+  }
+
+  html {
+    background-color: #0A0A0A;
+  }
+
   body {
     @apply antialiased;
+    background-color: #0A0A0A;
+    color: #FFFFFF;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

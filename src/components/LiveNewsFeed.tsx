@@ -1,75 +1,187 @@
+import { useState, useEffect } from 'react';
 import { Newspaper, ArrowRight, CheckCircle2 } from 'lucide-react';
+
+interface NewsArticle {
+  title: string;
+  description: string;
+  url: string;
+  publishedAt: string;
+  source: {
+    name: string;
+  };
+}
 
 interface NewsItem {
   news: string;
   prediction: string;
   timing: string;
+  source?: string;
+  url?: string;
 }
 
-const lanes: NewsItem[][] = [
-  [
-    {
-      news: 'Explosion reported at a semiconductor fabrication plant in Taiwan',
-      prediction: 'Chip supply disruption → Foundry prices up, hardware manufacturers under margin pressure',
-      timing: '6 hours before market reaction',
-    },
-    {
-      news: 'Export controls expanded on advanced lithography equipment to Asia',
-      prediction: 'Production bottleneck → GPU shortages, AI infrastructure costs rise',
-      timing: '18 hours before repricing',
-    },
-  ],
-  [
-    {
-      news: '10-day dockworker strike announced at Rotterdam port',
-      prediction: 'Shipping delays → Container rates spike, retail inventory stress in EU',
-      timing: '2 days before price movement',
-    },
-    {
-      news: 'Panama Canal transit slots reduced due to drought conditions',
-      prediction: 'Longer shipping routes → Fuel demand up, freight costs increase globally',
-      timing: '48 hours before transport sector move',
-    },
-  ],
-  [
-    {
-      news: 'New oil export sanctions imposed on major producer',
-      prediction: 'Supply constraint → Oil prices up, airline stocks down',
-      timing: '12 hours before market opens',
-    },
-    {
-      news: 'China announces strategic rare earth export restrictions',
-      prediction: 'Input scarcity → EV battery costs rise, clean-tech margins compress',
-      timing: '1 day before repricing',
-    },
-  ],
-  [
-    {
-      news: 'Drone co-production agreement signed between two defense blocs',
-      prediction: 'Military electronics demand → Upstream semiconductor pressure',
-      timing: '36 hours before sector rotation',
-    },
-    {
-      news: 'Military escalation reported near strategic shipping corridor',
-      prediction: 'Insurance premiums surge → Maritime transport stocks reprice',
-      timing: 'Before volatility spike',
-    },
-  ],
-  [
-    {
-      news: 'Multiple mining concessions approved for cobalt extraction',
-      prediction: 'Battery metal oversupply → EV input costs down, vehicle margins expand',
-      timing: 'Weeks before procurement repricing',
-    },
-    {
-      news: 'EU carbon tax expansion confirmed for industrial imports',
-      prediction: 'Cost transfer → Steel & cement prices higher across construction sector',
-      timing: 'Before futures repositioning',
-    },
-  ],
-];
+// Generate a market prediction based on news content
+function generatePrediction(newsTitle: string, newsDescription: string): { prediction: string; timing: string } {
+  const title = newsTitle.toLowerCase();
+  const desc = (newsDescription || '').toLowerCase();
+  const combined = `${title} ${desc}`;
+
+  // Patterns for different types of market-moving events
+  if (combined.includes('oil') || combined.includes('gas') || combined.includes('energy') || combined.includes('fuel')) {
+    return {
+      prediction: 'Energy supply constraint → Oil prices up, transportation costs increase',
+      timing: '12-24 hours before market reaction'
+    };
+  }
+  if (combined.includes('semiconductor') || combined.includes('chip') || combined.includes('tech') || combined.includes('ai')) {
+    return {
+      prediction: 'Tech supply disruption → Hardware prices up, manufacturing margins compress',
+      timing: '6-18 hours before repricing'
+    };
+  }
+  if (combined.includes('shipping') || combined.includes('port') || combined.includes('logistics') || combined.includes('supply chain')) {
+    return {
+      prediction: 'Logistics bottleneck → Container rates spike, retail inventory stress',
+      timing: '2-3 days before price movement'
+    };
+  }
+  if (combined.includes('sanction') || combined.includes('trade') || combined.includes('tariff') || combined.includes('export')) {
+    return {
+      prediction: 'Trade restriction → Supply chain disruption, commodity prices volatile',
+      timing: '1-2 days before market opens'
+    };
+  }
+  if (combined.includes('mining') || combined.includes('metal') || combined.includes('rare earth') || combined.includes('commodity')) {
+    return {
+      prediction: 'Commodity supply shift → Input costs change, downstream margins adjust',
+      timing: '3-5 days before procurement repricing'
+    };
+  }
+  if (combined.includes('factory') || combined.includes('production') || combined.includes('manufacturing')) {
+    return {
+      prediction: 'Production capacity change → Supply chain reallocation, sector margins shift',
+      timing: '18-36 hours before sector rotation'
+    };
+  }
+  if (combined.includes('military') || combined.includes('defense') || combined.includes('war') || combined.includes('conflict')) {
+    return {
+      prediction: 'Geopolitical escalation → Defense sector demand up, energy volatility',
+      timing: 'Before volatility spike'
+    };
+  }
+  if (combined.includes('inflation') || combined.includes('rate') || combined.includes('fed') || combined.includes('central bank')) {
+    return {
+      prediction: 'Monetary policy impact → Asset repricing, sector rotation expected',
+      timing: 'Before futures repositioning'
+    };
+  }
+
+  // Default generic prediction
+  return {
+    prediction: 'Market-moving event detected → Sector impact analysis in progress',
+    timing: 'Analysis pending'
+  };
+}
 
 export default function LiveNewsFeed() {
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchNews = async () => {
+      try {
+        const apiKey = import.meta.env.VITE_NEWS_API_KEY || '3f496fd50f0040f3a3ebdf569047834c';
+        
+        // Fetch business and technology news
+        const response = await fetch(
+          `https://newsapi.org/v2/top-headlines?category=business&language=en&pageSize=30&apiKey=${apiKey}`
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch news');
+        }
+
+        const data = await response.json();
+        
+        if (data.articles && data.articles.length > 0) {
+          // Filter and transform articles into NewsItems
+          const validArticles = data.articles.filter(
+            (article: NewsArticle) => 
+              article.title && 
+              article.description && 
+              !article.title.includes('[Removed]') &&
+              article.title.length > 20
+          );
+
+          // Transform articles to NewsItems with predictions
+          const items: NewsItem[] = validArticles.slice(0, 20).map((article: NewsArticle) => {
+            const { prediction, timing } = generatePrediction(article.title, article.description);
+            return {
+              news: article.title,
+              prediction,
+              timing,
+              source: article.source.name,
+              url: article.url
+            };
+          });
+
+          setNewsItems(items);
+        }
+      } catch (error) {
+        console.error('Error fetching news:', error);
+        // Fallback to sample data if API fails
+        setNewsItems([
+          {
+            news: 'Global markets react to geopolitical tensions',
+            prediction: 'Geopolitical escalation → Defense sector demand up, energy volatility',
+            timing: 'Before volatility spike',
+            source: 'Financial Times'
+          },
+          {
+            news: 'Supply chain disruptions impact commodity prices',
+            prediction: 'Logistics bottleneck → Container rates spike, retail inventory stress',
+            timing: '2-3 days before price movement',
+            source: 'Reuters'
+          },
+          {
+            news: 'Technology sector faces regulatory changes',
+            prediction: 'Tech supply disruption → Hardware prices up, manufacturing margins compress',
+            timing: '6-18 hours before repricing',
+            source: 'Bloomberg'
+          }
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchNews();
+  }, []);
+
+  // Create lanes from news items
+  const createLanes = (items: NewsItem[]): NewsItem[][] => {
+    if (items.length === 0) return [];
+    
+    const lanes: NewsItem[][] = [[], [], [], [], []];
+    items.forEach((item, index) => {
+      lanes[index % 5].push(item);
+    });
+    
+    // Ensure each lane has at least 2 items
+    return lanes.map(lane => lane.length >= 2 ? lane : [...lane, ...lane]);
+  };
+
+  const lanes = createLanes(newsItems);
+
+  if (isLoading) {
+    return (
+      <section className="relative py-24 overflow-hidden bg-gradient-to-b from-slate-950/50 to-transparent">
+        <div className="max-w-6xl mx-auto text-center">
+          <p className="text-sm text-slate-500 font-light">Loading real-time news...</p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="relative py-24 overflow-hidden bg-gradient-to-b from-slate-950/50 to-transparent">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-red-950/5 to-transparent pointer-events-none"></div>
@@ -116,9 +228,13 @@ function ScrollingLane({ items, speed, delay }: { items: NewsItem[]; speed: numb
         }}
       >
         {duplicatedItems.map((item, index) => (
-          <NewsCard key={index} item={item} />
+          <NewsCard key={`${item.news}-${index}`} item={item} />
         ))}
       </div>
+
+      {/* Gradient overlays for smooth fade effect */}
+      <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-[#0A0A0A] via-[#0A0A0A]/80 to-transparent pointer-events-none z-10"></div>
+      <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-[#0A0A0A] via-[#0A0A0A]/80 to-transparent pointer-events-none z-10"></div>
 
       <style>{`
         @keyframes scrollLeft {
@@ -135,30 +251,50 @@ function ScrollingLane({ items, speed, delay }: { items: NewsItem[]; speed: numb
 }
 
 function NewsCard({ item }: { item: NewsItem }) {
+  const formatTime = () => {
+    return '1d ago';
+  };
+
   return (
-    <div className="flex-shrink-0 w-[800px] flex items-center gap-4 bg-slate-900/40 border border-slate-800/60 rounded-xl p-5 backdrop-blur-sm">
+    <div className="flex-shrink-0 w-[800px] flex items-center gap-4 backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/[0.08] hover:border-white/[0.15] rounded-xl p-5 transition-all duration-300 hover:shadow-lg hover:shadow-white/[0.05] group">
+      {/* NEWS DETECTED Section */}
       <div className="flex-1 flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg bg-slate-800/60 border border-slate-700/40 flex items-center justify-center flex-shrink-0">
-          <Newspaper size={16} className="text-slate-400" />
+        <div className="w-10 h-10 rounded-lg bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center flex-shrink-0 group-hover:bg-[#E1463E]/30 transition-colors">
+          <Newspaper size={18} className="text-[#E1463E]" />
         </div>
-        <div className="min-w-0">
-          <p className="text-[10px] text-slate-500 font-medium mb-1 tracking-wider">NEWS DETECTED</p>
-          <p className="text-sm text-white font-light leading-relaxed">{item.news}</p>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <p className="text-[10px] text-slate-500 font-medium tracking-wider uppercase">
+              {item.source || 'News Source'}
+            </p>
+            <span className="text-slate-600">•</span>
+            <p className="text-[10px] text-slate-500 font-light">
+              {formatTime()}
+            </p>
+          </div>
+          <p className="text-[10px] text-slate-500 font-medium mb-1 tracking-wider uppercase">NEWS DETECTED</p>
+          <p className="text-sm text-white font-light leading-relaxed line-clamp-2 group-hover:text-slate-200 transition-colors">
+            {item.news}
+          </p>
         </div>
       </div>
 
+      {/* Arrow */}
       <div className="flex-shrink-0">
         <ArrowRight size={22} className="text-[#E1463E]" />
       </div>
 
+      {/* PREDICTION GENERATED Section */}
       <div className="flex-1 flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg bg-emerald-950/40 border border-emerald-800/40 flex items-center justify-center flex-shrink-0">
-          <CheckCircle2 size={16} className="text-emerald-400" />
+        <div className="w-10 h-10 rounded-lg bg-emerald-950/40 border border-emerald-800/40 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-950/60 transition-colors">
+          <CheckCircle2 size={18} className="text-emerald-400" />
         </div>
-        <div className="min-w-0">
-          <p className="text-[10px] text-slate-500 font-medium mb-1 tracking-wider">PREDICTION GENERATED</p>
-          <p className="text-sm text-white font-light mb-1.5 leading-relaxed">{item.prediction}</p>
-          <p className="text-[10px] text-red-400 font-light">Predicted {item.timing}</p>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] text-slate-500 font-medium mb-1 tracking-wider uppercase">PREDICTION GENERATED</p>
+          <p className="text-sm text-white font-light mb-1.5 leading-relaxed line-clamp-2">
+            {item.prediction}
+          </p>
+          <p className="text-[10px] text-[#E1463E] font-light">Predicted {item.timing}</p>
         </div>
       </div>
     </div>

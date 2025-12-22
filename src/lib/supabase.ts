@@ -22,6 +22,22 @@ export interface AccessRequest {
   updated_at?: string;
 }
 
+export interface InstitutionalRequest {
+  id?: string;
+  name: string;
+  email: string;
+  role?: string;
+  sector?: string;
+  country?: string;
+  capital_size?: string;
+  timeline?: string;
+  interests?: string;
+  status?: 'pending' | 'shortlisted' | 'approved' | 'rejected';
+  created_at?: string;
+  reviewed_at?: string;
+  notes?: string;
+}
+
 export async function submitAccessRequest(data: AccessRequest) {
   // Check if Supabase is properly configured
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -44,6 +60,38 @@ export async function submitAccessRequest(data: AccessRequest) {
   if (error) {
     if (error.code === '23505') {
       throw new Error('This email has already been registered');
+    }
+    throw new Error(error.message || 'Failed to submit request');
+  }
+
+  return result;
+}
+
+export async function submitInstitutionalRequest(data: InstitutionalRequest) {
+  // Check if Supabase is properly configured
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('Supabase is not configured. Institutional request not submitted.');
+    // Return a mock success response for development
+    return {
+      ...data,
+      id: 'mock-id',
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    };
+  }
+
+  const { data: result, error } = await supabase
+    .from('institutional_requests')
+    .insert([{
+      ...data,
+      status: data.status || 'pending',
+    }])
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('This email has already been submitted');
     }
     throw new Error(error.message || 'Failed to submit request');
   }

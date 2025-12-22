@@ -13,6 +13,7 @@ const Intelligence = lazy(() => import('./pages/Intelligence'));
 const Pricing = lazy(() => import('./pages/Pricing'));
 const Papers = lazy(() => import('./pages/Papers'));
 const CaseStudies = lazy(() => import('./pages/CaseStudies'));
+const LevelNews = lazy(() => import('./pages/LevelNews'));
 
 // Loading component for Suspense fallback
 const PageLoader = () => (
@@ -61,8 +62,8 @@ function App() {
       />
 
       <Suspense fallback={<PageLoader />}>
-        <Routes>
-          <Route path="/" element={<Home />} />
+      <Routes>
+        <Route path="/" element={<Home />} />
           <Route 
             path="/intelligence" 
             element={<Intelligence onRequestClearance={() => openModal('intelligence')} />} 
@@ -79,7 +80,11 @@ function App() {
             path="/papers" 
             element={<Papers onRequestClearance={() => openModal('papers')} />} 
           />
-        </Routes>
+          <Route 
+            path="/level/:level" 
+            element={<LevelNews />} 
+          />
+      </Routes>
       </Suspense>
     </div>
   );

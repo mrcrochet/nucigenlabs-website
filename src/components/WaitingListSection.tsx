@@ -56,9 +56,9 @@ export default function WaitingListSection() {
       )}
 
       <div className="max-w-4xl mx-auto">
-        <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/[0.15] rounded-2xl p-12">
+        <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-2xl p-12">
           <div className="text-center mb-10">
-            <h2 className="text-4xl md:text-5xl font-light text-white mb-4">
+            <h2 className="text-4xl md:text-5xl font-light mb-4">
               Get Early Access
             </h2>
             <p className="text-base text-slate-400 font-light">
@@ -74,7 +74,7 @@ export default function WaitingListSection() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isSubmitting}
-                className="w-full px-6 py-4 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-600 focus:outline-none focus:border-white/30 transition-all text-base font-light disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-6 py-4 bg-white/[0.10] backdrop-blur-xl border border-white/20 rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-[#E1463E]/50 transition-all text-base font-light disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Email address"
               />
             </div>

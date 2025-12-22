@@ -1,0 +1,163 @@
+{
+  "colors": {
+    "primary": {
+      "red": "#E1463E",
+      "redHover": "rgba(225, 70, 62, 0.9)",
+      "redLight": "rgba(225, 70, 62, 0.4)",
+      "redDark": "rgba(225, 70, 62, 0.2)"
+    },
+    "background": {
+      "base": "#0A0A0A",
+      "overlay": "rgba(10, 10, 10, 0.8)",
+      "glass": {
+        "subtle": "rgba(255, 255, 255, 0.03) to rgba(255, 255, 255, 0.01)",
+        "medium": "rgba(255, 255, 255, 0.05) to rgba(255, 255, 255, 0.02)",
+        "strong": "rgba(255, 255, 255, 0.08) to rgba(255, 255, 255, 0.02)"
+      }
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "rgba(148, 163, 184, 1)",
+      "tertiary": "rgba(100, 116, 139, 1)",
+      "muted": "rgba(71, 85, 105, 1)",
+      "dark": "rgba(51, 65, 85, 1)"
+    },
+    "borders": {
+      "subtle": "rgba(255, 255, 255, 0.08)",
+      "medium": "rgba(255, 255, 255, 0.15)",
+      "strong": "rgba(255, 255, 255, 0.2)"
+    },
+    "gradients": {
+      "redOrange": "from-red-500/20 to-orange-500/20",
+      "redOrangeBorder": "from-red-400 to-orange-400"
+    }
+  },
+  "typography": {
+    "fontFamily": "'Inter', system-ui, -apple-system, sans-serif",
+    "weights": {
+      "extralight": 200,
+      "light": 300,
+      "normal": 400,
+      "medium": 500,
+      "semibold": 600,
+      "bold": 700
+    },
+    "sizes": {
+      "xs": "0.75rem",
+      "sm": "0.875rem",
+      "base": "1rem",
+      "lg": "1.125rem",
+      "xl": "1.25rem",
+      "2xl": "1.5rem",
+      "3xl": "1.875rem",
+      "4xl": "2.25rem",
+      "5xl": "3rem",
+      "6xl": "3.75rem",
+      "7xl": "4.5rem",
+      "8xl": "6rem"
+    },
+    "letterSpacing": {
+      "tight": "-0.025em",
+      "normal": "0em",
+      "wide": "0.15em",
+      "wider": "0.2em",
+      "widest": "0.25em"
+    },
+    "lineHeight": {
+      "tight": "1.1",
+      "relaxed": "1.75"
+    }
+  },
+  "spacing": {
+    "container": {
+      "sm": "48rem",
+      "md": "56rem",
+      "lg": "64rem",
+      "xl": "72rem",
+      "2xl": "80rem"
+    },
+    "section": {
+      "vertical": "6rem",
+      "verticalLarge": "8rem",
+      "horizontal": "1.5rem"
+    },
+    "component": {
+      "padding": {
+        "sm": "0.5rem",
+        "md": "1rem",
+        "lg": "2rem",
+        "xl": "3rem",
+        "2xl": "4rem"
+      }
+    }
+  },
+  "borderRadius": {
+    "sm": "0.5rem",
+    "md": "0.75rem",
+    "lg": "1rem",
+    "xl": "1.5rem",
+    "2xl": "1rem",
+    "full": "9999px"
+  },
+  "shadows": {
+    "subtle": "0 1px 0 0 rgba(255,255,255,0.02)",
+    "medium": "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
+    "glowRed": "0 0 35px rgba(225,70,62,0.4)",
+    "glowRedSmall": "0 0 25px rgba(225,70,62,0.35)"
+  },
+  "transitions": {
+    "fast": "150ms",
+    "medium": "300ms",
+    "slow": "500ms",
+    "verySlow": "700ms"
+  },
+  "animations": {
+    "glowPulse": {
+      "duration": "10s",
+      "timing": "ease-in-out",
+      "iteration": "infinite"
+    },
+    "glowDrift": {
+      "duration": "18s",
+      "timing": "ease-in-out",
+      "iteration": "infinite"
+    },
+    "dataFlow": {
+      "duration": "12s",
+      "timing": "ease-in-out",
+      "iteration": "infinite"
+    },
+    "shimmer": {
+      "duration": "2s",
+      "timing": "linear",
+      "iteration": "infinite"
+    },
+    "float": {
+      "duration": "6s",
+      "timing": "ease-in-out",
+      "iteration": "infinite"
+    }
+  },
+  "breakpoints": {
+    "mobile": "768px",
+    "tablet": "1024px",
+    "desktop": "1280px"
+  },
+  "effects": {
+    "backdropBlur": {
+      "sm": "4px",
+      "md": "12px",
+      "lg": "16px",
+      "xl": "24px",
+      "2xl": "40px"
+    },
+    "opacity": {
+      "transparent": 0,
+      "subtle": 0.05,
+      "medium": 0.1,
+      "strong": 0.2,
+      "opaque": 1
+    }
+  }
+}
+
