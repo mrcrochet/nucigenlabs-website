@@ -103,13 +103,13 @@ getSignal().then(console.log);`
                 <div className="flex items-center gap-2">
                   <Code2 size={14} className="text-slate-400" />
                   <span className="text-xs text-slate-400 font-mono">{example.filename}</span>
-                </div>
+            </div>
                 <div className="flex items-center gap-1.5">
                   <div className="w-2.5 h-2.5 rounded-full bg-red-500/60"></div>
                   <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60"></div>
                   <div className="w-2.5 h-2.5 rounded-full bg-green-500/60"></div>
-                </div>
-              </div>
+            </div>
+          </div>
 
               {/* Code Content */}
               <div className="relative p-6">
@@ -125,54 +125,54 @@ getSignal().then(console.log);`
                       <Copy size={14} className="text-slate-400 group-hover:text-white transition-colors" />
                     )}
                   </button>
-                </div>
+                  </div>
 
                 <div className="mb-3">
                   <span className="text-xs text-slate-500 font-mono px-2 py-1 bg-slate-900/50 rounded border border-white/[0.05]">
                     {example.language}
                   </span>
-                </div>
+                  </div>
 
                 <pre className="font-mono text-xs leading-relaxed overflow-x-auto">
                   <code className="text-slate-300">
                     {example.code.split('\n').map((line, lineIdx) => {
                       // Syntax highlighting
                       if (line.trim().startsWith('import') || line.trim().startsWith('from') || line.trim().startsWith('const') || line.trim().startsWith('async')) {
-                        return (
+                return (
                           <div key={lineIdx} className="mb-1">
                             <span className="text-blue-400">{line.match(/^(import|from|const|async|function|await|return)/)?.[0]}</span>
                             <span className="text-slate-300">{line.replace(/^(import|from|const|async|function|await|return)/, '')}</span>
-                          </div>
-                        );
-                      }
+                  </div>
+                );
+              }
                       if (line.includes('console.log') || line.includes('print')) {
-                        return (
+                return (
                           <div key={lineIdx} className="mb-1">
                             <span className="text-slate-300">{line.substring(0, line.indexOf('console.log') || line.indexOf('print'))}</span>
                             <span className="text-yellow-400">{line.match(/(console\.log|print)/)?.[0]}</span>
                             <span className="text-slate-300">{line.substring((line.indexOf('console.log') || line.indexOf('print')) + (line.includes('console.log') ? 11 : 5))}</span>
-                          </div>
-                        );
-                      }
+                  </div>
+                );
+              }
                       if (line.includes("'") || line.includes('"')) {
-                        return (
+                return (
                           <div key={lineIdx} className="mb-1">
                             <span className="text-slate-300">{line.substring(0, line.indexOf("'") || line.indexOf('"'))}</span>
                             <span className="text-green-400">{line.match(/['"](.*?)['"]/)?.[0]}</span>
                             <span className="text-slate-300">{line.substring((line.indexOf("'") || line.indexOf('"')) + (line.match(/['"](.*?)['"]/)?.[0]?.length || 0))}</span>
-                          </div>
-                        );
-                      }
-                      return (
+                  </div>
+                );
+              }
+                return (
                         <div key={lineIdx} className="mb-1 text-slate-300">
                           {line || '\u00A0'}
-                        </div>
-                      );
-                    })}
+                </div>
+              );
+            })}
                   </code>
                 </pre>
-              </div>
-            </div>
+          </div>
+        </div>
           ))}
         </div>
       </div>

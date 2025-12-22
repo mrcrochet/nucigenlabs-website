@@ -58,8 +58,8 @@ export default function InstitutionalAccessModal({
 
     try {
       await submitInstitutionalRequest({
-        name: formData.name.trim(),
-        email: formData.email.toLowerCase().trim(),
+          name: formData.name.trim(),
+          email: formData.email.toLowerCase().trim(),
         role: formData.role || undefined,
         sector: formData.sector || undefined,
         country: formData.country || undefined,

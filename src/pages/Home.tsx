@@ -62,13 +62,13 @@ export default function Home() {
       <LiveNewsFeed />
 
       <div className="section-light">
-        <FourLevels />
+      <FourLevels />
       </div>
 
       <AdvancedFeatures />
 
       <div className="section-light">
-        <WhoThisIsFor />
+      <WhoThisIsFor />
       </div>
 
       <section className="relative px-6 py-24">
@@ -107,7 +107,7 @@ export default function Home() {
       </section>
 
       <div className="section-light">
-        <WaitingListSection />
+      <WaitingListSection />
       </div>
 
       <Mission />
