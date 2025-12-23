@@ -1,10 +1,13 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import CountdownTimer from './CountdownTimer';
 import Toast from './Toast';
 import { useToast } from '../hooks/useToast';
 import { submitAccessRequest } from '../lib/supabase';
+import { sendEarlyAccessConfirmationEmail } from '../lib/email';
 
 export default function Hero() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast, showToast, hideToast } = useToast();
@@ -30,13 +33,24 @@ export default function Hero() {
     setIsSubmitting(true);
 
     try {
+      const emailLower = email.toLowerCase().trim();
+      
+      // Submit to Supabase
       await submitAccessRequest({
-        email: email.toLowerCase().trim(),
+        email: emailLower,
         source_page: 'home',
       });
 
-      showToast('Request submitted successfully. We will review your application.', 'success');
-      setEmail('');
+      // Send confirmation email (non-blocking)
+      sendEarlyAccessConfirmationEmail({
+        to: emailLower,
+      }).catch(err => {
+        console.warn('Email sending failed:', err);
+        // Don't block the signup process if email fails
+      });
+
+      // Redirect to confirmation page
+      navigate(`/early-access-confirmation?email=${encodeURIComponent(emailLower)}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to submit request';
       showToast(message, 'error');
