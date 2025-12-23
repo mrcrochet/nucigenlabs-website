@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { submitAccessRequest } from '../lib/supabase';
+import { sendEarlyAccessConfirmationEmail } from '../lib/email';
 
 interface AccessRequestModalProps {
   isOpen: boolean;
@@ -17,6 +19,7 @@ export default function AccessRequestModal({
   onError,
   sourcePage = 'unknown',
 }: AccessRequestModalProps) {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
     role: '',
@@ -56,8 +59,11 @@ export default function AccessRequestModal({
     setIsSubmitting(true);
 
     try {
-      await submitAccessRequest({
-        email: formData.email.toLowerCase().trim(),
+      const email = formData.email.toLowerCase().trim();
+      
+      // Submit to Supabase
+      const result = await submitAccessRequest({
+        email,
         role: formData.role || undefined,
         company: formData.company || undefined,
         exposure: formData.exposure || undefined,
@@ -65,7 +71,18 @@ export default function AccessRequestModal({
         source_page: sourcePage,
       });
 
-      onSuccess('Request submitted successfully. We will review your application.');
+      // Send confirmation email (non-blocking)
+      sendEarlyAccessConfirmationEmail({
+        to: email,
+        name: formData.company || undefined,
+        role: formData.role || undefined,
+        company: formData.company || undefined,
+      }).catch(err => {
+        console.warn('Email sending failed:', err);
+        // Don't block the signup process if email fails
+      });
+
+      // Clear form
       setFormData({
         email: '',
         role: '',
@@ -73,7 +90,10 @@ export default function AccessRequestModal({
         exposure: '',
         intended_use: '',
       });
+      
+      // Close modal and navigate to confirmation page
       onClose();
+      navigate(`/early-access-confirmation?email=${encodeURIComponent(email)}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to submit request';
       onError(message);

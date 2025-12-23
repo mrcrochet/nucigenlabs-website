@@ -14,6 +14,7 @@ const Pricing = lazy(() => import('./pages/Pricing'));
 const Papers = lazy(() => import('./pages/Papers'));
 const CaseStudies = lazy(() => import('./pages/CaseStudies'));
 const LevelNews = lazy(() => import('./pages/LevelNews'));
+const EarlyAccessConfirmation = lazy(() => import('./pages/EarlyAccessConfirmation'));
 
 // Loading component for Suspense fallback
 const PageLoader = () => (
@@ -83,6 +84,10 @@ function App() {
           <Route 
             path="/level/:level" 
             element={<LevelNews />} 
+          />
+          <Route 
+            path="/early-access-confirmation" 
+            element={<EarlyAccessConfirmation />} 
           />
       </Routes>
       </Suspense>
