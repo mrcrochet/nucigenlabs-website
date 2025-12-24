@@ -161,15 +161,30 @@ export default function LevelNews() {
         const apiKey = import.meta.env.VITE_NEWS_API_KEY || '3f496fd50f0040f3a3ebdf569047834c';
         
         // Fetch business news
-        const response = await fetch(
-          `https://newsapi.org/v2/top-headlines?category=business&language=en&pageSize=50&apiKey=${apiKey}`
-        );
+        // Note: NewsAPI has CORS restrictions in production
+        const apiUrl = `https://newsapi.org/v2/top-headlines?category=business&language=en&pageSize=50&apiKey=${apiKey}`;
+        
+        // Try direct fetch first, if it fails due to CORS, use a proxy
+        let response;
+        try {
+          response = await fetch(apiUrl);
+        } catch (corsError) {
+          // If CORS error, try with a CORS proxy (for development/testing)
+          // In production, you should use your own backend proxy
+          console.warn('Direct API call failed, trying alternative method');
+          response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`);
+        }
 
         if (!response.ok) {
           throw new Error('Failed to fetch news');
         }
 
-        const data = await response.json();
+        let data = await response.json();
+        
+        // If using CORS proxy, extract the actual data
+        if (data.contents) {
+          data = JSON.parse(data.contents);
+        }
         
         if (data.articles && data.articles.length > 0) {
           // Filter articles by keywords
@@ -285,11 +300,17 @@ export default function LevelNews() {
                         <p className="text-xs text-slate-500 font-light mb-3">{item.source}</p>
                       )}
                     </div>
-                    {item.url && (
+                    {item.url && item.url !== '#' && (
                       <a
                         href={item.url}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (item.url && item.url !== '#') {
+                            window.open(item.url, '_blank', 'noopener,noreferrer');
+                          }
+                        }}
                         className="flex-shrink-0 text-[#E1463E] hover:text-[#E1463E]/80 transition-colors"
                         aria-label="Read full article"
                       >
