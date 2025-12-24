@@ -58,7 +58,7 @@ export default function PricingPreview() {
                 <div className="space-y-4 mb-8">
                   {[
                     'Real-time geopolitical event detection',
-                    'Market impact forecasting (crypto, stocks, commodities)',
+                    'Market impact forecasting (stocks, commodities)',
                     'Causal event-to-market dashboards',
                     'Alpha window predictions',
                     'Supply chain disruption alerts',
@@ -120,6 +120,7 @@ export default function PricingPreview() {
                     'Everything in Intelligence, plus:',
                     'Team collaboration features',
                     'Advanced analytics and reporting',
+                    'Live web research with AI agents',
                     'Priority support',
                     'Custom integrations',
                     'Enhanced API access',
@@ -317,7 +318,7 @@ export default function PricingPreview() {
                   'Takes action to track external systems and supply chains',
                   'Transfers to human analysts when needed',
                   'Real-time event detection and alpha window identification',
-                  'Multi-asset class coverage (crypto, stocks, commodities)'
+                  'Multi-asset class coverage (stocks, commodities)'
                 ].map((feature, idx) => (
                   <div key={idx} className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-[#E1463E] mt-2 flex-shrink-0"></div>

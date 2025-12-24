@@ -35,13 +35,13 @@ export default function CaseStudies({ onRequestClearance }: CaseStudiesProps) {
   ];
 
   if (selectedCase !== null) {
-    return <CaseStudyDetail caseId={selectedCase} onBack={() => setSelectedCase(null)} />;
+    return <CaseStudyDetail caseId={selectedCase} onBack={() => setSelectedCase(null)} onRequestClearance={onRequestClearance} />;
   }
 
   return (
     <main className="min-h-screen">
       <SEO
-        title="Case Studies — Nucigen Labs Labs"
+        title="Case Studies — Nucigen Labs"
         description="Intelligence built on consequences, not signals. Live event-to-supply-chain causality models."
       />
 
@@ -57,8 +57,12 @@ export default function CaseStudies({ onRequestClearance }: CaseStudiesProps) {
               <span className="text-slate-300">consequences, not signals.</span>
             </h1>
 
-            <p className="text-base md:text-xl text-slate-400 leading-[1.9] max-w-3xl mx-auto font-light mb-14">
+            <p className="text-base md:text-xl text-slate-400 leading-[1.9] max-w-3xl mx-auto font-light mb-8">
               Live event-to-supply-chain causality models that identify alpha windows before markets move.
+            </p>
+
+            <p className="text-sm text-slate-500 font-light mb-14 italic">
+              Built for analysts, operators, and investors who think in systems — not charts.
             </p>
 
             <button
@@ -99,6 +103,19 @@ export default function CaseStudies({ onRequestClearance }: CaseStudiesProps) {
               </button>
             ))}
           </div>
+
+          <div className="mt-20 text-center">
+            <button
+              onClick={onRequestClearance}
+              className="group inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-light"
+            >
+              Explore how causal intelligence works
+              <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+            <p className="text-xs text-slate-600 font-light mt-2">
+              No charts. No signals. No noise.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -107,7 +124,7 @@ export default function CaseStudies({ onRequestClearance }: CaseStudiesProps) {
   );
 }
 
-function CaseStudyDetail({ caseId, onBack }: { caseId: number; onBack: () => void }) {
+function CaseStudyDetail({ caseId, onBack, onRequestClearance }: { caseId: number; onBack: () => void; onRequestClearance: () => void }) {
   const caseContent = getCaseContent(caseId);
 
   return (
@@ -144,9 +161,12 @@ function CaseStudyDetail({ caseId, onBack }: { caseId: number; onBack: () => voi
                             <p>{paragraph.text}</p>
                           </div>
                           <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="backdrop-blur-xl bg-black/60 border border-white/20 rounded-xl px-6 py-4">
-                              <p className="text-sm text-slate-300 font-light tracking-wide">
+                            <div className="backdrop-blur-xl bg-black/60 border border-white/20 rounded-xl px-6 py-4 text-center">
+                              <p className="text-sm text-slate-300 font-light tracking-wide mb-2">
                                 🔒 Operator+ access required
+                              </p>
+                              <p className="text-xs text-slate-500 font-light">
+                                Full causal graphs, timelines and actor exposure available in Operator+.
                               </p>
                             </div>
                           </div>
@@ -159,6 +179,19 @@ function CaseStudyDetail({ caseId, onBack }: { caseId: number; onBack: () => voi
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="mt-20 pt-12 border-t border-white/[0.08] text-center">
+            <button
+              onClick={onRequestClearance}
+              className="group inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-light"
+            >
+              Explore how causal intelligence works
+              <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+            <p className="text-xs text-slate-600 font-light mt-2">
+              No charts. No signals. No noise.
+            </p>
           </div>
         </div>
       </section>
@@ -176,29 +209,37 @@ function getCaseContent(caseId: number) {
       tags: 'Geopolitical vectors · Industrial chains',
       sections: [
         {
-          heading: 'The headline was not the signal.',
+          heading: '① Misleading Headline',
           content: [
             {
-              text: `The press reported: "Congo signs new cobalt concessions."
+              text: `Headline: "Congo signs new cobalt concessions."
 
-The retail market reacted predictably:
-• Mining stocks up 2–3%
-• Day traders entered positions
-• Brief momentum
-
-The signal was noise.
-
-The truth was structural. The concessions don't release cobalt tomorrow. They modify the flux of the EV supply chain over 6–12 months. They lock export contracts to specific countries. They reduce Chinese dependency. They force EV OEMs to accelerate procurement.
-
-This isn't a trade. It's a macro industrial shift.`,
+To the market, this looked like a trade.
+To Nucigen, it was a structural re-routing of the EV supply chain.`,
             },
           ],
         },
         {
-          heading: 'What the Nucigen Labs engine detected',
+          heading: '② Retail / Signal Reaction',
           content: [
             {
-              text: `Our engine didn't "read an article." It detected:
+              text: `The retail market reacted predictably:
+• Mining stocks up 2–3%
+• Day traders entered positions
+• Brief momentum
+
+The signal was noise.`,
+            },
+          ],
+        },
+        {
+          heading: '③ Nucigen Detection',
+          content: [
+            {
+              text: `Nucigen does not ingest news.
+It models causal systems.
+
+In this case, the engine isolated:
 
 Actors:
 • Congo government
@@ -221,7 +262,17 @@ None of these dynamics are visible on Binance, TradingView, or an RSI indicator.
           ],
         },
         {
-          heading: 'The alpha window',
+          heading: '④ Causal Chain',
+          content: [
+            {
+              text: `The truth was structural. The concessions don't release cobalt tomorrow. They modify the flux of the EV supply chain over 6–12 months. They lock export contracts to specific countries. They reduce Chinese dependency. They force EV OEMs to accelerate procurement.
+
+This isn't a trade. It's a macro industrial shift.`,
+            },
+          ],
+        },
+        {
+          heading: '⑤ Alpha Window',
           content: [
             {
               text: `Retail looks at price → action.
@@ -235,7 +286,9 @@ Result:
 • Battery suppliers lock supply chains
 • Asia–Africa shipping lanes explode in volume
 
-The EV repricing occurred 6–12 months later.`,
+The EV repricing occurred 6–12 months later.
+
+This pattern was identified before it appeared in earnings calls or analyst notes.`,
             },
             {
               text: `Operator+ users received the complete window mapping, including specific ticker exposure, supply chain bottleneck analysis, and temporal cascade predictions across all four tiers.`,
@@ -244,7 +297,7 @@ The EV repricing occurred 6–12 months later.`,
           ],
         },
         {
-          heading: 'Why this beats signals',
+          heading: '⑥ Why Signals Fail',
           content: [
             {
               text: `An oversold RSI anticipates nothing. It reacts.
@@ -268,12 +321,21 @@ This is intelligence, not technical analysis.`,
       tags: 'Supply corridors',
       sections: [
         {
-          heading: 'The headline that fools traders',
+          heading: '① Misleading Headline',
           content: [
             {
-              text: `The press: "Major Asian port slowdown due to maintenance."
+              text: `Headline: "Major Asian port slowdown due to maintenance."
 
-Retail reaction:
+To the market, this looked like routine news.
+To Nucigen, it was a logistics chokepoint cascading into retail inflation.`,
+            },
+          ],
+        },
+        {
+          heading: '② Retail / Signal Reaction',
+          content: [
+            {
+              text: `Retail reaction:
 • "Minor news"
 • "It'll bounce back"
 • "Not significant"
@@ -288,39 +350,54 @@ The mechanical indicators saw nothing.`,
           ],
         },
         {
-          heading: 'What the Nucigen Labs engine saw',
+          heading: '③ Nucigen Detection',
           content: [
             {
-              text: `This wasn't maintenance. It was a logistics chokepoint.
+              text: `Nucigen does not ingest news.
+It models causal systems.
 
-The engine detected:
-• Container backlog +15%
+In this case, the engine isolated:
+
+Actors:
+• Port authority
 • Government cargo prioritization
+• Shipping lines
+
+Exposure:
+• Container backlog +15%
 • Reduced inland rail capacity
 • Ship diversion to port C
 
-The effect isn't the port. The effect is retail inventory inflation.`,
-            },
-          ],
-        },
-        {
-          heading: 'Propagation in the real world',
-          content: [
-            {
-              text: `Tier 1: Retail electronics import delayed → stock shortages
-
-Tier 2: Retailers overpay spot cargo → profit margin squeeze
-
-Tier 3: E-commerce earnings guidance repricing
-
-Tier 4: Local currency inflation pressure
+Propagation:
+• Tier 1: Retail electronics import delayed → stock shortages
+• Tier 2: Retailers overpay spot cargo → profit margin squeeze
+• Tier 3: E-commerce earnings guidance repricing
+• Tier 4: Local currency inflation pressure
 
 None of this appears in crypto signals.`,
             },
           ],
         },
         {
-          heading: 'The alpha window',
+          heading: '④ Causal Chain',
+          content: [
+            {
+              text: `This wasn't maintenance. It was a logistics chokepoint.
+
+The effect isn't the port. The effect is retail inventory inflation.
+
+The cascade:
+• 7–10 days physical backlog
+• 3–5 days warehouse clearing
+• 2–3 earnings calls
+• Then repricing
+
+Charts react after. Operators anticipate before.`,
+            },
+          ],
+        },
+        {
+          heading: '⑤ Alpha Window',
           content: [
             {
               text: `Duration: 10–45 days
@@ -331,7 +408,7 @@ Why?
 • 2–3 earnings calls
 • Then repricing
 
-Charts react after. Operators anticipate before.`,
+By the time this reached mainstream analysts, the positioning phase was already over.`,
             },
             {
               text: `Result analysis: Margin squeeze on retail, shipping multipliers, freight backwardation patterns, and specific ticker exposure across affected logistics chains and e-commerce platforms were provided to Operator+ subscribers in real-time.`,
@@ -340,7 +417,7 @@ Charts react after. Operators anticipate before.`,
           ],
         },
         {
-          heading: 'Why signals are blind here',
+          heading: '⑥ Why Signals Fail',
           content: [
             {
               text: `A technical indicator doesn't understand material chains.
@@ -357,12 +434,21 @@ Alpha is born in logistics, not on a chart.`,
       tags: 'Geopolitical vectors · Alpha windows',
       sections: [
         {
-          heading: 'What the world saw',
+          heading: '① Misleading Headline',
           content: [
             {
-              text: `The press: "Bilateral drone cooperation agreement."
+              text: `Headline: "Bilateral drone cooperation agreement."
 
-Retail reaction:
+To the market, this looked like a defense stock play.
+To Nucigen, it was a structural demand increase in microelectronics.`,
+            },
+          ],
+        },
+        {
+          heading: '② Retail / Signal Reaction',
+          content: [
+            {
+              text: `Retail reaction:
 • Defense stocks +3%
 • Brief pump
 • End of story
@@ -372,33 +458,41 @@ Total misunderstanding.`,
           ],
         },
         {
-          heading: 'What Nucigen Labs saw',
+          heading: '③ Nucigen Detection',
           content: [
             {
-              text: `The drones aren't the subject. The electronics are.
+              text: `Nucigen does not ingest news.
+It models causal systems.
 
-Our engine isolated:
+In this case, the engine isolated:
 
-Upstream supply chain:
+Actors:
+• Defense contractors
+• Technology transfer partners
+• Upstream suppliers
+
+Exposure:
 • Military-grade PCBs
 • Hardened semiconductors
 • Microcontrollers
 
-Downstream:
-• Maintenance capacity
-• Production facilities
-• Training/simulation loops
+Propagation:
+• Tier 1: Defense stock momentum (retail plays here)
+• Tier 2: Military microelectronics demand
+• Tier 3: Embedded systems manufacturers
+• Tier 4: Passive suppliers and maintenance capacity
 
-The drone cooperation equals structural demand increase in microelectronics.`,
+The market didn't see these actors for 8–12 months.`,
             },
           ],
         },
         {
-          heading: 'Alpha window',
+          heading: '④ Causal Chain',
           content: [
             {
-              text: `There's a temporal gap:
+              text: `The drones aren't the subject. The electronics are.
 
+There's a temporal gap:
 1. Diplomatic signature
 2. Technology transfer
 3. Production setup
@@ -412,7 +506,7 @@ This is a macro-industrial catalyst.`,
           ],
         },
         {
-          heading: 'What retail missed',
+          heading: '⑤ Alpha Window',
           content: [
             {
               text: `• Retail played the defense stock
@@ -423,7 +517,7 @@ This is a macro-industrial catalyst.`,
   - Drone maintenance
   - Passive suppliers
 
-The market didn't see these actors for 8–12 months.`,
+This pattern was identified before it appeared in earnings calls or analyst notes.`,
             },
             {
               text: `Detailed analysis of specific microelectronics manufacturers, MCU shortage predictions, anti-icing PCB supply constraints, and tier-by-tier exposure mapping with temporal windows was delivered to Operator+ subscribers during the pre-market phase.`,
@@ -432,7 +526,7 @@ The market didn't see these actors for 8–12 months.`,
           ],
         },
         {
-          heading: 'Why this destroys signals',
+          heading: '⑥ Why Signals Fail',
           content: [
             {
               text: `RSI doesn't tell you:
