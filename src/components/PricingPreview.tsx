@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, ArrowRight, TrendingUp, Shield, Zap, Sparkles, Lock } from 'lucide-react';
+import { Check, ArrowRight, TrendingUp, Shield, Zap, Sparkles, Lock, Star } from 'lucide-react';
 import AccessRequestModal from './AccessRequestModal';
 import InstitutionalAccessModal from './InstitutionalAccessModal';
 import LiveNewsTicker from './LiveNewsTicker';
@@ -34,28 +34,39 @@ export default function PricingPreview() {
 
       {/* Main Pricing Cards */}
       <section className="relative px-6 py-16">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-8 mb-12">
-            {/* Individual Plan */}
-            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-2xl p-10 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-6 mb-12">
+            {/* Individual Plan - Featured */}
+            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.10] to-white/[0.03] border-2 border-[#E1463E]/30 rounded-2xl p-10 relative overflow-hidden group hover:border-[#E1463E]/50 transition-all duration-300">
+              {/* Featured Badge */}
+              <div className="absolute top-0 right-0 bg-gradient-to-br from-[#E1463E] to-[#E1463E]/80 rounded-bl-2xl rounded-tr-2xl px-4 py-2 z-20">
+                <div className="flex items-center gap-1.5">
+                  <Star size={12} className="text-white fill-white" />
+                  <span className="text-[10px] text-white font-light tracking-wider uppercase">Available Now</span>
+                </div>
+              </div>
+
+              {/* Subtle glow effect */}
+              <div className="absolute inset-0 bg-gradient-to-br from-[#E1463E]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl"></div>
+
               <div className="relative z-10">
                 <div className="mb-8">
                   <h3 className="text-2xl font-light text-white mb-3">Nucigen Labs Intelligence</h3>
-                  <p className="text-sm text-slate-400 font-light mb-6">
+                  <p className="text-sm text-slate-400 font-light mb-6 leading-relaxed">
                     For individual operators, analysts, and strategic decision-makers.
                   </p>
                   
-                  <div className="flex items-baseline gap-2 mb-4">
-                    <span className="text-5xl text-white font-light">$59</span>
-                    <span className="text-slate-400 font-light">/ month</span>
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <span className="text-6xl text-white font-light tracking-tight">$59</span>
+                    <span className="text-slate-400 font-light text-lg">/ month</span>
                   </div>
-                  
+
                   <p className="text-xs text-slate-500 font-light mb-6">
                     Early access pricing. No commitments.
                   </p>
                 </div>
 
-                <div className="space-y-4 mb-8">
+                <div className="space-y-3.5 mb-8">
                   {[
                     'Real-time geopolitical event detection',
                     'Market impact forecasting (stocks, commodities)',
@@ -66,7 +77,9 @@ export default function PricingPreview() {
                     'Customizable intelligence feeds'
                   ].map((feature, idx) => (
                     <div key={idx} className="flex items-start gap-3">
-                      <Check size={18} className="text-[#E1463E] flex-shrink-0 mt-0.5" />
+                      <div className="mt-0.5 flex-shrink-0">
+                        <Check size={18} className="text-[#E1463E]" />
+                      </div>
                       <p className="text-sm text-slate-300 font-light leading-relaxed">{feature}</p>
                     </div>
                   ))}
@@ -90,24 +103,27 @@ export default function PricingPreview() {
             </div>
 
             {/* Pro Plan - Blurred/Coming Soon */}
-            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-2xl p-10 relative overflow-hidden">
-              <div className="absolute inset-0 backdrop-blur-sm bg-black/40 flex items-center justify-center z-20">
+            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.06] to-white/[0.01] border border-white/[0.10] rounded-2xl p-10 relative overflow-hidden">
+              <div className="absolute inset-0 backdrop-blur-md bg-black/50 flex items-center justify-center z-20 rounded-2xl">
                 <div className="text-center">
-                  <Lock size={32} className="text-slate-500 mx-auto mb-3" />
-                  <p className="text-sm text-slate-500 font-light">Coming Soon</p>
+                  <div className="w-16 h-16 rounded-full bg-white/[0.05] border border-white/10 flex items-center justify-center mx-auto mb-4">
+                    <Lock size={24} className="text-slate-400" />
+                  </div>
+                  <p className="text-sm text-slate-400 font-light tracking-wide">Coming Soon</p>
+                  <p className="text-xs text-slate-600 font-light mt-1">Q2 2026</p>
                 </div>
               </div>
-              
-              <div className="relative z-10 opacity-30">
+
+              <div className="relative z-10 opacity-25">
                 <div className="mb-8">
                   <h3 className="text-2xl font-light text-white mb-3">Nucigen Labs Pro</h3>
                   <p className="text-sm text-slate-400 font-light mb-6">
                     For professional teams and growing organizations.
                   </p>
                   
-                  <div className="flex items-baseline gap-2 mb-4">
-                    <span className="text-5xl text-white font-light">$XXX</span>
-                    <span className="text-slate-400 font-light">/ month</span>
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <span className="text-6xl text-white font-light tracking-tight">$XXX</span>
+                    <span className="text-slate-400 font-light text-lg">/ month</span>
                   </div>
                   
                   <p className="text-xs text-slate-500 font-light mb-6">
@@ -115,7 +131,7 @@ export default function PricingPreview() {
                   </p>
                 </div>
 
-                <div className="space-y-4 mb-8">
+                <div className="space-y-3.5 mb-8">
                   {[
                     'Everything in Intelligence, plus:',
                     'Team collaboration features',
@@ -127,32 +143,44 @@ export default function PricingPreview() {
                     'Dedicated account manager'
                   ].map((feature, idx) => (
                     <div key={idx} className="flex items-start gap-3">
-                      <Check size={18} className="text-[#E1463E] flex-shrink-0 mt-0.5" />
-                      <p className="text-sm text-slate-300 font-light leading-relaxed">{feature}</p>
+                      <div className="mt-0.5 flex-shrink-0">
+                        <Check size={18} className="text-[#E1463E]/30" />
+                      </div>
+                      <p className="text-sm text-slate-400 font-light leading-relaxed">{feature}</p>
                     </div>
                   ))}
                 </div>
 
                 <button
                   disabled
-                  className="w-full px-6 py-4 bg-white/[0.05] border border-white/10 text-slate-500 font-light rounded-lg text-sm tracking-wide mb-3 cursor-not-allowed opacity-50"
+                  className="w-full px-6 py-4 bg-white/[0.03] border border-white/5 text-slate-600 font-light rounded-lg text-sm tracking-wide mb-3 cursor-not-allowed"
                 >
                   Coming Soon
                 </button>
               </div>
             </div>
 
-            {/* Institutional Plan */}
-            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-2xl p-10 relative overflow-hidden">
-              <div className="relative z-10">
+            {/* Institutional Plan - Blurred/Coming Soon */}
+            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.06] to-white/[0.01] border border-white/[0.10] rounded-2xl p-10 relative overflow-hidden">
+              <div className="absolute inset-0 backdrop-blur-md bg-black/50 flex items-center justify-center z-20 rounded-2xl">
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-full bg-white/[0.05] border border-white/10 flex items-center justify-center mx-auto mb-4">
+                    <Lock size={24} className="text-slate-400" />
+                  </div>
+                  <p className="text-sm text-slate-400 font-light tracking-wide">Coming Soon</p>
+                  <p className="text-xs text-slate-600 font-light mt-1">Q3 2026</p>
+                </div>
+              </div>
+
+              <div className="relative z-10 opacity-25">
                 <div className="mb-8">
                   <h3 className="text-2xl font-light text-white mb-3">Nucigen Labs Enterprise</h3>
                   <p className="text-sm text-slate-400 font-light mb-6">
                     For institutions, funds, and organizations requiring strategic intelligence at scale.
                   </p>
                   
-                  <div className="flex items-baseline gap-2 mb-4">
-                    <span className="text-5xl text-white font-light">Custom</span>
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <span className="text-6xl text-white font-light tracking-tight">Custom</span>
                   </div>
                   
                   <p className="text-xs text-slate-500 font-light mb-6">
@@ -160,11 +188,13 @@ export default function PricingPreview() {
                   </p>
                 </div>
 
-                <div className="space-y-4 mb-8">
+                <div className="space-y-3.5 mb-8">
                   <div className="flex items-start gap-3">
-                    <Check size={18} className="text-[#E1463E] flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-slate-300 font-light leading-relaxed">
-                      <strong className="text-white">Everything in Intelligence, plus:</strong>
+                    <div className="mt-0.5 flex-shrink-0">
+                      <Check size={18} className="text-[#E1463E]/30" />
+                    </div>
+                    <p className="text-sm text-slate-400 font-light leading-relaxed">
+                      <strong className="text-white/30">Everything in Intelligence, plus:</strong>
                     </p>
                   </div>
                   
@@ -173,34 +203,28 @@ export default function PricingPreview() {
                     'API access for custom integrations',
                     'Dedicated intelligence analyst support',
                     'Custom event detection rules',
-                    { text: 'White-label reporting and dashboards', blurred: true },
+                    'White-label reporting and dashboards',
                     'Priority alpha window alerts',
                     'Quarterly strategic intelligence briefings',
                     'Custom supply chain mapping'
-                  ].map((feature, idx) => {
-                    const isBlurred = typeof feature === 'object' && feature.blurred;
-                    const featureText = typeof feature === 'string' ? feature : feature.text;
-                    
-                    return (
-                      <div key={idx} className={`flex items-start gap-3 ${isBlurred ? 'opacity-40 blur-sm' : ''}`}>
-                        <Check size={18} className="text-[#E1463E] flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-slate-300 font-light leading-relaxed">{featureText}</p>
+                  ].map((feature, idx) => (
+                    <div key={idx} className="flex items-start gap-3">
+                      <div className="mt-0.5 flex-shrink-0">
+                        <Check size={18} className="text-[#E1463E]/30" />
                       </div>
-                    );
-                  })}
+                      <p className="text-sm text-slate-400 font-light leading-relaxed">{feature}</p>
+                    </div>
+                  ))}
                 </div>
 
                 <button
-                  onClick={() => setShowInstitutionalModal(true)}
-                  className="w-full group relative px-6 py-4 bg-white/[0.08] hover:bg-white/[0.12] border border-white/20 hover:border-white/30 text-white font-light rounded-lg transition-all duration-300 text-sm tracking-wide mb-3"
+                  disabled
+                  className="w-full px-6 py-4 bg-white/[0.03] border border-white/5 text-slate-600 font-light rounded-lg text-sm tracking-wide mb-3 cursor-not-allowed"
                 >
-                  <span className="relative z-10 flex items-center justify-center gap-2">
-                    Request Institutional Access
-                    <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                  </span>
+                  Coming Soon
                 </button>
                 
-                <p className="text-xs text-slate-500 font-light text-center">
+                <p className="text-xs text-slate-600 font-light text-center">
                   Manual review process
                 </p>
               </div>
@@ -220,7 +244,7 @@ export default function PricingPreview() {
                   Why there is no direct competition
                 </p>
               </div>
-              
+
               <div className="space-y-8 text-left max-w-3xl mx-auto">
                 {/* Bloc 2 - Thèse centrale */}
                 <div>
@@ -238,8 +262,8 @@ export default function PricingPreview() {
                     <p className="text-base text-white font-light leading-relaxed">
                       <strong className="text-[#E1463E]">Nucigen</strong> is built for forward-looking interpretation.
                     </p>
-                  </div>
-                  
+              </div>
+
                   <div className="grid md:grid-cols-3 gap-4 pt-2">
                     <div className="text-center">
                       <p className="text-sm text-slate-400 font-light">Signals, not noise</p>
@@ -366,7 +390,7 @@ export default function PricingPreview() {
 
           <div className="grid md:grid-cols-3 gap-8">
             {/* Resolution-based pricing */}
-            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/[0.08] rounded-xl p-8 text-center">
+            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/[0.08] rounded-xl p-8 text-center hover:border-white/[0.12] transition-all duration-300">
               <div className="w-12 h-12 rounded-full bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center mx-auto mb-6">
                 <Zap size={24} className="text-[#E1463E]" />
               </div>
@@ -377,7 +401,7 @@ export default function PricingPreview() {
             </div>
 
             {/* Control built in */}
-            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/[0.08] rounded-xl p-8 text-center">
+            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/[0.08] rounded-xl p-8 text-center hover:border-white/[0.12] transition-all duration-300">
               <div className="w-12 h-12 rounded-full bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center mx-auto mb-6">
                 <Shield size={24} className="text-[#E1463E]" />
               </div>
@@ -388,7 +412,7 @@ export default function PricingPreview() {
             </div>
 
             {/* Value that compounds */}
-            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/[0.08] rounded-xl p-8 text-center">
+            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/[0.08] rounded-xl p-8 text-center hover:border-white/[0.12] transition-all duration-300">
               <div className="w-12 h-12 rounded-full bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center mx-auto mb-6">
                 <TrendingUp size={24} className="text-[#E1463E]" />
               </div>

@@ -1,51 +1,71 @@
-import { FileText, Lock } from 'lucide-react';
+import { useState } from 'react';
+import { FileText, Lock, X } from 'lucide-react';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
+import { submitAccessRequest } from '../lib/supabase';
+import Toast from '../components/Toast';
+import { useToast } from '../hooks/useToast';
 
 interface PapersProps {
   onRequestClearance?: () => void;
 }
 
 export default function Papers({ onRequestClearance }: PapersProps) {
+  const [showApplicationForm, setShowApplicationForm] = useState(false);
+  const [selectedPaper, setSelectedPaper] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    role: '',
+    company: '',
+    researchInterests: '',
+    intendedUse: '',
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast, showToast, hideToast } = useToast();
+
   const researchCategories = [
     {
       title: 'Causal Modeling',
-      items: ['Event → Industry → Supply → Market', 'Nonlinear propagation', 'Shock amplification']
+      items: ['Causal Discovery & Graphs', 'Bayesian Networks', 'Event → Industry → Supply → Market', 'Nonlinear propagation']
     },
     {
       title: 'Geopolitical Systems',
-      items: ['Sanctions', 'Defense alliances', 'Mining concessions', 'Energy treaties']
+      items: ['Statecraft', 'Mining & Extraction', 'Energy Futures', 'Sanctions', 'Defense alliances']
     },
     {
       title: 'Industrial Chain Intelligence',
-      items: ['Upstream capacity modeling', 'Bottleneck detection', 'OEM dependency graphs']
+      items: ['Industrial Propagation', 'Economic Resilience', 'Supply Chain Mapping', 'Bottleneck detection']
     },
     {
       title: 'Supply Corridor Dynamics',
-      items: ['Ports', 'Pipelines', 'Rail networks', 'Maritime chokepoints']
+      items: ['Trade', 'Logistics', 'Infrastructure', 'Maritime Transport', 'Ports & Pipelines']
     },
     {
       title: 'Alpha Window Theory',
-      items: ['Latency between cause and price', 'Structural vs speculative alpha', 'Narrative decay modeling']
+      items: ['Company Embedded Value', 'Market Structure', 'DRG & Alpha Propagation', 'Quantitative Forecasting']
     }
   ];
 
   const publicPapers = [
     {
-      title: 'Alpha Windows in Strategic Commodities',
-      subtitle: 'Latency between geopolitical shock and industrial repricing',
-      abstract: 'This paper models the temporal gap between upstream geopolitical interventions and downstream market repricing across energy and transition metals.',
-      tags: ['Alpha Windows', 'Mining', 'Energy', 'Macroeconomics']
+      id: 'alpha-windows',
+      title: 'Alpha Windows In Strategic Commodities',
+      subtitle: 'Latent windows geopolitical shock and industrial reasoning.',
+      abstract: 'This paper models the temporal gap between upstream geopolitical events, energy and transport markets.',
+      tags: ['Energy Markets', 'Mining', 'Geopolitics', 'Macroeconomics']
     },
     {
+      id: 'causal-graphs',
       title: 'Causal Graphs for Supply Chain Disruption',
-      subtitle: 'Graph-based modeling of shock propagation',
-      abstract: 'Graph-based modeling of shock propagation inside multi-tier industrial supply chains.',
-      tags: ['Supply Graphs', 'Logistics', 'AI Modeling']
+      subtitle: 'Graph-based modeling of shock propagation.',
+      abstract: 'Graph-based modeling on shock propagation across multi-tier industrial supply chains.',
+      tags: ['Causal Graphs', 'Logistics', 'AI Modeling']
     },
     {
+      id: 'political-volatility',
       title: 'The Political Origin of Market Volatility',
-      subtitle: 'Political causation as primary driver',
+      subtitle: 'Markets do not move randomly. This paper identifies political causation as the primary driver of structural volatility.',
       abstract: 'Markets do not move randomly. This paper identifies political causation as the primary driver of structural volatility.',
       tags: ['Geopolitics', 'Market Structure', 'Volatility']
     }
@@ -61,29 +81,98 @@ export default function Papers({ onRequestClearance }: PapersProps) {
   const researchPipeline = [
     'Global event ingestion',
     'Linguistic event extraction',
-    'Political classification',
+    'Pattern classification',
     'Industrial impact mapping',
-    'Supply-chain propagation',
+    'Supply chain propagation',
     'Asset exposure scoring',
     'Alpha window detection'
   ];
 
+  const handleApplicationClick = (paperId: string) => {
+    setSelectedPaper(paperId);
+    setShowApplicationForm(true);
+  };
+
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.name || !formData.email) {
+      showToast('Name and email are required', 'error');
+      return;
+    }
+
+    if (!validateEmail(formData.email)) {
+      showToast('Please enter a valid email address', 'error');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await submitAccessRequest({
+        email: formData.email.toLowerCase().trim(),
+        role: formData.role || undefined,
+        company: formData.company || undefined,
+        intended_use: `Research access request for: ${selectedPaper || 'general papers'}. Interests: ${formData.researchInterests || 'N/A'}. Intended use: ${formData.intendedUse || 'N/A'}`,
+        source_page: 'papers',
+      });
+
+      showToast('Application submitted successfully. We will review your request and contact you soon.', 'success');
+      setFormData({
+        name: '',
+        email: '',
+        role: '',
+        company: '',
+        researchInterests: '',
+        intendedUse: '',
+      });
+      setShowApplicationForm(false);
+      setSelectedPaper(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to submit application';
+      showToast(message, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <main className="min-h-screen">
       <SEO
-        title="Papers — Nucigen Labs Labs"
+        title="Papers — Nucigen Labs"
         description="The causal layer beneath the markets. Original research on geopolitical causality, industrial propagation, and systemic market consequences."
       />
 
+      {toast.isVisible && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={hideToast}
+        />
+      )}
+
       <section className="relative min-h-screen px-6 py-32">
         <div className="max-w-6xl mx-auto w-full">
+          {/* Hero Section */}
           <div className="text-center mb-24 max-w-5xl mx-auto">
             <h1 className="text-5xl md:text-7xl lg:text-8xl font-light mb-12 leading-[1.1] text-white">
               The causal layer beneath the markets.
             </h1>
 
             <p className="text-lg md:text-xl text-slate-400 leading-relaxed font-light mb-12">
-              Nucigen Labs Labs publishes original research on geopolitical causality, industrial propagation, and systemic market consequences.
+              Nucigen Labs publishes original research on geopolitical causality, industrial propagation, and systemic sequences.
             </p>
 
             {onRequestClearance && (
@@ -91,21 +180,18 @@ export default function Papers({ onRequestClearance }: PapersProps) {
                 onClick={onRequestClearance}
                 className="px-8 py-3.5 bg-white/[0.04] hover:bg-white/[0.07] border border-white/20 hover:border-white/30 text-white font-light rounded-md transition-all duration-300 text-sm tracking-wide"
               >
-                Request Research Access
+                Access Research
               </button>
             )}
-
-            <p className="text-xs text-slate-600 font-light mt-8">
-              Some papers are public. Strategic research requires clearance.
-            </p>
           </div>
 
+          {/* Research Categories */}
           <div className="mb-32">
-            <p className="text-xs text-slate-600 mb-16 text-center tracking-[0.3em] font-normal">RESEARCH CATEGORIES</p>
+            <p className="text-xs text-slate-600 mb-12 text-center tracking-[0.3em] font-normal uppercase">Research Categories</p>
 
-            <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-6">
+            <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-4">
               {researchCategories.map((category, idx) => (
-                <div key={idx} className="backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded-lg p-6">
+                <div key={idx} className="backdrop-blur-xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.08] rounded-lg p-6 hover:border-white/[0.12] transition-all">
                   <h3 className="text-base text-white font-light mb-4">{category.title}</h3>
                   <ul className="space-y-2">
                     {category.items.map((item, itemIdx) => (
@@ -119,8 +205,9 @@ export default function Papers({ onRequestClearance }: PapersProps) {
             </div>
           </div>
 
+          {/* Featured Papers */}
           <div className="mb-32">
-            <p className="text-xs text-slate-600 mb-16 text-center tracking-[0.3em] font-normal">FEATURED PAPERS — PUBLIC</p>
+            <p className="text-xs text-slate-600 mb-12 text-center tracking-[0.3em] font-normal uppercase">Featured Papers</p>
 
             <div className="grid md:grid-cols-1 gap-6 max-w-4xl mx-auto">
               {publicPapers.map((paper, idx) => (
@@ -147,72 +234,227 @@ export default function Papers({ onRequestClearance }: PapersProps) {
                     ))}
                   </div>
 
-                  <div className="flex gap-3">
-                    <button className="px-4 py-2 bg-white/[0.05] hover:bg-white/[0.08] border border-white/[0.10] hover:border-white/[0.15] text-white text-xs font-light rounded-md transition-all">
-                      View Abstract
-                    </button>
-                    <button className="px-4 py-2 bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] hover:border-white/[0.12] text-slate-400 hover:text-white text-xs font-light rounded-md transition-all">
-                      Download
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => handleApplicationClick(paper.id)}
+                    className="px-6 py-3 bg-[#E1463E]/10 hover:bg-[#E1463E]/20 border border-[#E1463E]/20 hover:border-[#E1463E]/30 text-[#E1463E] text-sm font-light rounded-md transition-all"
+                  >
+                    Apply for Access
+                  </button>
                 </div>
               ))}
             </div>
           </div>
 
+          {/* Application Form Modal */}
+          {showApplicationForm && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+              <div
+                className="absolute inset-0 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+                onClick={() => {
+                  setShowApplicationForm(false);
+                  setSelectedPaper(null);
+                }}
+              />
+
+              <div className="relative w-full max-w-2xl backdrop-blur-2xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-2xl shadow-2xl animate-in zoom-in-95 fade-in duration-300">
+                <div className="flex items-center justify-between p-8 border-b border-white/[0.08]">
+                  <div>
+                    <h2 className="text-2xl font-light text-white tracking-tight mb-2">Research Access Application</h2>
+                    <p className="text-sm text-slate-400 font-light">
+                      Submit your application to access research papers. All applications are reviewed manually.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowApplicationForm(false);
+                      setSelectedPaper(null);
+                    }}
+                    className="text-slate-400 hover:text-white transition-colors p-2 hover:bg-white/[0.05] rounded-lg"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleFormSubmit} className="p-8">
+                  <div className="space-y-6">
+                    <div>
+                      <label htmlFor="name" className="block text-sm text-slate-300 font-light mb-2">
+                        Full Name <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        id="name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleFormChange}
+                        disabled={isSubmitting}
+                        placeholder="John Doe"
+                        className="w-full px-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-white/30 transition-all text-sm font-light disabled:opacity-50"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="email" className="block text-sm text-slate-300 font-light mb-2">
+                        Email <span className="text-red-400">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleFormChange}
+                        disabled={isSubmitting}
+                        placeholder="your@company.com"
+                        className="w-full px-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-white/30 transition-all text-sm font-light disabled:opacity-50"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="role" className="block text-sm text-slate-300 font-light mb-2">
+                        Role / Position
+                      </label>
+                      <input
+                        type="text"
+                        id="role"
+                        name="role"
+                        value={formData.role}
+                        onChange={handleFormChange}
+                        disabled={isSubmitting}
+                        placeholder="e.g., Researcher, Analyst, Fund Manager"
+                        className="w-full px-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-white/30 transition-all text-sm font-light disabled:opacity-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="company" className="block text-sm text-slate-300 font-light mb-2">
+                        Institution / Company
+                      </label>
+                      <input
+                        type="text"
+                        id="company"
+                        name="company"
+                        value={formData.company}
+                        onChange={handleFormChange}
+                        disabled={isSubmitting}
+                        placeholder="Your organization"
+                        className="w-full px-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-white/30 transition-all text-sm font-light disabled:opacity-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="researchInterests" className="block text-sm text-slate-300 font-light mb-2">
+                        Research Interests
+                      </label>
+                      <textarea
+                        id="researchInterests"
+                        name="researchInterests"
+                        value={formData.researchInterests}
+                        onChange={handleFormChange}
+                        disabled={isSubmitting}
+                        placeholder="What areas of research are you most interested in? (e.g., Geopolitical Systems, Causal Modeling, Supply Chain Dynamics)"
+                        rows={3}
+                        className="w-full px-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-white/30 transition-all text-sm font-light disabled:opacity-50 resize-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="intendedUse" className="block text-sm text-slate-300 font-light mb-2">
+                        Intended Use
+                      </label>
+                      <textarea
+                        id="intendedUse"
+                        name="intendedUse"
+                        value={formData.intendedUse}
+                        onChange={handleFormChange}
+                        disabled={isSubmitting}
+                        placeholder="How do you plan to use this research? (e.g., Academic research, Investment analysis, Strategic planning)"
+                        rows={3}
+                        className="w-full px-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-white/30 transition-all text-sm font-light disabled:opacity-50 resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 mt-8 pt-6 border-t border-white/[0.08]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowApplicationForm(false);
+                        setSelectedPaper(null);
+                      }}
+                      disabled={isSubmitting}
+                      className="flex-1 px-6 py-3 border border-white/20 hover:border-white/40 hover:bg-white/[0.05] rounded-lg text-white text-sm font-light transition-all disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="flex-1 px-6 py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-150 hover:scale-105 hover:shadow-[0_0_25px_rgba(225,70,62,0.35)] text-sm tracking-wide disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    >
+                      {isSubmitting ? 'Submitting...' : 'Submit Application'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* Restricted Research */}
           <div className="mb-32 max-w-4xl mx-auto">
-            <p className="text-xs text-slate-600 mb-16 text-center tracking-[0.3em] font-normal">RESTRICTED RESEARCH</p>
+            <p className="text-xs text-slate-600 mb-12 text-center tracking-[0.3em] font-normal uppercase">Restricted Research</p>
 
             <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.02] to-white/[0.01] border border-white/[0.08] rounded-lg p-12 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/60 to-black/40 backdrop-blur-md z-10"></div>
-
-              <div className="relative z-0 blur-sm select-none">
+              {/* Blurred Content Behind */}
+              <div className="absolute inset-0 p-8 z-0">
                 <div className="space-y-4">
                   {restrictedPapers.map((paper, idx) => (
-                    <div key={idx} className="p-4 bg-white/[0.05] border border-white/[0.08] rounded-md">
+                    <div key={idx} className="p-4 bg-white/[0.05] border border-white/[0.08] rounded-md blur-sm select-none pointer-events-none">
                       <p className="text-sm text-slate-300 font-light">{paper}</p>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="absolute inset-0 flex flex-col items-center justify-center z-20">
-                <Lock size={32} className="text-slate-400 mb-4" />
-                <p className="text-lg text-white font-light mb-2">Restricted Research</p>
-                <p className="text-sm text-slate-400 font-light mb-6 text-center max-w-md">
-                  These papers require institutional clearance.<br />
-                  Not accessible to retail accounts.
+              {/* Overlay Content */}
+              <div className="relative z-10 flex flex-col items-center justify-center min-h-[300px]">
+                <Lock size={40} className="text-slate-400 mb-6" />
+                <h3 className="text-xl text-white font-light mb-3">Restricted Research</h3>
+                <p className="text-sm text-slate-400 font-light mb-8 text-center max-w-md">
+                  These reports require research accounts. Not accessible to retail users.
                 </p>
                 {onRequestClearance && (
                   <button
                     onClick={onRequestClearance}
                     className="px-6 py-3 bg-white/[0.08] hover:bg-white/[0.12] border border-white/20 hover:border-white/30 text-white font-light rounded-md transition-all text-sm tracking-wide"
                   >
-                    Request Clearance
+                    Request Clearances
                   </button>
                 )}
               </div>
             </div>
           </div>
 
+          {/* Scientific Pipeline */}
           <div className="mb-32 max-w-4xl mx-auto">
-            <p className="text-xs text-slate-600 mb-16 text-center tracking-[0.3em] font-normal">THE NUCIGEN RESEARCH METHOD</p>
+            <p className="text-xs text-slate-600 mb-12 text-center tracking-[0.3em] font-normal uppercase">The Nucigen Research Method</p>
 
-            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded-lg p-10">
-              <h3 className="text-2xl text-white font-light mb-8 text-center">Scientific Pipeline</h3>
+            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.08] rounded-lg p-10">
+              <h3 className="text-2xl text-white font-light mb-10 text-center">Scientific Pipeline</h3>
 
-              <div className="space-y-4">
+              <div className="space-y-6 mb-10">
                 {researchPipeline.map((step, idx) => (
                   <div key={idx} className="flex items-center gap-4">
-                    <div className="w-8 h-8 rounded-full bg-white/[0.05] border border-white/10 flex items-center justify-center flex-shrink-0">
-                      <span className="text-slate-400 text-sm font-light">{idx + 1}</span>
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-sm font-light">{idx + 1}</span>
                     </div>
                     <p className="text-base text-slate-300 font-light">{step}</p>
                   </div>
                 ))}
               </div>
 
-              <div className="mt-12 pt-8 border-t border-white/[0.08]">
+              <div className="pt-8 border-t border-white/[0.08]">
                 <p className="text-lg text-white font-light text-center">
                   Price is an output. Causality is the input.
                 </p>
@@ -220,56 +462,65 @@ export default function Papers({ onRequestClearance }: PapersProps) {
             </div>
           </div>
 
+          {/* What Makes Nucigen Different */}
           <div className="mb-32 max-w-4xl mx-auto">
-            <p className="text-xs text-slate-600 mb-16 text-center tracking-[0.3em] font-normal">WHAT MAKES NUCIGEN RESEARCH DIFFERENT</p>
+            <p className="text-xs text-slate-600 mb-12 text-center tracking-[0.3em] font-normal uppercase">What Makes Nucigen Research Different</p>
 
-            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-white/[0.08]">
-                    <th className="text-left p-6 text-sm text-slate-400 font-light">Traditional Finance Research</th>
-                    <th className="text-left p-6 text-sm text-white font-light">Nucigen Labs Labs</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    ['Price-based', 'Event-based'],
-                    ['Historical correlation', 'Causal modeling'],
-                    ['Signal processing', 'Structural impact'],
-                    ['Reactive', 'Pre-emptive']
-                  ].map((row, idx) => (
-                    <tr key={idx} className="border-b border-white/[0.05] last:border-0">
-                      <td className="p-6 text-sm text-slate-500 font-light">{row[0]}</td>
-                      <td className="p-6 text-sm text-slate-300 font-light">{row[1]}</td>
-                    </tr>
+            <div className="grid md:grid-cols-2 gap-6 mb-8">
+              {/* Traditional Finance Research */}
+              <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded-lg p-8">
+                <h3 className="text-lg text-slate-400 font-light mb-6">Traditional Finance Research</h3>
+                <ul className="space-y-3">
+                  {['Price-based', 'Heuristic correlation', 'Signal processing', 'Reactive'].map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-slate-500 mt-2 flex-shrink-0"></div>
+                      <p className="text-sm text-slate-500 font-light">{item}</p>
+                    </li>
                   ))}
-                </tbody>
-              </table>
+                </ul>
+              </div>
+
+              {/* Nucigen Labs */}
+              <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.12] rounded-lg p-8">
+                <h3 className="text-lg text-white font-light mb-6">Nucigen Labs</h3>
+                <ul className="space-y-3">
+                  {['Event-based', 'Causal modeling', 'Structured finance', 'Predictive'].map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#E1463E] mt-2 flex-shrink-0"></div>
+                      <p className="text-sm text-slate-300 font-light">{item}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
 
-            <p className="text-lg text-white font-light text-center mt-8">
+            <p className="text-lg text-white font-light text-center">
               We don't analyze markets. We analyze reality.
             </p>
           </div>
 
+          {/* Who These Papers Are For */}
           <div className="mb-32 max-w-4xl mx-auto">
-            <p className="text-xs text-slate-600 mb-16 text-center tracking-[0.3em] font-normal">WHO THESE PAPERS ARE FOR</p>
+            <p className="text-xs text-slate-600 mb-12 text-center tracking-[0.3em] font-normal uppercase">Who These Papers Are For</p>
 
-            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded-lg p-10">
-              <div className="grid md:grid-cols-2 gap-8 mb-10">
-                {[
-                  'Strategic analysts',
-                  'Hedge funds',
-                  'Energy & mining desks',
-                  'Governments',
-                  'Infrastructure operators',
-                  'Defense-linked industries'
-                ].map((audience, idx) => (
-                  <div key={idx} className="flex items-center gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div>
-                    <p className="text-base text-slate-300 font-light">{audience}</p>
-                  </div>
-                ))}
+            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.08] rounded-lg p-10">
+              <div className="grid md:grid-cols-2 gap-6 mb-8">
+                <div className="space-y-3">
+                  {['Strategic analysts', 'Energy & trading desks', 'Infrastructure operators'].map((audience, idx) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div>
+                      <p className="text-base text-slate-300 font-light">{audience}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-3">
+                  {['Hedge funds', 'Sovereign wealth funds', 'Defense-linked industries'].map((audience, idx) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div>
+                      <p className="text-base text-slate-300 font-light">{audience}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <p className="text-base text-slate-400 font-light text-center italic">
@@ -278,17 +529,13 @@ export default function Papers({ onRequestClearance }: PapersProps) {
             </div>
           </div>
 
+          {/* Research Access Policy */}
           <div className="mb-32 max-w-4xl mx-auto">
-            <p className="text-xs text-slate-600 mb-16 text-center tracking-[0.3em] font-normal">RESEARCH ACCESS POLICY</p>
+            <p className="text-xs text-slate-600 mb-12 text-center tracking-[0.3em] font-normal uppercase">Research Access Policy</p>
 
-            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.02] to-white/[0.01] border border-white/[0.08] rounded-lg p-10">
-              <ul className="space-y-4 mb-8">
-                {[
-                  'No anonymous research access',
-                  'No free institutional usage',
-                  'Manual validation only',
-                  'Misuse leads to permanent ban'
-                ].map((policy, idx) => (
+            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.08] rounded-lg p-10">
+              <ul className="space-y-4 mb-10">
+                {['No anonymous research access', 'No free institutional usage', 'Manual validation only'].map((policy, idx) => (
                   <li key={idx} className="flex items-start gap-3">
                     <div className="w-1.5 h-1.5 rounded-full bg-red-600/60 mt-2 flex-shrink-0"></div>
                     <p className="text-base text-slate-400 font-light">{policy}</p>
@@ -296,12 +543,34 @@ export default function Papers({ onRequestClearance }: PapersProps) {
                 ))}
               </ul>
 
+              {/* Access Request Bar */}
+              <div className="flex items-center justify-between gap-4 p-4 bg-white/[0.02] border border-white/[0.08] rounded-lg mb-6">
+                <div className="text-sm text-slate-500 font-light">NUCIGEN</div>
+                <div className="flex items-center gap-2">
+                  <button className="px-4 py-2 bg-white/[0.05] border border-white/[0.10] text-white text-xs font-light rounded-md">
+                    Researcher
+                  </button>
+                  <button className="px-4 py-2 bg-white/[0.02] border border-white/[0.08] text-slate-400 text-xs font-light rounded-md hover:bg-white/[0.05] transition-all">
+                    Analyst
+                  </button>
+                </div>
+                {onRequestClearance && (
+                  <button
+                    onClick={onRequestClearance}
+                    className="px-6 py-2.5 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white text-xs font-light rounded-md transition-all tracking-wide"
+                  >
+                    Request Access
+                  </button>
+                )}
+              </div>
+
               <p className="text-lg text-white font-light text-center">
                 Intelligence is earned, not consumed.
               </p>
             </div>
           </div>
 
+          {/* Closing Statement */}
           <div className="text-center py-16 border-y border-white/[0.10]">
             <p className="text-2xl md:text-4xl font-light leading-relaxed text-slate-300">
               Retail reads headlines.<br />
