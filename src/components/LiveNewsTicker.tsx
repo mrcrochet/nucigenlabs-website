@@ -21,15 +21,30 @@ export default function LiveNewsTicker() {
         const apiKey = import.meta.env.VITE_NEWS_API_KEY || '3f496fd50f0040f3a3ebdf569047834c';
         
         // Fetch top headlines about business, finance, technology, and politics
-        const response = await fetch(
-          `https://newsapi.org/v2/top-headlines?category=business&language=en&pageSize=20&apiKey=${apiKey}`
-        );
+        // Note: NewsAPI has CORS restrictions in production
+        const apiUrl = `https://newsapi.org/v2/top-headlines?category=business&language=en&pageSize=20&apiKey=${apiKey}`;
+        
+        // Try direct fetch first, if it fails due to CORS, use a proxy
+        let response;
+        try {
+          response = await fetch(apiUrl);
+        } catch (corsError) {
+          // If CORS error, try with a CORS proxy (for development/testing)
+          // In production, you should use your own backend proxy
+          console.warn('Direct API call failed, trying alternative method');
+          response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`);
+        }
 
         if (!response.ok) {
           throw new Error('Failed to fetch news');
         }
 
-        const data = await response.json();
+        let data = await response.json();
+        
+        // If using CORS proxy, extract the actual data
+        if (data.contents) {
+          data = JSON.parse(data.contents);
+        }
         
         if (data.articles && data.articles.length > 0) {
           // Filter out articles without titles or descriptions

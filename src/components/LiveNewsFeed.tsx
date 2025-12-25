@@ -92,15 +92,31 @@ export default function LiveNewsFeed() {
         const apiKey = import.meta.env.VITE_NEWS_API_KEY || '3f496fd50f0040f3a3ebdf569047834c';
         
         // Fetch business and technology news
-        const response = await fetch(
-          `https://newsapi.org/v2/top-headlines?category=business&language=en&pageSize=30&apiKey=${apiKey}`
-        );
+        // Note: NewsAPI has CORS restrictions in production, so we use a proxy approach
+        // In production, you may need to use a backend proxy or CORS proxy
+        const apiUrl = `https://newsapi.org/v2/top-headlines?category=business&language=en&pageSize=30&apiKey=${apiKey}`;
+        
+        // Try direct fetch first, if it fails due to CORS, use a proxy
+        let response;
+        try {
+          response = await fetch(apiUrl);
+        } catch (corsError) {
+          // If CORS error, try with a CORS proxy (for development/testing)
+          // In production, you should use your own backend proxy
+          console.warn('Direct API call failed, trying alternative method');
+          response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`);
+        }
 
         if (!response.ok) {
           throw new Error('Failed to fetch news');
         }
 
-        const data = await response.json();
+        let data = await response.json();
+        
+        // If using CORS proxy, extract the actual data
+        if (data.contents) {
+          data = JSON.parse(data.contents);
+        }
         
         if (data.articles && data.articles.length > 0) {
           // Filter and transform articles into NewsItems
@@ -255,8 +271,18 @@ function NewsCard({ item }: { item: NewsItem }) {
     return '1d ago';
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+    if (item.url && item.url !== '#') {
+      e.preventDefault();
+      window.open(item.url, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   return (
-    <div className="flex-shrink-0 w-[800px] flex items-center gap-4 backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/[0.08] hover:border-white/[0.15] rounded-xl p-5 transition-all duration-300 hover:shadow-lg hover:shadow-white/[0.05] group">
+    <div 
+      onClick={handleClick}
+      className={`flex-shrink-0 w-[800px] flex items-center gap-4 backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/[0.08] hover:border-white/[0.15] rounded-xl p-5 transition-all duration-300 hover:shadow-lg hover:shadow-white/[0.05] group ${item.url && item.url !== '#' ? 'cursor-pointer' : ''}`}
+    >
       {/* NEWS DETECTED Section */}
       <div className="flex-1 flex items-start gap-3">
         <div className="w-10 h-10 rounded-lg bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center flex-shrink-0 group-hover:bg-[#E1463E]/30 transition-colors">
