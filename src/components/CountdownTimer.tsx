@@ -9,7 +9,7 @@ export default function CountdownTimer() {
   });
 
   useEffect(() => {
-    const targetDate = new Date('2026-01-30T15:00:00Z'); // January 30, 2026 at 15:00 UTC
+    const targetDate = new Date('2025-01-30T15:00:00Z'); // January 30, 2025 at 15:00 UTC
 
     const updateTimer = () => {
       const now = new Date().getTime();
@@ -22,20 +22,10 @@ export default function CountdownTimer() {
           minutes: Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60)),
           seconds: Math.floor((distance % (1000 * 60)) / 1000)
         });
-      } else {
-        // If countdown is over, set all to 0
-        setTimeLeft({
-          days: 0,
-          hours: 0,
-          minutes: 0,
-          seconds: 0
-        });
       }
     };
 
-    // Update immediately
     updateTimer();
-    // Then update every second
     const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);
@@ -47,34 +37,34 @@ export default function CountdownTimer() {
         <div className="text-3xl md:text-4xl font-light text-white tabular-nums tracking-tight">
           {timeLeft.days.toString().padStart(2, '0')}
         </div>
-        <div className="text-[8px] md:text-[9px] text-slate-500 tracking-[0.3em] font-light mt-1">DAYS</div>
+        <div className="text-[8px] md:text-[9px] text-slate-700 tracking-[0.3em] font-light mt-1">DAYS</div>
       </div>
 
-      <div className="text-2xl md:text-3xl text-slate-600 font-extralight pb-3">|</div>
+      <div className="text-2xl md:text-3xl text-slate-800 font-extralight pb-3">|</div>
 
       <div className="text-center">
         <div className="text-3xl md:text-4xl font-light text-white tabular-nums tracking-tight">
           {timeLeft.hours.toString().padStart(2, '0')}
         </div>
-        <div className="text-[8px] md:text-[9px] text-slate-500 tracking-[0.3em] font-light mt-1">HOURS</div>
+        <div className="text-[8px] md:text-[9px] text-slate-700 tracking-[0.3em] font-light mt-1">HOURS</div>
       </div>
 
-      <div className="text-2xl md:text-3xl text-slate-600 font-extralight pb-3">|</div>
+      <div className="text-2xl md:text-3xl text-slate-800 font-extralight pb-3">|</div>
 
       <div className="text-center">
         <div className="text-3xl md:text-4xl font-light text-white tabular-nums tracking-tight">
           {timeLeft.minutes.toString().padStart(2, '0')}
         </div>
-        <div className="text-[8px] md:text-[9px] text-slate-500 tracking-[0.3em] font-light mt-1">MINUTES</div>
+        <div className="text-[8px] md:text-[9px] text-slate-700 tracking-[0.3em] font-light mt-1">MINUTES</div>
       </div>
 
-      <div className="text-2xl md:text-3xl text-slate-600 font-extralight pb-3">|</div>
+      <div className="text-2xl md:text-3xl text-slate-800 font-extralight pb-3">|</div>
 
       <div className="text-center">
         <div className="text-3xl md:text-4xl font-light text-white tabular-nums tracking-tight">
           {timeLeft.seconds.toString().padStart(2, '0')}
         </div>
-        <div className="text-[8px] md:text-[9px] text-slate-500 tracking-[0.3em] font-light mt-1">SECONDS</div>
+        <div className="text-[8px] md:text-[9px] text-slate-700 tracking-[0.3em] font-light mt-1">SECONDS</div>
       </div>
     </div>
   );
