@@ -44,24 +44,50 @@ async function fetchLevelNews(levelSlug: string): Promise<NewsArticle[]> {
     const apiKey = import.meta.env.VITE_NEWS_API_KEY || '3f496fd50f0040f3a3ebdf569047834c';
     const apiUrl = `https://newsapi.org/v2/top-headlines?category=business&language=en&pageSize=50&apiKey=${apiKey}`;
     
+    // In production, use CORS proxy directly to avoid CORS issues
+    const isProduction = import.meta.env.PROD;
     let response;
-    try {
-      response = await fetch(apiUrl);
-    } catch (corsError) {
-      console.warn('Direct API call failed, trying alternative method');
-      response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`);
-    }
+    let data;
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch news');
-    }
-
-    let data = await response.json();
-    if (data.contents) {
-      data = JSON.parse(data.contents);
+    if (isProduction) {
+      // Use CORS proxy directly in production
+      try {
+        response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`);
+        if (!response.ok) {
+          throw new Error('Proxy request failed');
+        }
+        const proxyData = await response.json();
+        data = proxyData.contents ? JSON.parse(proxyData.contents) : proxyData;
+      } catch (proxyError) {
+        console.error('CORS proxy failed:', proxyError);
+        // Fallback: try direct call as last resort
+        try {
+          response = await fetch(apiUrl);
+          if (!response.ok) throw new Error('Direct API call failed');
+          data = await response.json();
+        } catch (directError) {
+          console.error('All fetch methods failed:', directError);
+          return [];
+        }
+      }
+    } else {
+      // In development, try direct first, then proxy
+      try {
+        response = await fetch(apiUrl);
+        if (!response.ok) throw new Error('Direct API call failed');
+        data = await response.json();
+      } catch (corsError) {
+        console.warn('Direct API call failed, using CORS proxy');
+        response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`);
+        if (!response.ok) {
+          throw new Error('Proxy request failed');
+        }
+        const proxyData = await response.json();
+        data = proxyData.contents ? JSON.parse(proxyData.contents) : proxyData;
+      }
     }
     
-    if (data.articles && data.articles.length > 0) {
+    if (data && data.articles && data.articles.length > 0) {
       const filteredArticles = data.articles.filter((article: NewsArticle) => {
         if (!article.title || !article.description) return false;
         if (article.title.includes('[Removed]')) return false;
@@ -422,32 +448,55 @@ export default function FourLevels() {
                             key={articleIdx}
                             className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/[0.08] rounded-lg p-4 hover:border-white/[0.15] transition-all"
                           >
-                            <div className="flex items-start justify-between gap-3 mb-2">
-                              <h4 className="text-sm font-light text-white leading-snug flex-1">
-                                {article.title}
-                              </h4>
-                              {article.url && article.url !== '#' && (
-                                <a
-                                  href={article.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="flex-shrink-0 text-[#E1463E] hover:text-[#E1463E]/80 transition-colors"
-                                  aria-label="Read full article"
-                                >
-                                  <ExternalLink size={16} />
-                                </a>
-                              )}
-                            </div>
-                            {article.description && (
-                              <p className="text-xs text-slate-400 font-light leading-relaxed mb-2 line-clamp-2">
-                                {article.description}
-                              </p>
-                            )}
-                            {article.source && (
-                              <p className="text-[10px] text-slate-600 font-light">
-                                {article.source.name}
-                              </p>
+                            {article.url && article.url !== '#' ? (
+                              <a
+                                href={article.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Ensure the link opens even if there are issues
+                                  if (!e.defaultPrevented) {
+                                    window.open(article.url, '_blank', 'noopener,noreferrer');
+                                  }
+                                }}
+                                className="block"
+                              >
+                                <div className="flex items-start justify-between gap-3 mb-2">
+                                  <h4 className="text-sm font-light text-white leading-snug flex-1 hover:text-[#E1463E] transition-colors">
+                                    {article.title}
+                                  </h4>
+                                  <ExternalLink size={16} className="flex-shrink-0 text-[#E1463E] mt-0.5" />
+                                </div>
+                                {article.description && (
+                                  <p className="text-xs text-slate-400 font-light leading-relaxed mb-2 line-clamp-2">
+                                    {article.description}
+                                  </p>
+                                )}
+                                {article.source && (
+                                  <p className="text-[10px] text-slate-600 font-light">
+                                    {article.source.name}
+                                  </p>
+                                )}
+                              </a>
+                            ) : (
+                              <>
+                                <div className="flex items-start justify-between gap-3 mb-2">
+                                  <h4 className="text-sm font-light text-white leading-snug flex-1">
+                                    {article.title}
+                                  </h4>
+                                </div>
+                                {article.description && (
+                                  <p className="text-xs text-slate-400 font-light leading-relaxed mb-2 line-clamp-2">
+                                    {article.description}
+                                  </p>
+                                )}
+                                {article.source && (
+                                  <p className="text-[10px] text-slate-600 font-light">
+                                    {article.source.name}
+                                  </p>
+                                )}
+                              </>
                             )}
                           </div>
                         ))
