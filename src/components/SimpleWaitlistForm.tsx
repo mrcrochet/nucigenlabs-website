@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Mail } from 'lucide-react';
-import { submitAccessRequest } from '../lib/supabase';
-import { sendEarlyAccessConfirmationEmail } from '../lib/email';
+import { submitAccessRequest, createVerificationCode } from '../lib/supabase';
+import { sendEarlyAccessConfirmationEmail, sendVerificationCodeEmail } from '../lib/email';
 import Toast from './Toast';
 import { useToast } from '../hooks/useToast';
 import EmailRecoveryModal from './EmailRecoveryModal';
+import EmailVerificationCode from './EmailVerificationCode';
 
 interface SimpleWaitlistFormProps {
   variant?: 'inline' | 'modal' | 'section';
@@ -18,6 +19,7 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
   const [name, setName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const [showVerification, setShowVerification] = useState(false);
   const { toast, showToast, hideToast } = useToast();
 
   const validateEmail = (email: string) => {
@@ -43,9 +45,34 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
     try {
       const emailLower = email.toLowerCase().trim();
       
+      // Create and send verification code
+      const code = await createVerificationCode(emailLower);
+      await sendVerificationCodeEmail({
+        to: emailLower,
+        code,
+        name: name || undefined,
+      });
+
+      showToast('Verification code sent! Check your email.', 'success');
+      setShowVerification(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to send verification code';
+      showToast(message, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleEmailVerified = async () => {
+    setIsSubmitting(true);
+
+    try {
+      const emailLower = email.toLowerCase().trim();
+      
       // Submit to Supabase (simple waitlist entry)
       await submitAccessRequest({
         email: emailLower,
+        name: name || undefined,
         company: name || undefined,
         source_page: 'waitlist',
       });
@@ -73,6 +100,40 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
     }
   };
 
+  // Show verification code input if verification is needed
+  if (showVerification) {
+    return (
+      <div className={className}>
+        {toast.isVisible && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={hideToast}
+          />
+        )}
+        <div className={variant === 'section' ? 'max-w-xl mx-auto' : ''}>
+          <EmailVerificationCode
+            email={email}
+            name={name}
+            onVerified={handleEmailVerified}
+            onResend={async () => {
+              try {
+                const code = await createVerificationCode(email.toLowerCase().trim());
+                await sendVerificationCodeEmail({
+                  to: email.toLowerCase().trim(),
+                  code,
+                  name: name || undefined,
+                });
+              } catch (error) {
+                console.error('Failed to resend code:', error);
+              }
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   const formContent = (
     <>
       {toast.isVisible && (
@@ -84,7 +145,7 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
       )}
 
       <form onSubmit={handleSubmit} className={variant === 'section' ? 'max-w-xl mx-auto' : ''}>
-        {variant === 'section' && name !== undefined && (
+        {(variant === 'section' || variant === 'inline') && (
           <div className="mb-4">
             <label htmlFor="waitlist-name" className="block text-sm text-slate-300 font-light mb-2">
               Name (optional)

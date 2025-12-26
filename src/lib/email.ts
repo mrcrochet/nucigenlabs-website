@@ -10,6 +10,12 @@ interface EmailData {
   company?: string;
 }
 
+interface VerificationEmailData {
+  to: string;
+  code: string;
+  name?: string;
+}
+
 const RESEND_API_KEY = import.meta.env.VITE_RESEND_API_KEY;
 const RESEND_FROM_EMAIL = import.meta.env.VITE_RESEND_FROM_EMAIL || 'Nucigen Labs <onboarding@resend.dev>';
 
@@ -161,6 +167,136 @@ The Nucigen Labs Team
 ---
 Nucigen Labs — Predictive Market Intelligence
 You're receiving this because you signed up for early access.
+  `;
+}
+
+/**
+ * Send verification code email
+ */
+export async function sendVerificationCodeEmail(data: VerificationEmailData): Promise<boolean> {
+  if (!RESEND_API_KEY) {
+    console.warn('Resend API key not configured. Email not sent.');
+    return true; // Return true to not block the process
+  }
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: RESEND_FROM_EMAIL,
+        to: data.to,
+        subject: 'Verify your email - Nucigen Labs',
+        html: generateVerificationEmailHTML(data),
+        text: generateVerificationEmailText(data),
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Resend API error:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error sending verification email:', error);
+    return false;
+  }
+}
+
+function generateVerificationEmailHTML(data: VerificationEmailData): string {
+  const name = data.name || data.to.split('@')[0];
+  
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify your email - Nucigen Labs</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #0A0A0A; color: #FFFFFF;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #0A0A0A; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #1A1515; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="padding: 40px 40px 30px; text-align: center; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+              <h1 style="margin: 0; font-size: 28px; font-weight: 300; color: #FFFFFF; letter-spacing: 0.5px;">NUCIGEN LABS</h1>
+            </td>
+          </tr>
+          
+          <!-- Content -->
+          <tr>
+            <td style="padding: 40px;">
+              <h2 style="margin: 0 0 20px; font-size: 24px; font-weight: 300; color: #FFFFFF;">Verify your email</h2>
+              
+              <p style="margin: 0 0 20px; font-size: 16px; line-height: 1.6; color: #E5E5E5; font-weight: 300;">
+                Hi ${name},
+              </p>
+              
+              <p style="margin: 0 0 30px; font-size: 16px; line-height: 1.6; color: #E5E5E5; font-weight: 300;">
+                Please enter the following verification code to confirm your email address and complete your registration:
+              </p>
+              
+              <div style="background-color: rgba(225, 70, 62, 0.1); border: 2px solid rgba(225, 70, 62, 0.3); border-radius: 8px; padding: 24px; margin: 30px 0; text-align: center;">
+                <p style="margin: 0 0 10px; font-size: 14px; color: #E1463E; font-weight: 500; text-transform: uppercase; letter-spacing: 1px;">VERIFICATION CODE</p>
+                <p style="margin: 0; font-size: 36px; color: #FFFFFF; font-weight: 600; letter-spacing: 8px; font-family: 'Courier New', monospace;">${data.code}</p>
+              </div>
+              
+              <p style="margin: 20px 0; font-size: 14px; line-height: 1.6; color: #999999; font-weight: 300;">
+                This code will expire in 15 minutes. If you didn't request this code, you can safely ignore this email.
+              </p>
+              
+              <p style="margin: 30px 0 0; font-size: 14px; line-height: 1.6; color: #999999; font-weight: 300; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 30px;">
+                If you have any questions, simply reply to this email. We're here to help.
+              </p>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 30px 40px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.1); background-color: rgba(0, 0, 0, 0.2);">
+              <p style="margin: 0 0 10px; font-size: 12px; color: #666666; font-weight: 300;">
+                Nucigen Labs — Predictive Market Intelligence
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+}
+
+function generateVerificationEmailText(data: VerificationEmailData): string {
+  const name = data.name || data.to.split('@')[0];
+  
+  return `
+Verify your email - Nucigen Labs
+
+Hi ${name},
+
+Please enter the following verification code to confirm your email address and complete your registration:
+
+VERIFICATION CODE: ${data.code}
+
+This code will expire in 15 minutes. If you didn't request this code, you can safely ignore this email.
+
+If you have any questions, simply reply to this email. We're here to help.
+
+Best regards,
+The Nucigen Labs Team
+
+---
+Nucigen Labs — Predictive Market Intelligence
   `;
 }
 

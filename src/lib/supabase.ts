@@ -221,3 +221,93 @@ export async function submitInstitutionalRequest(data: InstitutionalRequest) {
 
   return result;
 }
+
+/**
+ * Generate a 4-digit verification code
+ */
+function generateVerificationCode(): string {
+  return Math.floor(1000 + Math.random() * 9000).toString();
+}
+
+/**
+ * Create and store a verification code for an email
+ */
+export async function createVerificationCode(email: string): Promise<string> {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('Supabase is not configured. Cannot create verification code.');
+    // Return a mock code for development
+    return '1234';
+  }
+
+  const emailLower = email.toLowerCase().trim();
+  const code = generateVerificationCode();
+  const expiresAt = new Date();
+  expiresAt.setMinutes(expiresAt.getMinutes() + 15); // 15 minutes expiration
+
+  // Delete any existing unverified codes for this email
+  await supabase
+    .from('email_verification_codes')
+    .delete()
+    .eq('email', emailLower)
+    .eq('verified', false);
+
+  // Insert new code
+  const { error } = await supabase
+    .from('email_verification_codes')
+    .insert({
+      email: emailLower,
+      code,
+      expires_at: expiresAt.toISOString(),
+      verified: false,
+    });
+
+  if (error) {
+    console.error('Error creating verification code:', error);
+    throw new Error('Failed to create verification code');
+  }
+
+  return code;
+}
+
+/**
+ * Verify a code for an email
+ */
+export async function verifyEmailCode(email: string, code: string): Promise<boolean> {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('Supabase is not configured. Cannot verify code.');
+    // In development, accept any code
+    return code.length === 4;
+  }
+
+  const emailLower = email.toLowerCase().trim();
+  const codeTrimmed = code.trim();
+
+  // Find the code
+  const { data, error } = await supabase
+    .from('email_verification_codes')
+    .select('*')
+    .eq('email', emailLower)
+    .eq('code', codeTrimmed)
+    .eq('verified', false)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error verifying code:', error);
+    return false;
+  }
+
+  if (!data) {
+    return false; // Code not found or expired
+  }
+
+  // Mark code as verified
+  await supabase
+    .from('email_verification_codes')
+    .update({ verified: true })
+    .eq('id', data.id);
+
+  return true;
+}
