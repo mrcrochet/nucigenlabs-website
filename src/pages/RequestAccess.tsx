@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { X, Building2, Briefcase, Target, FileText, Phone, Mail } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { X, Building2, Briefcase, Target, FileText, Phone, Mail, Clock, ArrowRight } from 'lucide-react';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
 import { submitAccessRequest } from '../lib/supabase';
 import { sendEarlyAccessConfirmationEmail } from '../lib/email';
 import Toast from '../components/Toast';
 import { useToast } from '../hooks/useToast';
+import SimpleWaitlistForm from '../components/SimpleWaitlistForm';
 
 export default function RequestAccess() {
   const navigate = useNavigate();
@@ -134,6 +135,31 @@ export default function RequestAccess() {
             <p className="text-lg text-slate-400 font-light max-w-2xl mx-auto">
               All applications are reviewed manually. Please provide accurate information to expedite the review process.
             </p>
+          </div>
+
+          {/* Alternative: Waitlist Option */}
+          <div className="mb-8 backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-6 md:p-8">
+            <div className="flex flex-col md:flex-row items-start gap-6">
+              <div className="w-12 h-12 rounded-full bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center flex-shrink-0">
+                <Clock size={24} className="text-[#E1463E]" />
+              </div>
+              <div className="flex-1 w-full">
+                <h3 className="text-xl font-light text-white mb-2">Join the Waiting List Instead</h3>
+                <p className="text-sm text-slate-400 font-light mb-6 leading-relaxed">
+                  If you prefer to wait, you can join our waiting list with just your email address. We'll notify you when access becomes available, and you can complete your application later.
+                </p>
+                <SimpleWaitlistForm variant="inline" className="max-w-none" />
+              </div>
+            </div>
+          </div>
+
+          <div className="relative mb-8">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-white/[0.1]"></div>
+            </div>
+            <div className="relative flex justify-center">
+              <span className="px-4 bg-[#0A0A0A] text-xs text-slate-500 font-light">OR</span>
+            </div>
           </div>
 
           <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-2xl shadow-2xl p-8 md:p-12">
@@ -312,6 +338,12 @@ export default function RequestAccess() {
                 </button>
                 <p className="text-xs text-slate-500 font-light mt-4 text-center">
                   By submitting, you agree to our review process. We typically respond within 2-3 business days.
+                </p>
+                <p className="text-xs text-slate-600 font-light mt-3 text-center">
+                  Don't want to fill this form?{' '}
+                  <Link to="/" className="text-[#E1463E] hover:text-[#E1463E]/80 underline underline-offset-4 transition-colors">
+                    Join the waiting list instead
+                  </Link>
                 </p>
               </div>
             </form>
