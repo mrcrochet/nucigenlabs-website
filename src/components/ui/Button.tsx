@@ -16,12 +16,12 @@ export default function Button({
   disabled,
   ...props
 }: ButtonProps) {
-  const baseStyles = 'inline-flex items-center justify-center font-normal rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#0A0A0A] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100';
+  const baseStyles = 'inline-flex items-center justify-center font-normal rounded-md transition-all duration-150 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-nucigen-bg-primary disabled:opacity-50 disabled:cursor-not-allowed';
   
   const variants = {
-    primary: 'bg-[#E1463E] hover:bg-[#E1463E]/90 text-white hover:scale-105 hover:shadow-[0_0_35px_rgba(225,70,62,0.4)] focus:ring-[#E1463E]',
-    secondary: 'border border-white/20 hover:border-white/40 hover:bg-white/[0.05] text-white focus:ring-white/50',
-    ghost: 'text-slate-400 hover:text-white hover:bg-white/[0.05] focus:ring-white/50',
+    primary: 'bg-transparent border border-nucigen-red text-nucigen-red hover:bg-nucigen-red/8 hover:border-nucigen-red focus:ring-nucigen-red',
+    secondary: 'bg-transparent border border-nucigen-border-subtle text-nucigen-text-secondary hover:border-nucigen-border hover:bg-white/2 focus:ring-nucigen-border-subtle',
+    ghost: 'text-nucigen-text-tertiary hover:text-nucigen-text-secondary hover:bg-white/2 focus:ring-nucigen-border-subtle',
   };
   
   const sizes = {
