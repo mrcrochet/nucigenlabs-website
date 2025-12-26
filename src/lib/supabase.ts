@@ -12,8 +12,11 @@ export const supabase = supabaseUrl && supabaseAnonKey
 export interface AccessRequest {
   id?: string;
   email: string;
+  name?: string;
   role?: string;
   company?: string;
+  phone?: string;
+  company_number?: string;
   exposure?: string;
   intended_use?: string;
   status?: 'pending' | 'approved' | 'rejected';

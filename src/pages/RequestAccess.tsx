@@ -61,8 +61,11 @@ export default function RequestAccess() {
       // Submit to Supabase
       const result = await submitAccessRequest({
         email,
+        name: formData.name || undefined,
         role: formData.role || undefined,
         company: formData.company || undefined,
+        phone: formData.phone || undefined,
+        company_number: formData.companyNumber || undefined,
         exposure: formData.exposure || undefined,
         intended_use: formData.intended_use || undefined,
         source_page: 'request-access',
