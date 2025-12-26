@@ -29,12 +29,15 @@ CREATE INDEX IF NOT EXISTS idx_email_verification_codes_code_email_verified ON e
   WHERE verified = false;
 
 -- Create index on expires_at for cleanup operations
-CREATE INDEX IF NOT EXISTS idx_email_verification_codes_expires_at ON email_verification_codes(expires_at) 
-  WHERE expires_at < NOW();
+-- Note: Cannot use NOW() in partial index predicate (not immutable)
+-- This index will help with cleanup queries that filter by expires_at
+CREATE INDEX IF NOT EXISTS idx_email_verification_codes_expires_at ON email_verification_codes(expires_at);
 
 -- Create index for finding active codes per email (for rate limiting)
+-- Note: Cannot use expires_at > NOW() in partial index (NOW() is not immutable)
+-- This index helps with queries filtering by email and verified status
 CREATE INDEX IF NOT EXISTS idx_email_verification_codes_email_active ON email_verification_codes(email, created_at) 
-  WHERE verified = false AND expires_at > NOW();
+  WHERE verified = false;
 
 -- Enable Row Level Security
 ALTER TABLE email_verification_codes ENABLE ROW LEVEL SECURITY;
