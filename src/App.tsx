@@ -1,8 +1,7 @@
-import { useState, Suspense, lazy } from 'react';
+import { Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import PremiumNavigation from './components/PremiumNavigation';
 import AnimatedBackground from './components/AnimatedBackground';
-import AccessRequestModal from './components/AccessRequestModal';
 import Toast from './components/Toast';
 import { useToast } from './hooks/useToast';
 import Home from './pages/Home';
@@ -14,6 +13,7 @@ const Papers = lazy(() => import('./pages/Papers'));
 const CaseStudies = lazy(() => import('./pages/CaseStudies'));
 const LevelNews = lazy(() => import('./pages/LevelNews'));
 const EarlyAccessConfirmation = lazy(() => import('./pages/EarlyAccessConfirmation'));
+const RequestAccess = lazy(() => import('./pages/RequestAccess'));
 
 // Loading component for Suspense fallback
 const PageLoader = () => (
@@ -26,18 +26,7 @@ const PageLoader = () => (
 );
 
 function App() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalSourcePage, setModalSourcePage] = useState('');
   const { toast, showToast, hideToast } = useToast();
-
-  const openModal = (sourcePage: string) => {
-    setModalSourcePage(sourcePage);
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-  };
 
   return (
     <div className="relative min-h-screen">
@@ -52,32 +41,24 @@ function App() {
         />
       )}
 
-      <AccessRequestModal
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        onSuccess={(message) => showToast(message, 'success')}
-        onError={(message) => showToast(message, 'error')}
-        sourcePage={modalSourcePage}
-      />
-
       <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/" element={<Home />} />
           <Route 
             path="/intelligence" 
-            element={<Intelligence onRequestClearance={() => openModal('intelligence')} />} 
+            element={<Intelligence />} 
           />
           <Route 
             path="/case-studies" 
-            element={<CaseStudies onRequestClearance={() => openModal('case-studies')} />} 
+            element={<CaseStudies />} 
           />
           <Route 
             path="/pricing" 
-            element={<Pricing onRequestClearance={() => openModal('pricing')} />} 
+            element={<Pricing />} 
           />
           <Route 
             path="/papers" 
-            element={<Papers onRequestClearance={() => openModal('papers')} />} 
+            element={<Papers />} 
           />
           <Route 
             path="/level/:level" 
@@ -86,6 +67,10 @@ function App() {
           <Route 
             path="/early-access-confirmation" 
             element={<EarlyAccessConfirmation />} 
+          />
+          <Route 
+            path="/request-access" 
+            element={<RequestAccess />} 
           />
       </Routes>
       </Suspense>

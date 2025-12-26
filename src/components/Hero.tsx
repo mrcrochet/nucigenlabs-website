@@ -1,82 +1,10 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import CountdownTimer from './CountdownTimer';
-import Toast from './Toast';
-import { useToast } from '../hooks/useToast';
-import { submitAccessRequest } from '../lib/supabase';
-import { sendEarlyAccessConfirmationEmail } from '../lib/email';
-import EmailRecoveryModal from './EmailRecoveryModal';
+import SimpleWaitlistForm from './SimpleWaitlistForm';
 
 export default function Hero() {
-  const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
-  const { toast, showToast, hideToast } = useToast();
-
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!email) {
-      showToast('Please enter your email address', 'error');
-      return;
-    }
-
-    if (!validateEmail(email)) {
-      showToast('Please enter a valid email address', 'error');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const emailLower = email.toLowerCase().trim();
-      
-      // Submit to Supabase
-      await submitAccessRequest({
-        email: emailLower,
-        source_page: 'home',
-      });
-
-      // Send confirmation email (non-blocking)
-      sendEarlyAccessConfirmationEmail({
-        to: emailLower,
-      }).catch(err => {
-        console.warn('Email sending failed:', err);
-        // Don't block the signup process if email fails
-      });
-
-      // Redirect to confirmation page
-      navigate(`/early-access-confirmation?email=${encodeURIComponent(emailLower)}`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to submit request';
-      
-      // Better error messages
-      if (message.includes('already been registered')) {
-        showToast('This email is already registered. Use "Check Your Email" below.', 'error');
-      } else {
-        showToast(message, 'error');
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <section className="relative min-h-screen flex items-center justify-center px-6 py-20">
-      {toast.isVisible && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={hideToast}
-        />
-      )}
-
       <div className="max-w-6xl mx-auto w-full">
         <div className="text-center mb-20">
           <h1 className="text-5xl md:text-7xl lg:text-8xl font-light mb-12 leading-[1.1] text-white max-w-5xl mx-auto">
@@ -100,37 +28,14 @@ export default function Hero() {
               </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="mb-10">
-              <div className="flex flex-col sm:flex-row gap-4 items-center max-w-2xl mx-auto">
-                <input
-                  type="email"
-                  placeholder="your@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={isSubmitting}
-                  className="w-full px-6 py-4 bg-black/60 backdrop-blur-xl border border-white/10 rounded-md text-white placeholder:text-slate-700 focus:outline-none focus:border-white/30 transition-all text-base font-light disabled:opacity-50 disabled:cursor-not-allowed"
-                  aria-label="Email address"
-                />
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full sm:w-auto px-10 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-md transition-all duration-150 hover:scale-105 hover:shadow-[0_0_25px_rgba(225,70,62,0.35)] text-base whitespace-nowrap tracking-wide disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                >
-                  {isSubmitting ? 'Submitting...' : 'Request Access'}
-                </button>
-              </div>
-            </form>
+            <div className="mb-10">
+              <SimpleWaitlistForm variant="inline" />
+            </div>
 
-            <div className="text-center space-y-2">
+            <div className="text-center">
               <p className="text-sm text-slate-500 font-light">
                 Access restricted to professional operators and analysts
               </p>
-              <button
-                onClick={() => setShowRecoveryModal(true)}
-                className="text-xs text-slate-600 hover:text-slate-400 font-light transition-colors underline underline-offset-4"
-              >
-                Already registered? Check your email
-              </button>
             </div>
           </div>
         </div>
@@ -172,14 +77,6 @@ export default function Hero() {
           </p>
         </div>
       </div>
-
-      <EmailRecoveryModal
-        isOpen={showRecoveryModal}
-        onClose={() => setShowRecoveryModal(false)}
-        onEmailFound={(email) => {
-          navigate(`/early-access-confirmation?email=${encodeURIComponent(email)}`);
-        }}
-      />
     </section>
   );
 }

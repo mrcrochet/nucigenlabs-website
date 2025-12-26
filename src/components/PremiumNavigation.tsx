@@ -93,13 +93,14 @@ export default function PremiumNavigation() {
             })}
           </div>
 
-          <button 
+          <Link
+            to="/request-access"
             className="group relative px-6 py-2 bg-gradient-to-r from-red-600/90 to-red-500/90 hover:from-red-500 hover:to-red-400 text-white rounded-lg text-sm font-light tracking-wide transition-all duration-300 overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#E1463E] focus:ring-offset-2 focus:ring-offset-black"
             aria-label="Request access to Nucigen Labs"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
             <span className="relative">Request Access</span>
-          </button>
+          </Link>
         </div>
       </nav>
 

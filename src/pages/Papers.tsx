@@ -6,11 +6,9 @@ import { submitAccessRequest } from '../lib/supabase';
 import Toast from '../components/Toast';
 import { useToast } from '../hooks/useToast';
 
-interface PapersProps {
-  onRequestClearance?: () => void;
-}
+import { Link } from 'react-router-dom';
 
-export default function Papers({ onRequestClearance }: PapersProps) {
+export default function Papers() {
   const [showApplicationForm, setShowApplicationForm] = useState(false);
   const [selectedPaper, setSelectedPaper] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -175,14 +173,12 @@ export default function Papers({ onRequestClearance }: PapersProps) {
               Nucigen Labs publishes original research on geopolitical causality, industrial propagation, and systemic sequences.
             </p>
 
-            {onRequestClearance && (
-              <button
-                onClick={onRequestClearance}
-                className="px-8 py-3.5 bg-white/[0.04] hover:bg-white/[0.07] border border-white/20 hover:border-white/30 text-white font-light rounded-md transition-all duration-300 text-sm tracking-wide"
-              >
-                Access Research
-              </button>
-            )}
+            <Link
+              to="/request-access"
+              className="inline-block px-8 py-3.5 bg-white/[0.04] hover:bg-white/[0.07] border border-white/20 hover:border-white/30 text-white font-light rounded-md transition-all duration-300 text-sm tracking-wide"
+            >
+              Request Access
+            </Link>
           </div>
 
           {/* Research Categories */}
@@ -424,14 +420,12 @@ export default function Papers({ onRequestClearance }: PapersProps) {
                 <p className="text-sm text-slate-400 font-light mb-8 text-center max-w-md">
                   These reports require research accounts. Not accessible to retail users.
                 </p>
-                {onRequestClearance && (
-                  <button
-                    onClick={onRequestClearance}
-                    className="px-6 py-3 bg-white/[0.08] hover:bg-white/[0.12] border border-white/20 hover:border-white/30 text-white font-light rounded-md transition-all text-sm tracking-wide"
-                  >
-                    Request Clearances
-                  </button>
-                )}
+                <Link
+                  to="/request-access"
+                  className="inline-block px-6 py-3 bg-white/[0.08] hover:bg-white/[0.12] border border-white/20 hover:border-white/30 text-white font-light rounded-md transition-all text-sm tracking-wide"
+                >
+                  Request Access
+                </Link>
               </div>
             </div>
           </div>
@@ -554,14 +548,12 @@ export default function Papers({ onRequestClearance }: PapersProps) {
                     Analyst
                   </button>
                 </div>
-                {onRequestClearance && (
-                  <button
-                    onClick={onRequestClearance}
-                    className="px-6 py-2.5 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white text-xs font-light rounded-md transition-all tracking-wide"
-                  >
-                    Request Access
-                  </button>
-                )}
+                <Link
+                  to="/request-access"
+                  className="inline-block px-6 py-2.5 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white text-xs font-light rounded-md transition-all tracking-wide"
+                >
+                  Request Access
+                </Link>
               </div>
 
               <p className="text-lg text-white font-light text-center">

@@ -1,11 +1,10 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Check, ArrowRight, TrendingUp, Shield, Zap, Sparkles, Lock, Star } from 'lucide-react';
-import AccessRequestModal from './AccessRequestModal';
 import InstitutionalAccessModal from './InstitutionalAccessModal';
 import LiveNewsTicker from './LiveNewsTicker';
 
 export default function PricingPreview() {
-  const [showAccessModal, setShowAccessModal] = useState(false);
   const [showInstitutionalModal, setShowInstitutionalModal] = useState(false);
 
   return (
@@ -85,16 +84,16 @@ export default function PricingPreview() {
                 ))}
               </div>
 
-              <button
-                onClick={() => setShowAccessModal(true)}
-                  className="w-full group relative px-6 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-300 text-sm tracking-wide shadow-lg shadow-[#E1463E]/20 hover:shadow-xl hover:shadow-[#E1463E]/30 hover:scale-[1.02] mb-3"
-                >
-                  <span className="relative z-10 flex items-center justify-center gap-2">
-                    Request Access
-                    <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                  </span>
-                  <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-white/0 via-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              </button>
+              <Link
+                to="/request-access"
+                className="w-full group relative inline-flex items-center justify-center gap-2 px-6 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-300 text-sm tracking-wide shadow-lg shadow-[#E1463E]/20 hover:shadow-xl hover:shadow-[#E1463E]/30 hover:scale-[1.02] mb-3"
+              >
+                <span className="relative z-10 flex items-center justify-center gap-2">
+                  Request Access
+                  <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                </span>
+                <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-white/0 via-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              </Link>
                 
                 <p className="text-xs text-slate-500 font-light text-center">
                   Manual approval required
@@ -428,14 +427,6 @@ export default function PricingPreview() {
 
       {/* Live News Ticker */}
       <LiveNewsTicker />
-
-      <AccessRequestModal
-        isOpen={showAccessModal}
-        onClose={() => setShowAccessModal(false)}
-        onSuccess={() => {}}
-        onError={() => {}}
-        sourcePage="pricing"
-      />
 
       <InstitutionalAccessModal
         isOpen={showInstitutionalModal}

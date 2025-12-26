@@ -1,13 +1,10 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
 
-interface CaseStudiesProps {
-  onRequestClearance: () => void;
-}
-
-export default function CaseStudies({ onRequestClearance }: CaseStudiesProps) {
+export default function CaseStudies() {
   const [selectedCase, setSelectedCase] = useState<number | null>(null);
 
   const cases = [
@@ -35,7 +32,7 @@ export default function CaseStudies({ onRequestClearance }: CaseStudiesProps) {
   ];
 
   if (selectedCase !== null) {
-    return <CaseStudyDetail caseId={selectedCase} onBack={() => setSelectedCase(null)} onRequestClearance={onRequestClearance} />;
+    return <CaseStudyDetail caseId={selectedCase} onBack={() => setSelectedCase(null)} />;
   }
 
   return (
@@ -65,13 +62,13 @@ export default function CaseStudies({ onRequestClearance }: CaseStudiesProps) {
               Built for analysts, operators, and investors who think in systems — not charts.
             </p>
 
-            <button
-              onClick={onRequestClearance}
-              className="group relative px-10 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-300 text-sm tracking-wide shadow-lg shadow-[#E1463E]/20 hover:shadow-xl hover:shadow-[#E1463E]/30 hover:scale-[1.02]"
+            <Link
+              to="/request-access"
+              className="group relative inline-block px-10 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-300 text-sm tracking-wide shadow-lg shadow-[#E1463E]/20 hover:shadow-xl hover:shadow-[#E1463E]/30 hover:scale-[1.02]"
             >
-              <span className="relative z-10">Request Clearance</span>
+              <span className="relative z-10">Request Access</span>
               <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-white/0 via-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            </button>
+            </Link>
           </div>
 
           <div className="space-y-6">
@@ -105,13 +102,13 @@ export default function CaseStudies({ onRequestClearance }: CaseStudiesProps) {
           </div>
 
           <div className="mt-20 text-center">
-            <button
-              onClick={onRequestClearance}
+            <Link
+              to="/request-access"
               className="group inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-light"
             >
-              Explore how causal intelligence works
+              Request Access
               <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-            </button>
+            </Link>
             <p className="text-xs text-slate-600 font-light mt-2">
               No charts. No signals. No noise.
             </p>
@@ -124,7 +121,7 @@ export default function CaseStudies({ onRequestClearance }: CaseStudiesProps) {
   );
 }
 
-function CaseStudyDetail({ caseId, onBack, onRequestClearance }: { caseId: number; onBack: () => void; onRequestClearance: () => void }) {
+function CaseStudyDetail({ caseId, onBack }: { caseId: number; onBack: () => void }) {
   const caseContent = getCaseContent(caseId);
 
   return (
@@ -182,13 +179,13 @@ function CaseStudyDetail({ caseId, onBack, onRequestClearance }: { caseId: numbe
           </div>
 
           <div className="mt-20 pt-12 border-t border-white/[0.08] text-center">
-            <button
-              onClick={onRequestClearance}
+            <Link
+              to="/request-access"
               className="group inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors text-sm font-light"
             >
-              Explore how causal intelligence works
+              Request Access
               <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-            </button>
+            </Link>
             <p className="text-xs text-slate-600 font-light mt-2">
               No charts. No signals. No noise.
             </p>

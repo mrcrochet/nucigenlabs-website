@@ -32,13 +32,13 @@ export default function Intelligence({ onRequestClearance }: IntelligenceProps) 
               Markets move last. Supply chains and treaties move first.
             </p>
 
-            <button
-              onClick={onRequestClearance}
-              className="group relative px-10 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-300 text-sm tracking-wide shadow-lg shadow-[#E1463E]/20 hover:shadow-xl hover:shadow-[#E1463E]/30 hover:scale-[1.02]"
+            <Link
+              to="/request-access"
+              className="group relative inline-block px-10 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-300 text-sm tracking-wide shadow-lg shadow-[#E1463E]/20 hover:shadow-xl hover:shadow-[#E1463E]/30 hover:scale-[1.02]"
             >
-              <span className="relative z-10">Request Clearance</span>
+              <span className="relative z-10">Request Access</span>
               <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-white/0 via-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            </button>
+            </Link>
           </div>
 
           <div className="mb-40">
