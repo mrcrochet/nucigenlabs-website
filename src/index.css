@@ -11,34 +11,18 @@
 
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Playfair Display', serif;
-    font-weight: 500;
+    font-weight: 400;
     letter-spacing: -0.02em;
-    color: #F4F6F8;
-  }
-
-  h1 {
-    font-size: clamp(3.5rem, 8vw, 4.5rem);
-    line-height: 1.1;
-  }
-
-  h2 {
-    font-size: clamp(2.5rem, 6vw, 3rem);
-    line-height: 1.2;
-  }
-
-  h3 {
-    font-size: clamp(1.75rem, 4vw, 2rem);
-    line-height: 1.3;
   }
 
   .font-serif {
     font-family: 'Playfair Display', serif;
   }
 
-  /* Section alternance - Surface secondaire (cards, panels) */
+  /* Section alternance - Fond clair avec teinte chaude (harmonie avec thème rouge) */
   .section-light {
-    background-color: #0F1623;
-    color: #C9D1E1;
+    background-color: #1A1515;
+    color: #E5E5E5;
   }
 
   .section-light h1,
@@ -47,48 +31,51 @@
   .section-light h4,
   .section-light h5,
   .section-light h6 {
-    color: #F4F6F8;
+    color: #E5E5E5;
   }
 
   .section-light p,
   .section-light span,
   .section-light div {
-    color: #C9D1E1;
+    color: #B8B8B8;
   }
 
   .section-light .text-white {
-    color: #F4F6F8 !important;
+    color: #E5E5E5 !important;
   }
 
-  .section-light .text-nucigen-text-primary {
-    color: #F4F6F8;
+  .section-light .text-slate-300 {
+    color: #C8C8C8;
   }
 
-  .section-light .text-nucigen-text-secondary {
-    color: #C9D1E1;
+  .section-light .text-slate-400 {
+    color: #A8A8A8;
   }
 
-  .section-light .text-nucigen-text-tertiary {
-    color: #8B93A7;
+  .section-light .text-slate-500 {
+    color: #888888;
   }
 
-  /* Section sombre (défaut) - Infrastructure-grade deep blue-black */
+  .section-light .text-slate-600 {
+    color: #707070;
+  }
+
+  /* Section sombre (défaut) */
   .section-dark {
-    background-color: #0B0F14;
-    color: #F4F6F8;
+    background-color: #0A0A0A;
+    color: #FFFFFF;
   }
 
   html {
-    background-color: #0B0F14;
+    background-color: #0A0A0A;
   }
 
   body {
     @apply antialiased;
-    background-color: #0B0F14;
-    color: #F4F6F8;
+    background-color: #0A0A0A;
+    color: #FFFFFF;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    line-height: 1.6;
   }
 
 }
@@ -278,59 +265,6 @@
 
   .animate-hologram-scan {
     animation: hologram-scan 3s linear infinite;
-  }
-
-  /* Infrastructure-grade UI Components */
-  .btn-primary {
-    background: transparent;
-    border: 1px solid #E1463E;
-    color: #E1463E;
-    padding: 12px 24px;
-    border-radius: 6px;
-    font-weight: 400;
-    transition: all 150ms ease-out;
-  }
-
-  .btn-primary:hover {
-    background: rgba(225, 70, 62, 0.08);
-    border-color: #E1463E;
-  }
-
-  .btn-secondary {
-    background: transparent;
-    border: 1px solid #2A324A;
-    color: #C9D1E1;
-    padding: 12px 24px;
-    border-radius: 6px;
-    font-weight: 400;
-    transition: all 150ms ease-out;
-  }
-
-  .btn-secondary:hover {
-    border-color: #1F2937;
-    background: rgba(255, 255, 255, 0.02);
-  }
-
-  .card-infrastructure {
-    background: #0F1623;
-    border: 1px solid #1F2937;
-    border-radius: 10px;
-    padding: 32px;
-    transition: all 200ms ease-out;
-  }
-
-  .card-infrastructure:hover {
-    border-color: #2A324A;
-  }
-
-  .tag-badge {
-    background: rgba(255, 255, 255, 0.04);
-    color: #8B93A7;
-    border: 1px solid #1F2937;
-    border-radius: 999px;
-    padding: 4px 12px;
-    font-size: 13px;
-    font-weight: 400;
   }
 
   @keyframes fadeIn {

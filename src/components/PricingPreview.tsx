@@ -16,7 +16,7 @@ export default function PricingPreview() {
           <div className="inline-block backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/10 to-[#E1463E]/5 border border-[#E1463E]/20 rounded-full px-6 py-2 mb-8">
             <p className="text-sm text-[#E1463E] font-light tracking-[0.15em]">TRANSPARENT PRICING</p>
           </div>
-          
+
           <h1 className="text-5xl md:text-7xl lg:text-8xl font-light mb-6 leading-[1.1] text-white">
             Strategic intelligence.<br />
             <span className="text-slate-300">Simple pricing.</span>
@@ -75,18 +75,18 @@ export default function PricingPreview() {
                     'Supply chain disruption alerts',
                     'Multi-asset exposure analysis',
                     'Customizable intelligence feeds'
-                  ].map((feature, idx) => (
-                    <div key={idx} className="flex items-start gap-3">
+                ].map((feature, idx) => (
+                  <div key={idx} className="flex items-start gap-3">
                       <div className="mt-0.5 flex-shrink-0">
                         <Check size={18} className="text-[#E1463E]" />
                       </div>
                       <p className="text-sm text-slate-300 font-light leading-relaxed">{feature}</p>
-                    </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
+              </div>
 
-                <button
-                  onClick={() => setShowAccessModal(true)}
+              <button
+                onClick={() => setShowAccessModal(true)}
                   className="w-full group relative px-6 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-300 text-sm tracking-wide shadow-lg shadow-[#E1463E]/20 hover:shadow-xl hover:shadow-[#E1463E]/30 hover:scale-[1.02] mb-3"
                 >
                   <span className="relative z-10 flex items-center justify-center gap-2">
@@ -94,7 +94,7 @@ export default function PricingPreview() {
                     <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                   </span>
                   <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-white/0 via-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                </button>
+              </button>
                 
                 <p className="text-xs text-slate-500 font-light text-center">
                   Manual approval required
@@ -124,8 +124,8 @@ export default function PricingPreview() {
                   <div className="flex items-baseline gap-2 mb-2">
                     <span className="text-6xl text-white font-light tracking-tight">$XXX</span>
                     <span className="text-slate-400 font-light text-lg">/ month</span>
-                  </div>
-                  
+              </div>
+
                   <p className="text-xs text-slate-500 font-light mb-6">
                     Advanced features. Team collaboration. Priority support.
                   </p>
@@ -147,7 +147,7 @@ export default function PricingPreview() {
                         <Check size={18} className="text-[#E1463E]/30" />
                       </div>
                       <p className="text-sm text-slate-400 font-light leading-relaxed">{feature}</p>
-                    </div>
+                </div>
                   ))}
                 </div>
 
