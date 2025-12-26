@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, Globe, Factory, Ship, TrendingUp, ExternalLink, Clock } from 'lucide-react';
 import SEO from '../components/SEO';
 import Footer from '../components/Footer';
+import TypewriterText from '../components/TypewriterText';
 
 interface NewsArticle {
   title: string;
@@ -149,7 +150,7 @@ export default function LevelNews() {
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const config = level && levelConfig[level as keyof typeof levelConfig];
+  const config = level ? levelConfig[level as keyof typeof levelConfig] : null;
   const Icon = config?.icon || Globe;
 
   useEffect(() => {
@@ -267,8 +268,23 @@ export default function LevelNews() {
               <Icon size={32} className="text-[#E1463E]" />
             </div>
             <div>
-              <h1 className="text-4xl md:text-5xl font-light mb-3">{config.title}</h1>
-              <p className="text-lg text-slate-400 font-light">{config.description}</p>
+              <h1 className="text-4xl md:text-5xl font-light mb-3">{config?.title}</h1>
+              <p className="text-lg text-slate-400 font-light min-h-[2rem]">
+                {config && (
+                  <TypewriterText
+                    texts={[
+                      config.description,
+                      'When volatility regimes shift, Nucigen maps the underlying causal drivers to distinguish transitory shocks from structural repricing.',
+                      'Industrial bottlenecks are often invisible until they fail. Nucigen identifies them earlier by mapping dependency networks.',
+                      'Technological systems fail gradually, not suddenly. Nucigen tracks capacity saturation and dependency buildup.'
+                    ]}
+                    typingSpeed={70}
+                    deletingSpeed={25}
+                    pauseDuration={5000}
+                    className="text-slate-400"
+                  />
+                )}
+              </p>
             </div>
           </div>
         </div>

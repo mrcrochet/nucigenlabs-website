@@ -30,7 +30,7 @@ export default function Hero() {
 
             <div className="mb-10">
               <SimpleWaitlistForm variant="inline" />
-            </div>
+              </div>
 
             <div className="text-center">
               <p className="text-sm text-slate-500 font-light">

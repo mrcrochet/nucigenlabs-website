@@ -41,8 +41,11 @@ export default function WhoThisIsFor() {
           <h2 className="text-4xl md:text-5xl font-light mb-6">
             Built for everyone who wants to invest smarter.
           </h2>
-          <p className="text-base text-slate-500 font-light max-w-3xl mx-auto">
+          <p className="text-base text-slate-500 font-light max-w-3xl mx-auto mb-4">
             You no longer need thousands of dollars to access professional-grade market intelligence.
+          </p>
+          <p className="text-sm text-slate-400 font-light max-w-2xl mx-auto italic">
+            If you can read the news, you can use Nucigen. No charts to decode. No noise. Just clear cause → effect → market impact.
           </p>
         </div>
 

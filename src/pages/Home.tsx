@@ -8,6 +8,8 @@ import FourLevels from '../components/FourLevels';
 import WhoThisIsFor from '../components/WhoThisIsFor';
 import Mission from '../components/Mission';
 import AdvancedFeatures from '../components/AdvancedFeatures';
+import HowPeopleUseNucigen from '../components/HowPeopleUseNucigen';
+import TypewriterText from '../components/TypewriterText';
 
 export default function Home() {
 
@@ -30,9 +32,43 @@ export default function Home() {
             Nucigen Labs transforms global news into predictive market signals in real-time.
           </p>
 
-          <p className="text-base md:text-lg text-slate-500 leading-relaxed font-light mb-12 max-w-3xl mx-auto">
-            When a factory closes in Taiwan or a sanction hits Russia, we detect it instantly and predict which assets will move — hours or days before the market reacts.
+          <p className="text-base md:text-lg text-slate-500 leading-relaxed font-light mb-8 max-w-3xl mx-auto min-h-[4rem]">
+            <TypewriterText
+              texts={[
+                'When a factory closes in Taiwan or a sanction hits Russia, we detect it instantly and predict which assets will move — hours or days before the market reacts.',
+                'When a port shuts down in Shanghai or a trade agreement collapses, we identify the ripple effects across supply chains — before prices adjust.',
+                'When a mining operation halts in Chile or geopolitical tensions escalate, we map the causal chains to market impact — giving you time to position.',
+                'When energy infrastructure fails or regulatory changes emerge, we predict sector-wide consequences — before the news becomes obvious.',
+                'When industrial capacity shifts or currency policies change, we forecast asset movements — hours or days ahead of market reaction.',
+                'When consumer demand shifts abruptly or brand sentiment deteriorates, Nucigen models the causal chain from demand signals to inventory pressure and pricing behavior before it becomes visible in earnings.',
+                'When volatility regimes shift following political or economic stress, Nucigen maps the underlying causal drivers to distinguish transitory shocks from structural repricing.',
+                'When compute availability tightens or data center expansion slows, Nucigen maps how capacity constraints propagate across AI, cloud, and enterprise software ecosystems.',
+                'When a major competitor exits a market or cuts capacity, Nucigen maps substitution limits and market structure to identify which players gain pricing power ahead of market consensus.',
+                'When political instability escalates in a strategic region, Nucigen models how institutional disruption propagates through production, logistics, and investment flows to anticipate market impact.',
+                'When new sanctions are introduced or enforcement tightens, Nucigen maps the causal chains across trade, compliance, and supply corridors to identify downstream exposure before markets fully adjust.',
+                'Political uncertainty does not hit markets directly. It first alters permits, enforcement, financing, and movement. Nucigen models those intermediate constraints before they show up in prices.',
+                'Industrial bottlenecks are often invisible until they fail. Nucigen identifies them earlier by mapping dependency networks rather than monitoring output alone.',
+                'Technological systems fail gradually, not suddenly. Nucigen tracks capacity saturation and dependency buildup to detect stress before outages occur.',
+                'Nucigen does not forecast outcomes. It maps how decisions and disruptions propagate through real systems.',
+                'Volatility is rarely random. Nucigen links price instability to structural constraints rather than treating it as noise.',
+                'A regulatory decision in one capital can quietly reshape production incentives across multiple regions. Nucigen traces those shifts through industrial and trade systems to surface their downstream effects.'
+              ]}
+              typingSpeed={60}
+              deletingSpeed={20}
+              pauseDuration={4000}
+              className="text-slate-500"
+            />
           </p>
+
+          {/* Simple explanation layer */}
+          <div className="mb-12 max-w-3xl mx-auto">
+            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] rounded-xl p-6">
+              <p className="text-sm text-slate-500 font-light mb-2 tracking-wide text-center">IN SIMPLE TERMS</p>
+              <p className="text-base text-slate-300 font-light leading-relaxed text-center">
+                We translate world events into early market insights — so you understand what's coming before it becomes obvious.
+              </p>
+            </div>
+          </div>
 
           <div className="mb-8">
             <div className="inline-block backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded-2xl px-8 py-6">
@@ -41,27 +77,61 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mb-8">
+          <div className="mb-12 max-w-2xl mx-auto">
             <SimpleWaitlistForm variant="inline" />
+            <p className="text-xs text-slate-500 font-light mt-4 text-center">
+              Be ahead of the market, not behind it.
+            </p>
           </div>
-
-          <p className="text-xs text-slate-600 font-light">
-            Early users shape the future of the platform.
-          </p>
         </div>
       </section>
 
       <LiveNewsFeed />
 
-      <div className="section-light">
-      <FourLevels />
-      </div>
+      {/* Who is this for - Early section */}
+      <section className="relative px-6 py-24">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-light mb-6 text-white">
+              Who is Nucigen for?
+            </h2>
+            <p className="text-lg text-slate-400 font-light max-w-2xl mx-auto leading-relaxed mb-8">
+              If you care about understanding why markets move — not just reacting after — Nucigen is for you.
+            </p>
+          </div>
 
-      <AdvancedFeatures />
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
+            {[
+              {
+                title: 'Everyone who\'s curious',
+                description: 'Understand how real markets work by seeing cause → effect in action'
+              },
+              {
+                title: 'Investors',
+                description: 'Avoid reacting too late. Get early signals before markets reprice'
+              },
+              {
+                title: 'Professionals',
+                description: 'Monitor structural signals and risk thresholds in real-time'
+              }
+            ].map((item, idx) => (
+              <div key={idx} className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] rounded-xl p-6 text-center">
+                <h3 className="text-lg text-white font-light mb-3">{item.title}</h3>
+                <p className="text-sm text-slate-400 font-light leading-relaxed">{item.description}</p>
+              </div>
+            ))}
+          </div>
 
-      <div className="section-light">
-      <WhoThisIsFor />
-      </div>
+          <div className="text-center space-y-4">
+            <p className="text-base text-slate-300 font-light italic">
+              You don't need to be a specialist. We offer the same technology that specialists use.
+            </p>
+            <p className="text-sm text-slate-400 font-light">
+              The same intelligence used by professionals — now accessible to everyone who's curious about how the world works.
+            </p>
+          </div>
+        </div>
+      </section>
 
       <section className="relative px-6 py-24">
         <div className="max-w-4xl mx-auto">
@@ -94,6 +164,181 @@ export default function Home() {
                 A strategic information-to-decision platform.
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="section-light">
+      <FourLevels />
+      </div>
+
+      <AdvancedFeatures />
+
+      {/* Simple Example Section */}
+      <section className="relative px-6 py-24">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <div className="inline-block mb-6 px-4 py-1 rounded-full border border-white/10 bg-white/[0.02] backdrop-blur-sm">
+              <span className="text-[10px] text-slate-600 font-light tracking-[0.25em]">EXAMPLE</span>
+            </div>
+            <h3 className="text-3xl md:text-4xl font-light text-white mb-4">
+              How it works in practice
+            </h3>
+            <p className="text-base text-slate-400 font-light max-w-2xl mx-auto mb-6">
+              See how we transform a real-world event into actionable market intelligence
+            </p>
+            <div className="max-w-2xl mx-auto mb-8">
+              <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] rounded-xl p-6">
+                <p className="text-sm text-slate-500 font-light mb-2 tracking-wide text-center">In simple terms:</p>
+                <p className="text-base text-slate-300 font-light leading-relaxed text-center min-h-[3rem]">
+                  <TypewriterText
+                    texts={[
+                      'We turn world events into clear signals about what might happen next in markets — so you can act earlier, not later.',
+                      'Technological systems fail gradually, not suddenly. Nucigen tracks capacity saturation and dependency buildup.',
+                      'A regulatory decision in one capital can quietly reshape production incentives across multiple regions.',
+                      'When volatility regimes shift, Nucigen maps the underlying causal drivers to distinguish transitory shocks from structural repricing.',
+                      'Industrial bottlenecks are often invisible until they fail. Nucigen identifies them earlier by mapping dependency networks.'
+                    ]}
+                    typingSpeed={65}
+                    deletingSpeed={25}
+                    pauseDuration={4500}
+                    className="text-slate-300"
+                  />
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6 mb-8">
+            {/* Step 1 */}
+            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-6 hover:border-white/[0.20] transition-all duration-300">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-lg bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center flex-shrink-0">
+                  <span className="text-[#E1463E] font-bold text-lg">1</span>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="text-xs text-slate-500 font-medium tracking-wider uppercase">Event Detected</p>
+                    <span className="text-xs text-slate-600">•</span>
+                    <p className="text-xs text-slate-500 font-light">Real-time</p>
+                  </div>
+                  <p className="text-base text-white font-light mb-2">
+                    A strike shuts down a lithium mine in Chile
+                  </p>
+                  <p className="text-sm text-slate-400 font-light">
+                    Our system detects this event from global news sources within minutes
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Arrow */}
+            <div className="flex items-center justify-center py-2">
+              <div className="w-10 h-10 rounded-full bg-[#E1463E]/10 border border-[#E1463E]/30 flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#E1463E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Step 2 */}
+            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-6 hover:border-white/[0.20] transition-all duration-300">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-lg bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center flex-shrink-0">
+                  <span className="text-[#E1463E] font-bold text-lg">2</span>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="text-xs text-slate-500 font-medium tracking-wider uppercase">Impact Predicted</p>
+                    <span className="text-xs text-slate-600">•</span>
+                    <p className="text-xs text-slate-500 font-light">Within hours</p>
+                  </div>
+                  <p className="text-base text-white font-light mb-2">
+                    Battery supply tightens → EV manufacturers face higher costs
+                  </p>
+                  <p className="text-sm text-slate-400 font-light">
+                    We map the causal chain: mine closure → lithium shortage → battery production impact → EV manufacturing costs
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Arrow */}
+            <div className="flex items-center justify-center py-2">
+              <div className="w-10 h-10 rounded-full bg-[#E1463E]/10 border border-[#E1463E]/30 flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#E1463E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Step 3 */}
+            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-6 hover:border-white/[0.20] transition-all duration-300">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-lg bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center flex-shrink-0">
+                  <span className="text-[#E1463E] font-bold text-lg">3</span>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="text-xs text-slate-500 font-medium tracking-wider uppercase">Market Signal</p>
+                    <span className="text-xs text-slate-600">•</span>
+                    <p className="text-xs text-slate-500 font-light">Before market reacts</p>
+                  </div>
+                  <p className="text-base text-white font-light mb-2">
+                    EV stocks likely to come under pressure before the market reacts
+                  </p>
+                  <p className="text-sm text-slate-400 font-light">
+                    You receive this signal hours or days before prices adjust, giving you time to position
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/10 to-[#E1463E]/5 border border-[#E1463E]/30 rounded-xl p-8 text-center">
+            <p className="text-lg text-white font-light mb-3">
+              <span className="font-medium">Less stress. Less noise. More clarity.</span>
+            </p>
+            <p className="text-sm text-slate-300 font-light">
+              No hype. No guessing. Just understanding what's changing — before it becomes obvious.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div className="section-light">
+      <HowPeopleUseNucigen />
+      </div>
+
+      <section className="relative px-6 py-24">
+        <div className="max-w-4xl mx-auto">
+          <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-10 text-center">
+            <div className="inline-block mb-6 px-4 py-1 rounded-full border border-white/10 bg-white/[0.02] backdrop-blur-sm">
+              <span className="text-[10px] text-slate-600 font-light tracking-[0.25em]">TECHNOLOGY</span>
+            </div>
+            <h3 className="text-2xl font-light text-white mb-4">
+              Fully automated causal inference engine
+            </h3>
+            <p className="text-base text-slate-400 font-light leading-relaxed max-w-2xl mx-auto mb-4">
+              Signals are generated automatically and continuously from global news sources. 
+              Our LLM-based system extracts causal structure and predicts market impact with no human bias. 
+              High-impact events receive additional validation, but the core intelligence engine operates 24/7 without intervention.
+            </p>
+            <p className="text-sm text-slate-500 font-light leading-relaxed max-w-2xl mx-auto italic min-h-[3rem]">
+              <TypewriterText
+                texts={[
+                  'In practice: we follow "cause → effect → market reaction" step by step. You never see the complexity — only the insights.',
+                  'When consumer demand shifts abruptly, Nucigen models the causal chain from demand signals to inventory pressure before it becomes visible in earnings.',
+                  'Political uncertainty does not hit markets directly. It first alters permits, enforcement, financing, and movement.',
+                  'Nucigen traces regulatory shifts through industrial and trade systems to surface their downstream effects.',
+                  'Volatility is rarely random. Nucigen links price instability to structural constraints rather than treating it as noise.'
+                ]}
+                typingSpeed={60}
+                deletingSpeed={25}
+                pauseDuration={5000}
+                className="text-slate-500 italic"
+              />
+            </p>
           </div>
         </div>
       </section>

@@ -305,12 +305,32 @@ export default function PricingPreview() {
 
                 {/* Prix en fin de section */}
                 <div className="pt-6 border-t border-white/[0.08]">
-                  <p className="text-base text-slate-300 font-light leading-relaxed mb-2">
+                  <p className="text-base text-slate-300 font-light leading-relaxed mb-4">
                     <strong className="text-white">Access is subscription-based.</strong>
                   </p>
-                  <p className="text-base text-slate-300 font-light leading-relaxed">
+                  <p className="text-base text-slate-300 font-light leading-relaxed mb-6">
                     Pricing starts at <strong className="text-[#E1463E]">$59/month</strong>, designed to extend institutional intelligence beyond Wall Street.
                   </p>
+                  
+                  <div className="bg-white/[0.02] border border-white/[0.05] rounded-lg p-6">
+                    <p className="text-sm text-slate-400 font-medium mb-4 tracking-wide">$59/month includes:</p>
+                    <div className="space-y-3">
+                      {[
+                        'Real-time event stream from global news sources',
+                        'Market impact predictions with timing estimates',
+                        'Sector & asset exposure analysis',
+                        'Email and in-app alerts',
+                        'Access to historical signals and patterns',
+                        'Multi-asset class coverage (stocks, commodities)',
+                        'Customizable alert frequency and filters'
+                      ].map((item, idx) => (
+                        <div key={idx} className="flex items-start gap-3">
+                          <div className="w-1 h-1 rounded-full bg-[#E1463E] mt-2 flex-shrink-0"></div>
+                          <p className="text-sm text-slate-300 font-light">{item}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Mantra produit */}

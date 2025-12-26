@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Calendar, Mail, ArrowRight } from 'lucide-react';
 import SEO from '../components/SEO';
 import Footer from '../components/Footer';
+import TypewriterText from '../components/TypewriterText';
 
 export default function EarlyAccessConfirmation() {
   const [searchParams] = useSearchParams();
@@ -75,8 +76,19 @@ export default function EarlyAccessConfirmation() {
                 Information saved for <span className="text-white font-normal">{email}</span>
               </p>
             </div>
-            <p className="mt-4 text-sm text-slate-400 font-light">
-              We've received your information. We'll contact you soon with more details about early access.
+            <p className="mt-4 text-sm text-slate-400 font-light min-h-[2rem]">
+              <TypewriterText
+                texts={[
+                  'We\'ve received your information. We\'ll contact you soon with more details about early access.',
+                  'Nucigen does not forecast outcomes. It maps how decisions and disruptions propagate through real systems.',
+                  'Volatility is rarely random. Nucigen links price instability to structural constraints.',
+                  'Industrial bottlenecks are often invisible until they fail. Nucigen identifies them earlier.'
+                ]}
+                typingSpeed={60}
+                deletingSpeed={20}
+                pauseDuration={6000}
+                className="text-slate-400"
+              />
             </p>
           </div>
 

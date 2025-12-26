@@ -104,7 +104,7 @@ export default function AccessRequestModal({
       if (message.includes('already been registered')) {
         onError('This email is already registered. Use "Check Your Email" to view your status.');
       } else {
-        onError(message);
+      onError(message);
       }
     } finally {
       setIsSubmitting(false);

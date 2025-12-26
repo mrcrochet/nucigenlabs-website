@@ -17,10 +17,12 @@ interface NewsItem {
   timing: string;
   source?: string;
   url?: string;
+  tickers?: string;
+  confidence?: string;
 }
 
 // Generate a market prediction based on news content
-function generatePrediction(newsTitle: string, newsDescription: string): { prediction: string; timing: string } {
+function generatePrediction(newsTitle: string, newsDescription: string): { prediction: string; timing: string; tickers?: string; confidence?: string } {
   const title = newsTitle.toLowerCase();
   const desc = (newsDescription || '').toLowerCase();
   const combined = `${title} ${desc}`;
@@ -29,56 +31,73 @@ function generatePrediction(newsTitle: string, newsDescription: string): { predi
   if (combined.includes('oil') || combined.includes('gas') || combined.includes('energy') || combined.includes('fuel')) {
     return {
       prediction: 'Energy supply constraint → Oil prices up, transportation costs increase',
-      timing: '12-24 hours before market reaction'
+      timing: '12-24 hours before market reaction',
+      tickers: 'WTI, XLE, OIL',
+      confidence: 'High'
     };
   }
   if (combined.includes('semiconductor') || combined.includes('chip') || combined.includes('tech') || combined.includes('ai')) {
     return {
       prediction: 'Tech supply disruption → Hardware prices up, manufacturing margins compress',
-      timing: '6-18 hours before repricing'
+      timing: '6-18 hours before repricing',
+      tickers: 'SOXX, SMH, NVDA',
+      confidence: 'High'
     };
   }
   if (combined.includes('shipping') || combined.includes('port') || combined.includes('logistics') || combined.includes('supply chain')) {
     return {
       prediction: 'Logistics bottleneck → Container rates spike, retail inventory stress',
-      timing: '2-3 days before price movement'
+      timing: '2-3 days before price movement',
+      tickers: 'XRT, FDX, UPS',
+      confidence: 'Medium-High'
     };
   }
   if (combined.includes('sanction') || combined.includes('trade') || combined.includes('tariff') || combined.includes('export')) {
     return {
       prediction: 'Trade restriction → Supply chain disruption, commodity prices volatile',
-      timing: '1-2 days before market opens'
+      timing: '1-2 days before market opens',
+      tickers: 'DBA, DBC, XLB',
+      confidence: 'High'
     };
   }
   if (combined.includes('mining') || combined.includes('metal') || combined.includes('rare earth') || combined.includes('commodity')) {
     return {
       prediction: 'Commodity supply shift → Input costs change, downstream margins adjust',
-      timing: '3-5 days before procurement repricing'
+      timing: '3-5 days before procurement repricing',
+      tickers: 'XME, COPX, LIT',
+      confidence: 'Medium'
     };
   }
   if (combined.includes('factory') || combined.includes('production') || combined.includes('manufacturing')) {
     return {
       prediction: 'Production capacity change → Supply chain reallocation, sector margins shift',
-      timing: '18-36 hours before sector rotation'
+      timing: '18-36 hours before sector rotation',
+      tickers: 'XLI, ITA, IYT',
+      confidence: 'Medium-High'
     };
   }
   if (combined.includes('military') || combined.includes('defense') || combined.includes('war') || combined.includes('conflict')) {
     return {
       prediction: 'Geopolitical escalation → Defense sector demand up, energy volatility',
-      timing: 'Before volatility spike'
+      timing: 'Before volatility spike',
+      tickers: 'ITA, XAR, PPA',
+      confidence: 'High'
     };
   }
   if (combined.includes('inflation') || combined.includes('rate') || combined.includes('fed') || combined.includes('central bank')) {
     return {
       prediction: 'Monetary policy impact → Asset repricing, sector rotation expected',
-      timing: 'Before futures repositioning'
+      timing: 'Before futures repositioning',
+      tickers: 'TLT, TIP, DJP',
+      confidence: 'Medium'
     };
   }
 
   // Default generic prediction
   return {
     prediction: 'Market-moving event detected → Sector impact analysis in progress',
-    timing: 'Analysis pending'
+    timing: 'Analysis pending',
+    confidence: 'Analyzing'
   };
 }
 
@@ -128,13 +147,15 @@ export default function LiveNewsFeed() {
               article.title.length > 20
           );
 
-          // Transform articles to NewsItems with predictions
-          const items: NewsItem[] = validArticles.slice(0, 20).map((article: NewsArticle) => {
-            const { prediction, timing } = generatePrediction(article.title, article.description);
+          // Transform articles to NewsItems with predictions (limit to 2 examples for better UX)
+          const items: NewsItem[] = validArticles.slice(0, 2).map((article: NewsArticle) => {
+            const { prediction, timing, tickers, confidence } = generatePrediction(article.title, article.description);
             return {
               news: article.title,
               prediction,
               timing,
+              tickers,
+              confidence,
               source: article.source.name,
               url: article.url
             };
@@ -144,25 +165,23 @@ export default function LiveNewsFeed() {
         }
       } catch (error) {
         console.error('Error fetching news:', error);
-        // Fallback to sample data if API fails
+        // Fallback to sample data if API fails (limit to 2 examples)
         setNewsItems([
           {
             news: 'Global markets react to geopolitical tensions',
             prediction: 'Geopolitical escalation → Defense sector demand up, energy volatility',
             timing: 'Before volatility spike',
+            tickers: 'ITA, XAR, PPA',
+            confidence: 'High',
             source: 'Financial Times'
           },
           {
             news: 'Supply chain disruptions impact commodity prices',
             prediction: 'Logistics bottleneck → Container rates spike, retail inventory stress',
             timing: '2-3 days before price movement',
+            tickers: 'XRT, FDX, UPS',
+            confidence: 'Medium-High',
             source: 'Reuters'
-          },
-          {
-            news: 'Technology sector faces regulatory changes',
-            prediction: 'Tech supply disruption → Hardware prices up, manufacturing margins compress',
-            timing: '6-18 hours before repricing',
-            source: 'Bloomberg'
           }
         ]);
       } finally {
@@ -320,7 +339,15 @@ function NewsCard({ item }: { item: NewsItem }) {
           <p className="text-sm text-white font-light mb-1.5 leading-relaxed line-clamp-2">
             {item.prediction}
           </p>
-          <p className="text-[10px] text-[#E1463E] font-light">Predicted {item.timing}</p>
+          <div className="flex items-center gap-3 flex-wrap">
+            {item.tickers && (
+              <p className="text-[10px] text-emerald-400 font-medium">Watch: {item.tickers}</p>
+            )}
+            <p className="text-[10px] text-[#E1463E] font-light">Expected impact: {item.timing}</p>
+            {item.confidence && (
+              <p className="text-[10px] text-slate-500 font-light">Confidence: {item.confidence}</p>
+            )}
+          </div>
         </div>
       </div>
     </div>

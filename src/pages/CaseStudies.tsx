@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
+import TypewriterText from '../components/TypewriterText';
 
 export default function CaseStudies() {
   const [selectedCase, setSelectedCase] = useState<number | null>(null);
@@ -54,12 +55,33 @@ export default function CaseStudies() {
               <span className="text-slate-300">consequences, not signals.</span>
             </h1>
 
-            <p className="text-base md:text-xl text-slate-400 leading-[1.9] max-w-3xl mx-auto font-light mb-8">
-              Live event-to-supply-chain causality models that identify alpha windows before markets move.
+            <p className="text-base md:text-xl text-slate-400 leading-[1.9] max-w-3xl mx-auto font-light mb-8 min-h-[3rem]">
+              <TypewriterText
+                texts={[
+                  'Live event-to-supply-chain causality models that identify alpha windows before markets move.',
+                  'When a major competitor exits a market, Nucigen maps substitution limits and market structure to identify which players gain pricing power.',
+                  'When political instability escalates, Nucigen models how institutional disruption propagates through production, logistics, and investment flows.',
+                  'Nucigen traces regulatory shifts through industrial and trade systems to surface their downstream effects.'
+                ]}
+                typingSpeed={70}
+                deletingSpeed={25}
+                pauseDuration={5000}
+                className="text-slate-400"
+              />
             </p>
 
-            <p className="text-sm text-slate-500 font-light mb-14 italic">
-              Built for analysts, operators, and investors who think in systems — not charts.
+            <p className="text-sm text-slate-500 font-light mb-14 italic min-h-[2rem]">
+              <TypewriterText
+                texts={[
+                  'Built for analysts, operators, and investors who think in systems — not charts.',
+                  'Volatility is rarely random. Nucigen links price instability to structural constraints.',
+                  'Nucigen does not forecast outcomes. It maps how decisions and disruptions propagate through real systems.'
+                ]}
+                typingSpeed={60}
+                deletingSpeed={20}
+                pauseDuration={4000}
+                className="text-slate-500 italic"
+              />
             </p>
 
             <Link

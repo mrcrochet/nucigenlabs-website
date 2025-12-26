@@ -81,7 +81,7 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
       )}
 
       <form onSubmit={handleSubmit} className={variant === 'section' ? 'max-w-xl mx-auto' : ''}>
-        {(variant === 'section' || variant === 'inline') && (
+        {variant === 'section' && (
           <div className="mb-4">
             <label htmlFor="waitlist-name" className="block text-sm text-slate-300 font-light mb-2">
               Name (optional)
@@ -98,20 +98,22 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
           </div>
         )}
 
-        <div className={variant === 'inline' ? 'flex flex-col sm:flex-row gap-4 items-center' : 'mb-4'}>
+        <div className={variant === 'inline' 
+          ? 'flex flex-col sm:flex-row gap-3 items-stretch sm:items-center max-w-2xl mx-auto backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.1] rounded-xl p-2' 
+          : 'mb-4'}>
           <div className={variant === 'inline' ? 'flex-1 w-full' : 'w-full'}>
             <div className="relative">
               <Mail
                 size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
               />
               <input
                 type="email"
-                placeholder="your@email.com"
+                placeholder={variant === 'inline' ? "Enter your email" : "your@email.com"}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isSubmitting}
-                className="w-full pl-10 pr-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-white/30 transition-all text-sm font-light disabled:opacity-50 disabled:cursor-not-allowed"
+                className={`w-full ${variant === 'inline' ? 'pl-12 pr-4 py-4 bg-transparent border-0 text-white placeholder:text-slate-500 focus:outline-none' : 'pl-10 pr-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-white/30'} transition-all text-sm font-light disabled:opacity-50 disabled:cursor-not-allowed`}
                 aria-label="Email address"
                 required
               />
@@ -120,9 +122,11 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
           <button
             type="submit"
             disabled={isSubmitting}
-            className={`${variant === 'inline' ? 'w-full sm:w-auto px-10' : 'w-full px-6'} py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-150 hover:scale-105 hover:shadow-[0_0_25px_rgba(225,70,62,0.35)] text-sm whitespace-nowrap tracking-wide disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2`}
+            className={`${variant === 'inline' 
+              ? 'w-full sm:w-auto px-8 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-medium rounded-lg' 
+              : 'w-full px-6 py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg'} transition-all duration-150 hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(225,70,62,0.4)] text-sm whitespace-nowrap tracking-wide disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2`}
           >
-            {isSubmitting ? 'Submitting...' : variant === 'section' ? 'Request Early Access' : 'Request Early Access'}
+            {isSubmitting ? 'Submitting...' : variant === 'section' ? 'Get early access to market intelligence' : 'Get early access to market intelligence'}
             {!isSubmitting && <ArrowRight size={18} />}
           </button>
         </div>
@@ -138,12 +142,10 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
           <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-2xl p-12">
             <div className="text-center mb-10">
               <h2 className="text-4xl md:text-5xl font-light mb-4">
-                Request Early Access
-                <br />
-                <span className="text-2xl md:text-3xl text-slate-400 font-light">Join the Waiting List</span>
+                Get early access to market intelligence
               </h2>
               <p className="text-base text-slate-400 font-light">
-                Join the waiting list. Share your information and we'll contact you soon about early access.
+                Join the early analyst cohort. Be ahead of the market, not behind it.
               </p>
             </div>
             {formContent}

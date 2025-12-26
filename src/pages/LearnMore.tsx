@@ -4,6 +4,7 @@ import Footer from '../components/Footer';
 import SEO from '../components/SEO';
 import FourLevels from '../components/FourLevels';
 import LiveNewsFeed from '../components/LiveNewsFeed';
+import TypewriterText from '../components/TypewriterText';
 
 export default function LearnMore() {
   return (
@@ -30,8 +31,20 @@ export default function LearnMore() {
             Nucigen Labs transforms global news into predictive market signals in real-time.
           </p>
 
-          <p className="text-base md:text-lg text-slate-500 leading-relaxed font-light mb-12 max-w-3xl mx-auto">
-            When a factory closes in Taiwan or a sanction hits Russia, we detect it instantly and predict which assets will move — hours or days before the market reacts.
+          <p className="text-base md:text-lg text-slate-500 leading-relaxed font-light mb-12 max-w-3xl mx-auto min-h-[4rem]">
+            <TypewriterText
+              texts={[
+                'When a factory closes in Taiwan or a sanction hits Russia, we detect it instantly and predict which assets will move — hours or days before the market reacts.',
+                'When consumer demand shifts abruptly, Nucigen models the causal chain from demand signals to inventory pressure before it becomes visible in earnings.',
+                'When volatility regimes shift following political or economic stress, Nucigen maps the underlying causal drivers to distinguish transitory shocks from structural repricing.',
+                'Political uncertainty does not hit markets directly. It first alters permits, enforcement, financing, and movement.',
+                'Nucigen does not forecast outcomes. It maps how decisions and disruptions propagate through real systems.'
+              ]}
+              typingSpeed={60}
+              deletingSpeed={20}
+              pauseDuration={4000}
+              className="text-slate-500"
+            />
           </p>
         </div>
       </section>

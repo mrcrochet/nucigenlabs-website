@@ -8,6 +8,7 @@ import { sendEarlyAccessConfirmationEmail } from '../lib/email';
 import Toast from '../components/Toast';
 import { useToast } from '../hooks/useToast';
 import SimpleWaitlistForm from '../components/SimpleWaitlistForm';
+import TypewriterText from '../components/TypewriterText';
 
 export default function RequestAccess() {
   const navigate = useNavigate();
@@ -132,8 +133,19 @@ export default function RequestAccess() {
             <h1 className="text-4xl md:text-5xl font-light mb-4 text-white">
               Request Access
             </h1>
-            <p className="text-lg text-slate-400 font-light max-w-2xl mx-auto">
-              All applications are reviewed manually. Please provide accurate information to expedite the review process.
+            <p className="text-lg text-slate-400 font-light max-w-2xl mx-auto min-h-[3rem]">
+              <TypewriterText
+                texts={[
+                  'All applications are reviewed manually. Please provide accurate information to expedite the review process.',
+                  'When compute availability tightens, Nucigen maps how capacity constraints propagate across AI and cloud ecosystems.',
+                  'Political uncertainty does not hit markets directly. It first alters permits, enforcement, financing, and movement.',
+                  'Nucigen traces regulatory shifts through industrial and trade systems to surface their downstream effects.'
+                ]}
+                typingSpeed={70}
+                deletingSpeed={25}
+                pauseDuration={5000}
+                className="text-slate-400"
+              />
             </p>
           </div>
 

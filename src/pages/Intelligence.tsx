@@ -1,11 +1,9 @@
+import { Link } from 'react-router-dom';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
+import TypewriterText from '../components/TypewriterText';
 
-interface IntelligenceProps {
-  onRequestClearance: () => void;
-}
-
-export default function Intelligence({ onRequestClearance }: IntelligenceProps) {
+export default function Intelligence() {
   return (
     <main className="min-h-screen">
       <SEO
@@ -24,12 +22,33 @@ export default function Intelligence({ onRequestClearance }: IntelligenceProps) 
               <span className="text-slate-300">We predict consequences.</span>
             </h1>
 
-            <p className="text-base md:text-xl text-slate-400 leading-[1.9] max-w-3xl mx-auto font-light mb-8">
-              Nucigen Labs transforms geopolitical and industrial events into exploitable intelligence long before media amplification.
+            <p className="text-base md:text-xl text-slate-400 leading-[1.9] max-w-3xl mx-auto font-light mb-8 min-h-[3rem]">
+              <TypewriterText
+                texts={[
+                  'Nucigen Labs transforms geopolitical and industrial events into exploitable intelligence long before media amplification.',
+                  'When compute availability tightens, Nucigen maps how capacity constraints propagate across AI, cloud, and enterprise software ecosystems.',
+                  'When a major competitor exits a market, Nucigen maps substitution limits and market structure to identify which players gain pricing power.',
+                  'When political instability escalates, Nucigen models how institutional disruption propagates through production, logistics, and investment flows.'
+                ]}
+                typingSpeed={70}
+                deletingSpeed={25}
+                pauseDuration={5000}
+                className="text-slate-400"
+              />
             </p>
 
-            <p className="text-sm text-slate-500 font-light mb-14 tracking-wide">
-              Markets move last. Supply chains and treaties move first.
+            <p className="text-sm text-slate-500 font-light mb-14 tracking-wide min-h-[2rem]">
+              <TypewriterText
+                texts={[
+                  'Markets move last. Supply chains and treaties move first.',
+                  'Volatility is rarely random. Nucigen links price instability to structural constraints.',
+                  'Industrial bottlenecks are often invisible until they fail. Nucigen identifies them earlier.'
+                ]}
+                typingSpeed={60}
+                deletingSpeed={20}
+                pauseDuration={4000}
+                className="text-slate-500"
+              />
             </p>
 
             <Link

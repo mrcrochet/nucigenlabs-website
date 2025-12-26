@@ -1,6 +1,7 @@
 import { Activity, Shield, Cpu, Radio } from 'lucide-react';
 import EnhancedCard from './EnhancedCard';
 import ParallaxSection from './ParallaxSection';
+import TypewriterText from './TypewriterText';
 
 export default function AdvancedFeatures() {
   const features = [
@@ -43,11 +44,26 @@ export default function AdvancedFeatures() {
               ENTERPRISE-GRADE INFRASTRUCTURE
             </p>
             <h2 className="text-4xl md:text-6xl font-light text-white mb-8 leading-tight">
-              Built for institutions.<br />
-              <span className="text-slate-400">Accessible to professionals.</span>
+              Built for professionals.<br />
+              <span className="text-slate-400">Accessible to everyone.</span>
             </h2>
-            <p className="text-lg text-slate-400 font-light max-w-3xl mx-auto">
-              The same technology powering hedge funds and trading desks, now available through a simple API.
+            <p className="text-lg text-slate-400 font-light max-w-3xl mx-auto mb-4">
+              The same intelligence used by professionals — now accessible to everyone.
+            </p>
+            <p className="text-base text-slate-500 font-light max-w-2xl mx-auto italic min-h-[3rem]">
+              <TypewriterText
+                texts={[
+                  'Institutional-grade market intelligence, built for anyone who wants to invest smarter.',
+                  'Political uncertainty does not hit markets directly. It first alters permits, enforcement, financing, and movement.',
+                  'Nucigen does not forecast outcomes. It maps how decisions and disruptions propagate through real systems.',
+                  'Volatility is rarely random. Nucigen links price instability to structural constraints rather than treating it as noise.',
+                  'Industrial bottlenecks are often invisible until they fail. Nucigen identifies them earlier by mapping dependency networks.'
+                ]}
+                typingSpeed={70}
+                deletingSpeed={25}
+                pauseDuration={5000}
+                className="text-slate-500 italic"
+              />
             </p>
           </div>
         </ParallaxSection>

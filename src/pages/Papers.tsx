@@ -5,6 +5,7 @@ import SEO from '../components/SEO';
 import { submitAccessRequest } from '../lib/supabase';
 import Toast from '../components/Toast';
 import { useToast } from '../hooks/useToast';
+import TypewriterText from '../components/TypewriterText';
 
 import { Link } from 'react-router-dom';
 
@@ -169,8 +170,19 @@ export default function Papers() {
               The causal layer beneath the markets.
             </h1>
 
-            <p className="text-lg md:text-xl text-slate-400 leading-relaxed font-light mb-12">
-              Nucigen Labs publishes original research on geopolitical causality, industrial propagation, and systemic sequences.
+            <p className="text-lg md:text-xl text-slate-400 leading-relaxed font-light mb-12 min-h-[3rem]">
+              <TypewriterText
+                texts={[
+                  'Nucigen Labs publishes original research on geopolitical causality, industrial propagation, and systemic sequences.',
+                  'The causal layer beneath the markets. Original research on geopolitical causality, industrial propagation, and systemic market consequences.',
+                  'When consumer demand shifts abruptly, Nucigen models the causal chain from demand signals to inventory pressure before it becomes visible in earnings.',
+                  'Nucigen does not forecast outcomes. It maps how decisions and disruptions propagate through real systems.'
+                ]}
+                typingSpeed={70}
+                deletingSpeed={25}
+                pauseDuration={5000}
+                className="text-slate-400"
+              />
             </p>
 
             <Link
