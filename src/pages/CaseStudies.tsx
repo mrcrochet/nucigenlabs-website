@@ -59,9 +59,9 @@ export default function CaseStudies() {
               <TypewriterText
                 texts={[
                   'Live event-to-supply-chain causality models that identify alpha windows before markets move.',
-                  'When a major competitor exits a market, Nucigen maps substitution limits and market structure to identify which players gain pricing power.',
-                  'When political instability escalates, Nucigen models how institutional disruption propagates through production, logistics, and investment flows.',
-                  'Nucigen traces regulatory shifts through industrial and trade systems to surface their downstream effects.'
+                  'When a major competitor exits a market, Nucigen Labs maps substitution limits and market structure to identify which players gain pricing power.',
+                  'When political instability escalates, Nucigen Labs models how institutional disruption propagates through production, logistics, and investment flows.',
+                  'Nucigen Labs traces regulatory shifts through industrial and trade systems to surface their downstream effects.'
                 ]}
                 typingSpeed={70}
                 deletingSpeed={25}
@@ -74,8 +74,8 @@ export default function CaseStudies() {
               <TypewriterText
                 texts={[
                   'Built for analysts, operators, and investors who think in systems — not charts.',
-                  'Volatility is rarely random. Nucigen links price instability to structural constraints.',
-                  'Nucigen does not forecast outcomes. It maps how decisions and disruptions propagate through real systems.'
+                  'Volatility is rarely random. Nucigen Labs links price instability to structural constraints.',
+                  'Nucigen Labs does not forecast outcomes. It maps how decisions and disruptions propagate through real systems.'
                 ]}
                 typingSpeed={60}
                 deletingSpeed={20}
@@ -234,7 +234,7 @@ function getCaseContent(caseId: number) {
               text: `Headline: "Congo signs new cobalt concessions."
 
 To the market, this looked like a trade.
-To Nucigen, it was a structural re-routing of the EV supply chain.`,
+To Nucigen Labs, it was a structural re-routing of the EV supply chain.`,
             },
           ],
         },
@@ -252,10 +252,10 @@ The signal was noise.`,
           ],
         },
         {
-          heading: '③ Nucigen Detection',
+          heading: '③ Nucigen Labs Detection',
           content: [
             {
-              text: `Nucigen does not ingest news.
+              text: `Nucigen Labs does not ingest news.
 It models causal systems.
 
 In this case, the engine isolated:
@@ -346,7 +346,7 @@ This is intelligence, not technical analysis.`,
               text: `Headline: "Major Asian port slowdown due to maintenance."
 
 To the market, this looked like routine news.
-To Nucigen, it was a logistics chokepoint cascading into retail inflation.`,
+To Nucigen Labs, it was a logistics chokepoint cascading into retail inflation.`,
             },
           ],
         },
@@ -369,10 +369,10 @@ The mechanical indicators saw nothing.`,
           ],
         },
         {
-          heading: '③ Nucigen Detection',
+          heading: '③ Nucigen Labs Detection',
           content: [
             {
-              text: `Nucigen does not ingest news.
+              text: `Nucigen Labs does not ingest news.
 It models causal systems.
 
 In this case, the engine isolated:
@@ -459,7 +459,7 @@ Alpha is born in logistics, not on a chart.`,
               text: `Headline: "Bilateral drone cooperation agreement."
 
 To the market, this looked like a defense stock play.
-To Nucigen, it was a structural demand increase in microelectronics.`,
+To Nucigen Labs, it was a structural demand increase in microelectronics.`,
             },
           ],
         },
@@ -477,10 +477,10 @@ Total misunderstanding.`,
           ],
         },
         {
-          heading: '③ Nucigen Detection',
+          heading: '③ Nucigen Labs Detection',
           content: [
             {
-              text: `Nucigen does not ingest news.
+              text: `Nucigen Labs does not ingest news.
 It models causal systems.
 
 In this case, the engine isolated:

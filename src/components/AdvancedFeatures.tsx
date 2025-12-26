@@ -55,9 +55,9 @@ export default function AdvancedFeatures() {
                 texts={[
                   'Institutional-grade market intelligence, built for anyone who wants to invest smarter.',
                   'Political uncertainty does not hit markets directly. It first alters permits, enforcement, financing, and movement.',
-                  'Nucigen does not forecast outcomes. It maps how decisions and disruptions propagate through real systems.',
-                  'Volatility is rarely random. Nucigen links price instability to structural constraints rather than treating it as noise.',
-                  'Industrial bottlenecks are often invisible until they fail. Nucigen identifies them earlier by mapping dependency networks.'
+                  'Nucigen Labs does not forecast outcomes. It maps how decisions and disruptions propagate through real systems.',
+                  'Volatility is rarely random. Nucigen Labs links price instability to structural constraints rather than treating it as noise.',
+                  'Industrial bottlenecks are often invisible until they fail. Nucigen Labs identifies them earlier by mapping dependency networks.'
                 ]}
                 typingSpeed={70}
                 deletingSpeed={25}

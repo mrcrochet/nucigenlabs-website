@@ -93,7 +93,7 @@ export default function HowPeopleUseNucigen() {
         </div>
 
         <div className="mt-12 text-center">
-          <div className="inline-block backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] rounded-xl px-8 py-6">
+          <div className="inline-block backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] rounded-xl px-8 py-6 hover:border-white/[0.15] transition-all duration-300">
             <p className="text-sm text-slate-400 font-light mb-2">
               <span className="text-white font-medium">Early access cohort:</span>{' '}
               <span className="text-white font-medium">
@@ -105,9 +105,9 @@ export default function HowPeopleUseNucigen() {
               <TypewriterText
                 texts={[
                   'Join analysts, investors, researchers, and operators from finance, supply chains, and beyond',
-                  'When new sanctions are introduced, Nucigen maps causal chains across trade, compliance, and supply corridors.',
-                  'When compute availability tightens, Nucigen maps how capacity constraints propagate across AI and cloud ecosystems.',
-                  'When a major competitor exits a market, Nucigen maps substitution limits to identify which players gain pricing power.'
+                  'When new sanctions are introduced, Nucigen Labs maps causal chains across trade, compliance, and supply corridors.',
+                  'When compute availability tightens, Nucigen Labs maps how capacity constraints propagate across AI and cloud ecosystems.',
+                  'When a major competitor exits a market, Nucigen Labs maps substitution limits to identify which players gain pricing power.'
                 ]}
                 typingSpeed={50}
                 deletingSpeed={20}

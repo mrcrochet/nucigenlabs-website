@@ -101,9 +101,9 @@ export default function TypewriterText({
   }, [displayedText, isDeleting, isPaused, currentTextIndex, texts, typingSpeed, deletingSpeed, pauseDuration, nextCharDelay]);
 
   return (
-    <span className={className}>
+    <span className={className} style={{ willChange: 'contents' }}>
       {displayedText}
-      <span className="animate-pulse">|</span>
+      <span className="animate-pulse opacity-75">|</span>
     </span>
   );
 }

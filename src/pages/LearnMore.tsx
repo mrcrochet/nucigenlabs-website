@@ -35,10 +35,10 @@ export default function LearnMore() {
             <TypewriterText
               texts={[
                 'When a factory closes in Taiwan or a sanction hits Russia, we detect it instantly and predict which assets will move — hours or days before the market reacts.',
-                'When consumer demand shifts abruptly, Nucigen models the causal chain from demand signals to inventory pressure before it becomes visible in earnings.',
-                'When volatility regimes shift following political or economic stress, Nucigen maps the underlying causal drivers to distinguish transitory shocks from structural repricing.',
+                'When consumer demand shifts abruptly, Nucigen Labs models the causal chain from demand signals to inventory pressure before it becomes visible in earnings.',
+                'When volatility regimes shift following political or economic stress, Nucigen Labs maps the underlying causal drivers to distinguish transitory shocks from structural repricing.',
                 'Political uncertainty does not hit markets directly. It first alters permits, enforcement, financing, and movement.',
-                'Nucigen does not forecast outcomes. It maps how decisions and disruptions propagate through real systems.'
+                'Nucigen Labs does not forecast outcomes. It maps how decisions and disruptions propagate through real systems.'
               ]}
               typingSpeed={60}
               deletingSpeed={20}

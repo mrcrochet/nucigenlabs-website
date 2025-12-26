@@ -93,7 +93,7 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
               onChange={(e) => setName(e.target.value)}
               disabled={isSubmitting}
               placeholder="Your name"
-              className="w-full px-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-white/30 transition-all text-sm font-light disabled:opacity-50"
+              className="w-full px-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-[#E1463E]/50 focus:ring-2 focus:ring-[#E1463E]/20 transition-all duration-200 text-sm font-light disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
         )}
@@ -105,7 +105,7 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
             <div className="relative">
               <Mail
                 size={18}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors duration-200 pointer-events-none"
               />
               <input
                 type="email"
@@ -113,7 +113,7 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isSubmitting}
-                className={`w-full ${variant === 'inline' ? 'pl-12 pr-4 py-4 bg-transparent border-0 text-white placeholder:text-slate-500 focus:outline-none' : 'pl-10 pr-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-white/30'} transition-all text-sm font-light disabled:opacity-50 disabled:cursor-not-allowed`}
+                className={`w-full ${variant === 'inline' ? 'pl-12 pr-4 py-4 bg-transparent border-0 text-white placeholder:text-slate-500 focus:outline-none focus:placeholder:text-slate-400' : 'pl-10 pr-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-[#E1463E]/50 focus:ring-2 focus:ring-[#E1463E]/20'} transition-all duration-200 text-sm font-light disabled:opacity-50 disabled:cursor-not-allowed`}
                 aria-label="Email address"
                 required
               />
@@ -124,7 +124,7 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
             disabled={isSubmitting}
             className={`${variant === 'inline' 
               ? 'w-full sm:w-auto px-8 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-medium rounded-lg' 
-              : 'w-full px-6 py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg'} transition-all duration-150 hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(225,70,62,0.4)] text-sm whitespace-nowrap tracking-wide disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2`}
+              : 'w-full px-6 py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg'} transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(225,70,62,0.4)] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 focus:ring-offset-2 focus:ring-offset-black text-sm whitespace-nowrap tracking-wide disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2`}
           >
             {isSubmitting ? 'Submitting...' : variant === 'section' ? 'Get early access to market intelligence' : 'Get early access to market intelligence'}
             {!isSubmitting && <ArrowRight size={18} />}

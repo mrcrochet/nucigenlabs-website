@@ -137,9 +137,9 @@ export default function RequestAccess() {
               <TypewriterText
                 texts={[
                   'All applications are reviewed manually. Please provide accurate information to expedite the review process.',
-                  'When compute availability tightens, Nucigen maps how capacity constraints propagate across AI and cloud ecosystems.',
+                  'When compute availability tightens, Nucigen Labs maps how capacity constraints propagate across AI and cloud ecosystems.',
                   'Political uncertainty does not hit markets directly. It first alters permits, enforcement, financing, and movement.',
-                  'Nucigen traces regulatory shifts through industrial and trade systems to surface their downstream effects.'
+                  'Nucigen Labs traces regulatory shifts through industrial and trade systems to surface their downstream effects.'
                 ]}
                 typingSpeed={70}
                 deletingSpeed={25}

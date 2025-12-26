@@ -274,9 +274,9 @@ export default function LevelNews() {
                   <TypewriterText
                     texts={[
                       config.description,
-                      'When volatility regimes shift, Nucigen maps the underlying causal drivers to distinguish transitory shocks from structural repricing.',
-                      'Industrial bottlenecks are often invisible until they fail. Nucigen identifies them earlier by mapping dependency networks.',
-                      'Technological systems fail gradually, not suddenly. Nucigen tracks capacity saturation and dependency buildup.'
+                      'When volatility regimes shift, Nucigen Labs maps the underlying causal drivers to distinguish transitory shocks from structural repricing.',
+                      'Industrial bottlenecks are often invisible until they fail. Nucigen Labs identifies them earlier by mapping dependency networks.',
+                      'Technological systems fail gradually, not suddenly. Nucigen Labs tracks capacity saturation and dependency buildup.'
                     ]}
                     typingSpeed={70}
                     deletingSpeed={25}

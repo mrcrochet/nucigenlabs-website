@@ -259,7 +259,7 @@ export default function PricingPreview() {
                       <span className="opacity-40 blur-sm">Traditional financial platforms</span> optimize historical certainty.
                     </p>
                     <p className="text-base text-white font-light leading-relaxed">
-                      <strong className="text-[#E1463E]">Nucigen</strong> is built for forward-looking interpretation.
+                      <strong className="text-[#E1463E]">Nucigen Labs</strong> is built for forward-looking interpretation.
                     </p>
               </div>
 

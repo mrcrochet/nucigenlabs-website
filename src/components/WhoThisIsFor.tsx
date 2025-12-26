@@ -45,7 +45,7 @@ export default function WhoThisIsFor() {
             You no longer need thousands of dollars to access professional-grade market intelligence.
           </p>
           <p className="text-sm text-slate-400 font-light max-w-2xl mx-auto italic">
-            If you can read the news, you can use Nucigen. No charts to decode. No noise. Just clear cause → effect → market impact.
+            If you can read the news, you can use Nucigen Labs. No charts to decode. No noise. Just clear cause → effect → market impact.
           </p>
         </div>
 
@@ -55,12 +55,12 @@ export default function WhoThisIsFor() {
             return (
               <div
                 key={idx}
-                className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-6 hover:border-white/[0.20] transition-all duration-300"
+                className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-6 hover:border-white/[0.20] hover:shadow-xl hover:shadow-white/[0.05] hover:-translate-y-1 transition-all duration-300"
               >
-                <div className="w-12 h-12 rounded-lg bg-white/[0.10] border border-white/20 flex items-center justify-center mb-4">
-                  <Icon size={22} className="text-[#E1463E]" />
+                <div className="w-12 h-12 rounded-lg bg-white/[0.10] border border-white/20 flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110">
+                  <Icon size={22} className="text-[#E1463E] transition-colors duration-200" />
                 </div>
-                <h3 className="text-lg font-light mb-2">{audience.title}</h3>
+                <h3 className="text-lg font-light mb-2 text-white">{audience.title}</h3>
                 <p className="text-sm text-slate-400 font-light leading-relaxed">
                   {audience.description}
                 </p>
@@ -69,8 +69,8 @@ export default function WhoThisIsFor() {
           })}
         </div>
 
-        <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-8 text-center">
-          <p className="text-lg font-light leading-relaxed">
+        <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-8 text-center hover:border-white/[0.18] transition-all duration-300">
+          <p className="text-lg font-light leading-relaxed text-white">
             The intelligence usually reserved for institutions — now available for $59/month.
           </p>
         </div>

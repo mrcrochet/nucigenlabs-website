@@ -26,9 +26,9 @@ export default function Intelligence() {
               <TypewriterText
                 texts={[
                   'Nucigen Labs transforms geopolitical and industrial events into exploitable intelligence long before media amplification.',
-                  'When compute availability tightens, Nucigen maps how capacity constraints propagate across AI, cloud, and enterprise software ecosystems.',
-                  'When a major competitor exits a market, Nucigen maps substitution limits and market structure to identify which players gain pricing power.',
-                  'When political instability escalates, Nucigen models how institutional disruption propagates through production, logistics, and investment flows.'
+                  'When compute availability tightens, Nucigen Labs maps how capacity constraints propagate across AI, cloud, and enterprise software ecosystems.',
+                  'When a major competitor exits a market, Nucigen Labs maps substitution limits and market structure to identify which players gain pricing power.',
+                  'When political instability escalates, Nucigen Labs models how institutional disruption propagates through production, logistics, and investment flows.'
                 ]}
                 typingSpeed={70}
                 deletingSpeed={25}
@@ -41,8 +41,8 @@ export default function Intelligence() {
               <TypewriterText
                 texts={[
                   'Markets move last. Supply chains and treaties move first.',
-                  'Volatility is rarely random. Nucigen links price instability to structural constraints.',
-                  'Industrial bottlenecks are often invisible until they fail. Nucigen identifies them earlier.'
+                  'Volatility is rarely random. Nucigen Labs links price instability to structural constraints.',
+                  'Industrial bottlenecks are often invisible until they fail. Nucigen Labs identifies them earlier.'
                 ]}
                 typingSpeed={60}
                 deletingSpeed={20}

@@ -80,9 +80,9 @@ export default function EarlyAccessConfirmation() {
               <TypewriterText
                 texts={[
                   'We\'ve received your information. We\'ll contact you soon with more details about early access.',
-                  'Nucigen does not forecast outcomes. It maps how decisions and disruptions propagate through real systems.',
-                  'Volatility is rarely random. Nucigen links price instability to structural constraints.',
-                  'Industrial bottlenecks are often invisible until they fail. Nucigen identifies them earlier.'
+                  'Nucigen Labs does not forecast outcomes. It maps how decisions and disruptions propagate through real systems.',
+                  'Volatility is rarely random. Nucigen Labs links price instability to structural constraints.',
+                  'Industrial bottlenecks are often invisible until they fail. Nucigen Labs identifies them earlier.'
                 ]}
                 typingSpeed={60}
                 deletingSpeed={20}

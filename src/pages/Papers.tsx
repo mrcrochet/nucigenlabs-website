@@ -175,8 +175,8 @@ export default function Papers() {
                 texts={[
                   'Nucigen Labs publishes original research on geopolitical causality, industrial propagation, and systemic sequences.',
                   'The causal layer beneath the markets. Original research on geopolitical causality, industrial propagation, and systemic market consequences.',
-                  'When consumer demand shifts abruptly, Nucigen models the causal chain from demand signals to inventory pressure before it becomes visible in earnings.',
-                  'Nucigen does not forecast outcomes. It maps how decisions and disruptions propagate through real systems.'
+                  'When consumer demand shifts abruptly, Nucigen Labs models the causal chain from demand signals to inventory pressure before it becomes visible in earnings.',
+                  'Nucigen Labs does not forecast outcomes. It maps how decisions and disruptions propagate through real systems.'
                 ]}
                 typingSpeed={70}
                 deletingSpeed={25}
@@ -444,7 +444,7 @@ export default function Papers() {
 
           {/* Scientific Pipeline */}
           <div className="mb-32 max-w-4xl mx-auto">
-            <p className="text-xs text-slate-600 mb-12 text-center tracking-[0.3em] font-normal uppercase">The Nucigen Research Method</p>
+            <p className="text-xs text-slate-600 mb-12 text-center tracking-[0.3em] font-normal uppercase">The Nucigen Labs Research Method</p>
 
             <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.08] rounded-lg p-10">
               <h3 className="text-2xl text-white font-light mb-10 text-center">Scientific Pipeline</h3>
@@ -470,7 +470,7 @@ export default function Papers() {
 
           {/* What Makes Nucigen Different */}
           <div className="mb-32 max-w-4xl mx-auto">
-            <p className="text-xs text-slate-600 mb-12 text-center tracking-[0.3em] font-normal uppercase">What Makes Nucigen Research Different</p>
+            <p className="text-xs text-slate-600 mb-12 text-center tracking-[0.3em] font-normal uppercase">What Makes Nucigen Labs Research Different</p>
 
             <div className="grid md:grid-cols-2 gap-6 mb-8">
               {/* Traditional Finance Research */}

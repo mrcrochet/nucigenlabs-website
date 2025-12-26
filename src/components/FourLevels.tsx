@@ -219,7 +219,7 @@ export default function FourLevels() {
           </p>
           <p className="text-base text-slate-400 font-light italic max-w-2xl mx-auto mb-8">
             Markets react at the last level.<br />
-            <span className="text-white">Nucigen operates across all four — in real time.</span>
+            <span className="text-white">Nucigen Labs operates across all four — in real time.</span>
           </p>
           
           {/* Directional indicator */}
