@@ -271,16 +271,22 @@ export async function createVerificationCode(email: string): Promise<string> {
 
 /**
  * Verify a code for an email
+ * Returns true if code is valid, false otherwise
  */
 export async function verifyEmailCode(email: string, code: string): Promise<boolean> {
   if (!supabaseUrl || !supabaseAnonKey) {
     console.warn('Supabase is not configured. Cannot verify code.');
-    // In development, accept any code
-    return code.length === 4;
+    // In development, accept any 4-digit code
+    return /^\d{4}$/.test(code);
   }
 
   const emailLower = email.toLowerCase().trim();
   const codeTrimmed = code.trim();
+
+  // Validate code format
+  if (!/^\d{4}$/.test(codeTrimmed)) {
+    return false;
+  }
 
   // Find the code
   const { data, error } = await supabase
@@ -303,11 +309,53 @@ export async function verifyEmailCode(email: string, code: string): Promise<bool
     return false; // Code not found or expired
   }
 
+  // Check if too many attempts (optional: limit to 5 attempts)
+  if (data.verification_attempts >= 5) {
+    console.warn('Too many verification attempts for code');
+    return false;
+  }
+
   // Mark code as verified
-  await supabase
+  const { error: updateError } = await supabase
     .from('email_verification_codes')
     .update({ verified: true })
     .eq('id', data.id);
 
+  if (updateError) {
+    console.error('Error marking code as verified:', updateError);
+    return false;
+  }
+
   return true;
+}
+
+/**
+ * Increment verification attempts for a code (when verification fails)
+ */
+export async function incrementVerificationAttempts(email: string, code: string): Promise<void> {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return;
+  }
+
+  const emailLower = email.toLowerCase().trim();
+  const codeTrimmed = code.trim();
+
+  // Find the code and increment attempts
+  const { data } = await supabase
+    .from('email_verification_codes')
+    .select('id, verification_attempts')
+    .eq('email', emailLower)
+    .eq('code', codeTrimmed)
+    .eq('verified', false)
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (data) {
+    await supabase
+      .from('email_verification_codes')
+      .update({ verification_attempts: (data.verification_attempts || 0) + 1 })
+      .eq('id', data.id);
+  }
 }

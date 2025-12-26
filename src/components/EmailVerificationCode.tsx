@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Mail, ArrowRight, RotateCcw } from 'lucide-react';
-import { verifyEmailCode, createVerificationCode } from '../lib/supabase';
+import { verifyEmailCode, createVerificationCode, incrementVerificationAttempts } from '../lib/supabase';
 import { sendVerificationCodeEmail } from '../lib/email';
 import { useToast } from '../hooks/useToast';
 
@@ -65,8 +65,8 @@ export default function EmailVerificationCode({ email, name, onVerified, onResen
   const handleVerify = async (codeToVerify?: string) => {
     const codeString = codeToVerify || code.join('');
     
-    if (codeString.length !== 4) {
-      showToast('Please enter a 4-digit code', 'error');
+    if (codeString.length !== 4 || !/^\d{4}$/.test(codeString)) {
+      showToast('Please enter a valid 4-digit code', 'error');
       return;
     }
 
@@ -79,6 +79,8 @@ export default function EmailVerificationCode({ email, name, onVerified, onResen
         showToast('Email verified successfully!', 'success');
         onVerified();
       } else {
+        // Increment attempts for tracking
+        await incrementVerificationAttempts(email, codeString);
         showToast('Invalid or expired code. Please try again.', 'error');
         setCode(['', '', '', '']);
         inputRefs.current[0]?.focus();

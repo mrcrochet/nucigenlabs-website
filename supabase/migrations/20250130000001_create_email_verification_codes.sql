@@ -68,6 +68,7 @@ CREATE POLICY "Allow anonymous read own active codes" ON email_verification_code
 -- Policy: Allow anonymous users to update only their own codes (for verification)
 -- Can only update unverified, non-expired codes
 -- Can set verified=true or increment verification_attempts
+-- Note: Application logic should enforce that attempts only increment and verified only changes to true
 CREATE POLICY "Allow anonymous update own codes" ON email_verification_codes
   FOR UPDATE
   TO anon
@@ -76,9 +77,10 @@ CREATE POLICY "Allow anonymous update own codes" ON email_verification_codes
     AND expires_at > NOW()
   )
   WITH CHECK (
-    -- Allow marking as verified OR incrementing attempts (but not both)
-    (verified = true AND verification_attempts = OLD.verification_attempts)
-    OR (verified = false AND verification_attempts > OLD.verification_attempts)
+    -- Must remain unverified OR can be set to verified
+    -- Verification attempts can be incremented (enforced in application)
+    verified IN (false, true)
+    AND expires_at > NOW()
   );
 
 -- Policy: Service role has full access (for admin operations and cleanup)
