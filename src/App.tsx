@@ -1,7 +1,6 @@
 import { useState, Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import PremiumNavigation from './components/PremiumNavigation';
-import CustomCursor from './components/CustomCursor';
 import AnimatedBackground from './components/AnimatedBackground';
 import AccessRequestModal from './components/AccessRequestModal';
 import Toast from './components/Toast';
@@ -43,7 +42,6 @@ function App() {
   return (
     <div className="relative min-h-screen">
       <AnimatedBackground />
-      <CustomCursor />
       <PremiumNavigation />
 
       {toast.isVisible && (
