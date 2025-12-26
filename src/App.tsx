@@ -14,6 +14,7 @@ const CaseStudies = lazy(() => import('./pages/CaseStudies'));
 const LevelNews = lazy(() => import('./pages/LevelNews'));
 const EarlyAccessConfirmation = lazy(() => import('./pages/EarlyAccessConfirmation'));
 const RequestAccess = lazy(() => import('./pages/RequestAccess'));
+const LearnMore = lazy(() => import('./pages/LearnMore'));
 
 // Loading component for Suspense fallback
 const PageLoader = () => (
@@ -71,6 +72,10 @@ function App() {
           <Route 
             path="/request-access" 
             element={<RequestAccess />} 
+          />
+          <Route 
+            path="/learn-more" 
+            element={<LearnMore />} 
           />
       </Routes>
       </Suspense>

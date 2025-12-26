@@ -152,7 +152,7 @@ export default function EarlyAccessConfirmation() {
               Back to Home
             </button>
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/learn-more')}
               className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-150 hover:scale-105 hover:shadow-[0_0_25px_rgba(225,70,62,0.35)]"
             >
               Learn More
