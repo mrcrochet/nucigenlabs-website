@@ -253,6 +253,24 @@
     animation: float 6s ease-in-out infinite;
   }
 
+  @keyframes hologram-scan {
+    0% {
+      transform: translateX(-100%) translateY(-100%);
+      opacity: 0;
+    }
+    50% {
+      opacity: 0.6;
+    }
+    100% {
+      transform: translateX(100%) translateY(100%);
+      opacity: 0;
+    }
+  }
+
+  .animate-hologram-scan {
+    animation: hologram-scan 3s linear infinite;
+  }
+
   @keyframes fadeIn {
     from {
       opacity: 0;
