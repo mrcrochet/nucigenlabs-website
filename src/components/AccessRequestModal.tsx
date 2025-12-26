@@ -61,7 +61,7 @@ export default function AccessRequestModal({
     try {
       const email = formData.email.toLowerCase().trim();
       
-      // Submit to Supabase
+      // Submit to Supabase (will update if email exists)
       const result = await submitAccessRequest({
         email,
         role: formData.role || undefined,
@@ -72,15 +72,18 @@ export default function AccessRequestModal({
       });
 
       // Send confirmation email (non-blocking)
-      sendEarlyAccessConfirmationEmail({
-        to: email,
-        name: formData.company || undefined,
-        role: formData.role || undefined,
-        company: formData.company || undefined,
-      }).catch(err => {
-        console.warn('Email sending failed:', err);
-        // Don't block the signup process if email fails
-      });
+      // Only send if email wasn't already sent
+      if (!result?.email_sent) {
+        sendEarlyAccessConfirmationEmail({
+          to: email,
+          name: formData.company || undefined,
+          role: formData.role || undefined,
+          company: formData.company || undefined,
+        }).catch(err => {
+          console.warn('Email sending failed:', err);
+          // Don't block the signup process if email fails
+        });
+      }
 
       // Clear form
       setFormData({
@@ -96,7 +99,13 @@ export default function AccessRequestModal({
       navigate(`/early-access-confirmation?email=${encodeURIComponent(email)}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to submit request';
-      onError(message);
+      
+      // Better error messages
+      if (message.includes('already been registered')) {
+        onError('This email is already registered. Use "Check Your Email" to view your status.');
+      } else {
+        onError(message);
+      }
     } finally {
       setIsSubmitting(false);
     }

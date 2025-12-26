@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ArrowRight, XCircle } from 'lucide-react';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
 import AccessRequestModal from '../components/AccessRequestModal';
+import EmailRecoveryModal from '../components/EmailRecoveryModal';
 import CountdownTimer from '../components/CountdownTimer';
 import LiveNewsFeed from '../components/LiveNewsFeed';
 import FourLevels from '../components/FourLevels';
@@ -10,12 +12,11 @@ import WhoThisIsFor from '../components/WhoThisIsFor';
 import WaitingListSection from '../components/WaitingListSection';
 import Mission from '../components/Mission';
 import AdvancedFeatures from '../components/AdvancedFeatures';
-import PerformanceMetrics from '../components/PerformanceMetrics';
-import Integrations from '../components/Integrations';
-import AIArchitecture from '../components/AIArchitecture';
 
 export default function Home() {
+  const navigate = useNavigate();
   const [showAccessModal, setShowAccessModal] = useState(false);
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
 
   return (
     <main className="min-h-screen">
@@ -47,14 +48,22 @@ export default function Home() {
             </div>
           </div>
 
-          <button
-            onClick={() => setShowAccessModal(true)}
-            className="group inline-flex items-center gap-3 px-10 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-150 hover:scale-105 hover:shadow-[0_0_35px_rgba(225,70,62,0.4)] text-base tracking-wide mb-6 focus:outline-none focus:ring-2 focus:ring-[#E1463E] focus:ring-offset-2 focus:ring-offset-[#0A0A0A]"
-            aria-label="Join early access to Nucigen Labs"
-          >
-            Join Early Access
-            <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-          </button>
+          <div className="flex flex-col sm:flex-row gap-4 items-center justify-center mb-4">
+            <button
+              onClick={() => setShowAccessModal(true)}
+              className="group inline-flex items-center gap-3 px-10 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-150 hover:scale-105 hover:shadow-[0_0_35px_rgba(225,70,62,0.4)] text-base tracking-wide focus:outline-none focus:ring-2 focus:ring-[#E1463E] focus:ring-offset-2 focus:ring-offset-[#0A0A0A]"
+              aria-label="Join early access to Nucigen Labs"
+            >
+              Join Early Access
+              <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+            <button
+              onClick={() => setShowRecoveryModal(true)}
+              className="text-sm text-slate-400 hover:text-white font-light transition-colors underline underline-offset-4"
+            >
+              Already registered? Check your email
+            </button>
+          </div>
 
           <p className="text-xs text-slate-600 font-light">
             Early users shape the future of the platform.
@@ -68,13 +77,7 @@ export default function Home() {
       <FourLevels />
       </div>
 
-      <PerformanceMetrics />
-
       <AdvancedFeatures />
-
-      <Integrations />
-
-      <AIArchitecture />
 
       <div className="section-light">
       <WhoThisIsFor />
@@ -129,6 +132,14 @@ export default function Home() {
         onSuccess={() => {}}
         onError={() => {}}
         sourcePage="home"
+      />
+
+      <EmailRecoveryModal
+        isOpen={showRecoveryModal}
+        onClose={() => setShowRecoveryModal(false)}
+        onEmailFound={(email) => {
+          navigate(`/early-access-confirmation?email=${encodeURIComponent(email)}`);
+        }}
       />
     </main>
   );

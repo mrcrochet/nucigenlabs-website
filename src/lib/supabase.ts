@@ -22,7 +22,7 @@ export interface AccessRequest {
   updated_at?: string;
   // Early access fields
   early_access?: boolean;
-  launch_date?: string; // January 30, 2025
+  launch_date?: string; // January 30, 2026
   email_sent?: boolean;
   email_sent_at?: string;
   utm_source?: string;
@@ -46,6 +46,78 @@ export interface InstitutionalRequest {
   notes?: string;
 }
 
+/**
+ * Check if an email is already registered
+ */
+export async function checkEmailExists(email: string): Promise<AccessRequest | null> {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+
+  const emailLower = email.toLowerCase().trim();
+  const { data, error } = await supabase
+    .from('access_requests')
+    .select('*')
+    .eq('email', emailLower)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+    console.error('Error checking email:', error);
+    return null;
+  }
+
+  return data;
+}
+
+/**
+ * Get access request by email (for recovery)
+ */
+export async function getAccessRequestByEmail(email: string): Promise<AccessRequest | null> {
+  return checkEmailExists(email);
+}
+
+/**
+ * Update existing access request
+ */
+export async function updateAccessRequest(email: string, updates: Partial<AccessRequest>): Promise<AccessRequest | null> {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('Supabase is not configured.');
+    return null;
+  }
+
+  const emailLower = email.toLowerCase().trim();
+  const { data, error } = await supabase
+    .from('access_requests')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('email', emailLower)
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error updating access request:', error);
+    throw new Error(error.message || 'Failed to update request');
+  }
+
+  return data;
+}
+
+/**
+ * Extract UTM parameters from URL
+ */
+export function getUTMParams(): { utm_source?: string; utm_medium?: string; utm_campaign?: string } {
+  if (typeof window === 'undefined') return {};
+
+  const params = new URLSearchParams(window.location.search);
+  return {
+    utm_source: params.get('utm_source') || undefined,
+    utm_medium: params.get('utm_medium') || undefined,
+    utm_campaign: params.get('utm_campaign') || undefined,
+  };
+}
+
 export async function submitAccessRequest(data: AccessRequest) {
   // Check if Supabase is properly configured
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -56,17 +128,42 @@ export async function submitAccessRequest(data: AccessRequest) {
       id: 'mock-id',
       status: 'pending',
       early_access: true,
-      launch_date: '2025-01-30',
+      launch_date: '2026-01-30',
       created_at: new Date().toISOString(),
     };
   }
 
+  const emailLower = data.email.toLowerCase().trim();
+
+  // Check if email already exists
+  const existing = await checkEmailExists(emailLower);
+  if (existing) {
+    // Update existing record instead of creating new one
+    const utmParams = getUTMParams();
+    const updated = await updateAccessRequest(emailLower, {
+      role: data.role || existing.role,
+      company: data.company || existing.company,
+      exposure: data.exposure || existing.exposure,
+      intended_use: data.intended_use || existing.intended_use,
+      source_page: data.source_page || existing.source_page,
+      utm_source: utmParams.utm_source || existing.utm_source,
+      utm_medium: utmParams.utm_medium || existing.utm_medium,
+      utm_campaign: utmParams.utm_campaign || existing.utm_campaign,
+    });
+    return updated || existing;
+  }
+
   // Set early access defaults
+  const utmParams = getUTMParams();
   const requestData = {
     ...data,
+    email: emailLower,
     early_access: true,
-    launch_date: '2025-01-30', // January 30, 2025
+    launch_date: '2026-01-30', // January 30, 2026
     status: 'pending' as const,
+    utm_source: utmParams.utm_source,
+    utm_medium: utmParams.utm_medium,
+    utm_campaign: utmParams.utm_campaign,
   };
 
   const { data: result, error } = await supabase
@@ -77,6 +174,11 @@ export async function submitAccessRequest(data: AccessRequest) {
 
   if (error) {
     if (error.code === '23505') {
+      // Email already exists, try to get it
+      const existing = await checkEmailExists(emailLower);
+      if (existing) {
+        return existing;
+      }
       throw new Error('This email has already been registered for early access');
     }
     throw new Error(error.message || 'Failed to submit request');

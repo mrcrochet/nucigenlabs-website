@@ -5,11 +5,13 @@ import { submitAccessRequest } from '../lib/supabase';
 import { sendEarlyAccessConfirmationEmail } from '../lib/email';
 import Toast from './Toast';
 import { useToast } from '../hooks/useToast';
+import EmailRecoveryModal from './EmailRecoveryModal';
 
 export default function WaitingListSection() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const { toast, showToast, hideToast } = useToast();
 
   const validateEmail = (email: string) => {
@@ -53,7 +55,13 @@ export default function WaitingListSection() {
       navigate(`/early-access-confirmation?email=${encodeURIComponent(emailLower)}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to submit request';
-      showToast(message, 'error');
+      
+      // Better error messages
+      if (message.includes('already been registered')) {
+        showToast('This email is already registered. Use "Check Your Email" below.', 'error');
+      } else {
+        showToast(message, 'error');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -104,8 +112,25 @@ export default function WaitingListSection() {
               )}
             </button>
           </form>
+
+          <div className="text-center mt-6">
+            <button
+              onClick={() => setShowRecoveryModal(true)}
+              className="text-sm text-slate-500 hover:text-slate-300 font-light transition-colors underline underline-offset-4"
+            >
+              Already registered? Check your email
+            </button>
+          </div>
         </div>
       </div>
+
+      <EmailRecoveryModal
+        isOpen={showRecoveryModal}
+        onClose={() => setShowRecoveryModal(false)}
+        onEmailFound={(email) => {
+          navigate(`/early-access-confirmation?email=${encodeURIComponent(email)}`);
+        }}
+      />
     </section>
   );
 }
