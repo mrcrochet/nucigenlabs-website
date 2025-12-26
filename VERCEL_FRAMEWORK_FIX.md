@@ -131,3 +131,4 @@ Après ces corrections :
 - ✅ Les modifications sont visibles en production
 - ✅ Le routing fonctionne correctement
 
+

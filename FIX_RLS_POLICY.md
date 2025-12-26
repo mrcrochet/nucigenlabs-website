@@ -153,3 +153,4 @@ Les politiques RLS sont **cumulatives** (OR logic). Si vous avez plusieurs polit
 
 Le fichier `supabase/migrations/20250130000000_fix_rls_policies.sql` contient le script complet à exécuter.
 
+

@@ -125,3 +125,4 @@ getUTMParams(): { utm_source?, utm_medium?, utm_campaign? }
 4. **UTM tracking** : Vérifier que les paramètres UTM sont bien enregistrés
 5. **Mise à jour** : Tester la mise à jour d'une inscription existante
 
+

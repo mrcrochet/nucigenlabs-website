@@ -256,3 +256,4 @@ Si le problème persiste après avoir suivi ce guide :
 2. Vérifiez la console du navigateur sur le site en production (F12)
 3. Comparez le code local avec ce qui est sur GitHub
 
+

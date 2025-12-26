@@ -175,11 +175,15 @@ You're receiving this because you signed up for early access.
  */
 export async function sendVerificationCodeEmail(data: VerificationEmailData): Promise<boolean> {
   if (!RESEND_API_KEY) {
-    console.warn('Resend API key not configured. Email not sent.');
-    return true; // Return true to not block the process
+    console.error('❌ Resend API key not configured. Email not sent.');
+    console.error('Please set VITE_RESEND_API_KEY in your .env file');
+    return false; // Return false to indicate failure
   }
 
   try {
+    console.log('📧 Sending verification email to:', data.to);
+    console.log('📧 Using from email:', RESEND_FROM_EMAIL);
+    
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -195,15 +199,22 @@ export async function sendVerificationCodeEmail(data: VerificationEmailData): Pr
       }),
     });
 
+    const responseData = await response.json();
+
     if (!response.ok) {
-      const error = await response.json();
-      console.error('Resend API error:', error);
+      console.error('❌ Resend API error:', response.status, responseData);
+      console.error('Full error details:', JSON.stringify(responseData, null, 2));
       return false;
     }
 
+    console.log('✅ Email sent successfully:', responseData);
     return true;
   } catch (error) {
-    console.error('Error sending verification email:', error);
+    console.error('❌ Error sending verification email:', error);
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
     return false;
   }
 }

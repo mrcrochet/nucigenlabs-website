@@ -1,12 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, Mail } from 'lucide-react';
-import { submitAccessRequest, createVerificationCode } from '../lib/supabase';
-import { sendEarlyAccessConfirmationEmail, sendVerificationCodeEmail } from '../lib/email';
+import { submitAccessRequest } from '../lib/supabase';
 import Toast from './Toast';
 import { useToast } from '../hooks/useToast';
-import EmailRecoveryModal from './EmailRecoveryModal';
-import EmailVerificationCode from './EmailVerificationCode';
 
 interface SimpleWaitlistFormProps {
   variant?: 'inline' | 'modal' | 'section';
@@ -18,8 +15,6 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
-  const [showVerification, setShowVerification] = useState(false);
   const { toast, showToast, hideToast } = useToast();
 
   const validateEmail = (email: string) => {
@@ -45,53 +40,28 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
     try {
       const emailLower = email.toLowerCase().trim();
       
-      // Create and send verification code
-      const code = await createVerificationCode(emailLower);
-      await sendVerificationCodeEmail({
-        to: emailLower,
-        code,
-        name: name || undefined,
-      });
-
-      showToast('Verification code sent! Check your email.', 'success');
-      setShowVerification(true);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to send verification code';
-      showToast(message, 'error');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleEmailVerified = async () => {
-    setIsSubmitting(true);
-
-    try {
-      const emailLower = email.toLowerCase().trim();
-      
-      // Submit to Supabase (simple waitlist entry)
+      // Save to access_requests table (just store the information)
       await submitAccessRequest({
         email: emailLower,
         name: name || undefined,
         company: name || undefined,
-        source_page: 'waitlist',
+        source_page: 'early_access',
       });
 
-      // Send confirmation email (non-blocking)
-      sendEarlyAccessConfirmationEmail({
-        to: emailLower,
-        name: name || undefined,
-      }).catch(err => {
-        console.warn('Email sending failed:', err);
-      });
-
-      // Redirect to confirmation page
-      navigate(`/early-access-confirmation?email=${encodeURIComponent(emailLower)}`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to join waitlist';
+      // Show success message and redirect
+      showToast('Thank you! We\'ll contact you soon.', 'success');
       
-      if (message.includes('already been registered')) {
-        showToast('This email is already registered. Use "Check your email" below.', 'error');
+      // Redirect to confirmation page
+      setTimeout(() => {
+        navigate(`/early-access-confirmation?email=${encodeURIComponent(emailLower)}`);
+      }, 1000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to submit request';
+      console.error('Error in handleSubmit:', error);
+      
+      if (message.includes('already been registered') || message.includes('already exists')) {
+        showToast('This email is already registered. We\'ll contact you soon!', 'success');
+        navigate(`/early-access-confirmation?email=${encodeURIComponent(email.toLowerCase().trim())}`);
       } else {
         showToast(message, 'error');
       }
@@ -99,40 +69,6 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
       setIsSubmitting(false);
     }
   };
-
-  // Show verification code input if verification is needed
-  if (showVerification) {
-    return (
-      <div className={className}>
-        {toast.isVisible && (
-          <Toast
-            message={toast.message}
-            type={toast.type}
-            onClose={hideToast}
-          />
-        )}
-        <div className={variant === 'section' ? 'max-w-xl mx-auto' : ''}>
-          <EmailVerificationCode
-            email={email}
-            name={name}
-            onVerified={handleEmailVerified}
-            onResend={async () => {
-              try {
-                const code = await createVerificationCode(email.toLowerCase().trim());
-                await sendVerificationCodeEmail({
-                  to: email.toLowerCase().trim(),
-                  code,
-                  name: name || undefined,
-                });
-              } catch (error) {
-                console.error('Failed to resend code:', error);
-              }
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
 
   const formContent = (
     <>
@@ -175,7 +111,7 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isSubmitting}
-                className={`w-full ${variant === 'inline' ? 'pl-10 pr-4' : 'px-4'} py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-white/30 transition-all text-sm font-light disabled:opacity-50 disabled:cursor-not-allowed`}
+                className="w-full pl-10 pr-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-white/30 transition-all text-sm font-light disabled:opacity-50 disabled:cursor-not-allowed"
                 aria-label="Email address"
                 required
               />
@@ -186,31 +122,12 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
             disabled={isSubmitting}
             className={`${variant === 'inline' ? 'w-full sm:w-auto px-10' : 'w-full px-6'} py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-150 hover:scale-105 hover:shadow-[0_0_25px_rgba(225,70,62,0.35)] text-sm whitespace-nowrap tracking-wide disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2`}
           >
-            {isSubmitting ? 'Joining...' : variant === 'section' ? 'Join Waitlist' : 'Join Waitlist'}
+            {isSubmitting ? 'Submitting...' : variant === 'section' ? 'Request Early Access' : 'Request Early Access'}
             {!isSubmitting && <ArrowRight size={18} />}
           </button>
         </div>
 
-        {variant !== 'inline' && (
-          <div className="text-center mt-4">
-            <button
-              type="button"
-              onClick={() => setShowRecoveryModal(true)}
-              className="text-xs text-slate-500 hover:text-slate-300 font-light transition-colors underline underline-offset-4"
-            >
-              Already registered? Check your email
-            </button>
-          </div>
-        )}
       </form>
-
-      <EmailRecoveryModal
-        isOpen={showRecoveryModal}
-        onClose={() => setShowRecoveryModal(false)}
-        onEmailFound={(email) => {
-          navigate(`/early-access-confirmation?email=${encodeURIComponent(email)}`);
-        }}
-      />
     </>
   );
 
@@ -221,10 +138,12 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
           <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-2xl p-12">
             <div className="text-center mb-10">
               <h2 className="text-4xl md:text-5xl font-light mb-4">
-                Join the Waitlist
+                Request Early Access
+                <br />
+                <span className="text-2xl md:text-3xl text-slate-400 font-light">Join the Waiting List</span>
               </h2>
               <p className="text-base text-slate-400 font-light">
-                Be among the first to access Nucigen Labs when we launch.
+                Join the waiting list. Share your information and we'll contact you soon about early access.
               </p>
             </div>
             {formContent}

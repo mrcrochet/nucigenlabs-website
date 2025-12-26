@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Calendar, Mail, ArrowRight } from 'lucide-react';
 import SEO from '../components/SEO';
 import Footer from '../components/Footer';
-import CountdownTimer from '../components/CountdownTimer';
 
 export default function EarlyAccessConfirmation() {
   const [searchParams] = useSearchParams();
@@ -73,9 +72,12 @@ export default function EarlyAccessConfirmation() {
             <div className="inline-flex items-center gap-3 backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl px-6 py-4">
               <Mail size={20} className="text-[#E1463E]" />
               <p className="text-base text-slate-300 font-light">
-                Confirmation sent to <span className="text-white font-normal">{email}</span>
+                Information saved for <span className="text-white font-normal">{email}</span>
               </p>
             </div>
+            <p className="mt-4 text-sm text-slate-400 font-light">
+              We've received your information. We'll contact you soon with more details about early access.
+            </p>
           </div>
 
           {/* Countdown */}
@@ -162,7 +164,7 @@ export default function EarlyAccessConfirmation() {
 
           {/* Info */}
           <p className="mt-12 text-sm text-slate-500 font-light">
-            We'll keep you updated as we approach launch. Check your email for more details.
+            We've received your information. We'll contact you soon with more details about early access.
           </p>
         </div>
       </section>

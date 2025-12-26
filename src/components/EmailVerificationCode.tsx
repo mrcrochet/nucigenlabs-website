@@ -100,11 +100,17 @@ export default function EmailVerificationCode({ email, name, onVerified, onResen
 
     try {
       const newCode = await createVerificationCode(email);
-      await sendVerificationCodeEmail({
+      const emailSent = await sendVerificationCodeEmail({
         to: email,
         code: newCode,
         name,
       });
+      
+      if (!emailSent) {
+        showToast('Failed to resend email. Please check the console for details.', 'error');
+        console.error('Email resend failed. Check console for details.');
+        return;
+      }
       
       showToast('Verification code sent! Check your email.', 'success');
       setCode(['', '', '', '']);
@@ -115,6 +121,7 @@ export default function EmailVerificationCode({ email, name, onVerified, onResen
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to resend code';
+      console.error('Error in handleResend:', error);
       showToast(message, 'error');
     } finally {
       setIsResending(false);
