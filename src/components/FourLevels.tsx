@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Globe, Factory, Ship, TrendingUp, ArrowRight, X, ExternalLink } from 'lucide-react';
+import { Globe, Factory, Ship, TrendingUp, ArrowRight, X, ExternalLink, ChevronDown } from 'lucide-react';
 
 interface NewsArticle {
   title: string;
@@ -111,6 +111,7 @@ export default function FourLevels() {
   const [flippedCards, setFlippedCards] = useState<Set<number>>(new Set());
   const [newsData, setNewsData] = useState<Record<number, NewsArticle[]>>({});
   const [loadingNews, setLoadingNews] = useState<Record<number, boolean>>({});
+  const [expandedChains, setExpandedChains] = useState<Record<number, boolean>>({ 0: true }); // First level expanded
   const navigate = useNavigate();
 
   const levels = [
@@ -362,22 +363,42 @@ export default function FourLevels() {
                         </div>
                       </div>
 
-                      {/* Causal Chains - Dashboard List Style */}
-                      <div className="space-y-3 mb-6">
-                        {level.chains.map((chain, chainIdx) => (
-                          <div key={chainIdx} className="flex items-start gap-3">
-                            <div 
-                              className="w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0"
-                              style={{
-                                background: level.iconColor.replace('0.2', '0.6'),
-                                boxShadow: `0 0 6px ${level.iconColor}`,
-                              }}
-                            ></div>
-                            <p className="text-sm text-slate-300 font-light leading-relaxed flex-1">
-                              {chain}
-                            </p>
-                          </div>
-                        ))}
+                      {/* Causal Chains - Accordion */}
+                      <div className="mb-6">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedChains({ ...expandedChains, [idx]: !expandedChains[idx] });
+                          }}
+                          className="w-full flex items-center justify-between mb-3 text-left focus:outline-none focus:ring-2 focus:ring-white/20 rounded-lg p-2 -m-2"
+                          aria-expanded={expandedChains[idx]}
+                        >
+                          <span className="text-xs text-slate-400 font-light">Causal chains</span>
+                          <ChevronDown
+                            size={14}
+                            className={`text-slate-400 transition-transform duration-300 ${
+                              expandedChains[idx] ? 'transform rotate-180' : ''
+                            }`}
+                          />
+                        </button>
+                        <div className={`space-y-3 transition-all duration-300 ${
+                          expandedChains[idx] ? 'opacity-100 max-h-96' : 'opacity-0 max-h-0 overflow-hidden'
+                        }`}>
+                          {level.chains.map((chain, chainIdx) => (
+                            <div key={chainIdx} className="flex items-start gap-3">
+                              <div 
+                                className="w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0"
+                                style={{
+                                  background: level.iconColor.replace('0.2', '0.6'),
+                                  boxShadow: `0 0 6px ${level.iconColor}`,
+                                }}
+                              ></div>
+                              <p className="text-sm text-slate-300 font-light leading-relaxed flex-1">
+                                {chain}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
                       </div>
 
                       {/* Hover entry indicator */}

@@ -150,8 +150,10 @@ export default function Papers() {
   return (
     <main className="min-h-screen">
       <SEO
-        title="Papers — Nucigen Labs"
-        description="The causal layer beneath the markets. Original research on geopolitical causality, industrial propagation, and systemic market consequences."
+        title="Research Papers — Nucigen Labs"
+        description="Original research papers on causal modeling, geopolitical analysis, and market intelligence. Access cutting-edge research on how events propagate through markets."
+        keywords="market intelligence research, causal modeling papers, geopolitical analysis research, predictive analytics research, strategic intelligence papers"
+        type="article"
       />
 
       {toast.isVisible && (

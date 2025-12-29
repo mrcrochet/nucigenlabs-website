@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Mail } from 'lucide-react';
+import { ArrowRight, Mail, CheckCircle2 } from 'lucide-react';
 import { submitAccessRequest } from '../lib/supabase';
 import Toast from './Toast';
 import { useToast } from '../hooks/useToast';
+import UrgencyBadge from './UrgencyBadge';
 
 interface SimpleWaitlistFormProps {
   variant?: 'inline' | 'modal' | 'section';
@@ -15,6 +16,7 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEmailValid, setIsEmailValid] = useState(false);
   const { toast, showToast, hideToast } = useToast();
 
   const validateEmail = (email: string) => {
@@ -98,7 +100,7 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
           </div>
         )}
 
-        <div className={variant === 'inline' 
+          <div className={variant === 'inline' 
           ? 'flex flex-col sm:flex-row gap-3 items-stretch sm:items-center max-w-2xl mx-auto backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.1] rounded-xl p-2' 
           : 'mb-4'}>
           <div className={variant === 'inline' ? 'flex-1 w-full' : 'w-full'}>
@@ -111,12 +113,19 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
                 type="email"
                 placeholder={variant === 'inline' ? "Enter your email" : "your@email.com"}
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setIsEmailValid(validateEmail(e.target.value));
+                }}
+                onBlur={() => setIsEmailValid(validateEmail(email))}
                 disabled={isSubmitting}
-                className={`w-full ${variant === 'inline' ? 'pl-12 pr-4 py-4 bg-transparent border-0 text-white placeholder:text-slate-500 focus:outline-none focus:placeholder:text-slate-400' : 'pl-10 pr-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-[#E1463E]/50 focus:ring-2 focus:ring-[#E1463E]/20'} transition-all duration-200 text-sm font-light disabled:opacity-50 disabled:cursor-not-allowed`}
+                className={`w-full ${variant === 'inline' ? `pl-12 ${isEmailValid && email ? 'pr-10' : 'pr-4'} py-4 bg-transparent border-0 text-white placeholder:text-slate-500 focus:outline-none focus:placeholder:text-slate-400` : `pl-10 ${isEmailValid && email ? 'pr-10' : 'pr-4'} py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-[#E1463E]/50 focus:ring-2 focus:ring-[#E1463E]/20`} ${isEmailValid && email ? 'border-green-500/50' : ''} transition-all duration-200 text-sm font-light disabled:opacity-50 disabled:cursor-not-allowed`}
                 aria-label="Email address"
                 required
               />
+              {isEmailValid && email && (
+                <CheckCircle2 size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-green-500 pointer-events-none" />
+              )}
             </div>
           </div>
           <button
@@ -141,11 +150,17 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
         <div className="max-w-4xl mx-auto">
           <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-2xl p-12">
             <div className="text-center mb-10">
+              <div className="mb-4 flex justify-center">
+                <UrgencyBadge type="spots" />
+              </div>
               <h2 className="text-4xl md:text-5xl font-light mb-4">
                 Get early access to market intelligence
               </h2>
-              <p className="text-base text-slate-400 font-light">
+              <p className="text-base text-slate-400 font-light mb-4">
                 Join the early analyst cohort. Be ahead of the market, not behind it.
+              </p>
+              <p className="text-sm text-slate-500 font-light">
+                Limited to 1,200 spots for technical reasons and quality assurance. Apply now for priority access.
               </p>
             </div>
             {formContent}

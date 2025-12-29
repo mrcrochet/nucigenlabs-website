@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Terminal, TrendingUp, FileText, DollarSign, Layers } from 'lucide-react';
+import { Terminal, TrendingUp, FileText, DollarSign, Layers, Users } from 'lucide-react';
 
 export default function PremiumNavigation() {
   const [scrolled, setScrolled] = useState(false);
@@ -22,6 +22,7 @@ export default function PremiumNavigation() {
     { path: '/case-studies', label: 'Case Studies', icon: TrendingUp },
     { path: '/papers', label: 'Research', icon: FileText },
     { path: '/pricing', label: 'Pricing', icon: DollarSign },
+    { path: '/partners', label: 'Partners', icon: Users },
   ];
 
   return (

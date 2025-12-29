@@ -249,7 +249,8 @@ export default function LevelNews() {
     <main className="min-h-screen">
       <SEO 
         title={`${config.title} — Nucigen Labs`}
-        description={`Real-time news and predictions for ${config.description}`}
+        description={`Real-time intelligence and market predictions for ${config.description}. Live news feed, causal analysis, and market impact forecasts.`}
+        keywords={`${config.title.toLowerCase()}, market intelligence, real-time analysis, ${config.description.toLowerCase()}, predictive analytics`}
       />
 
       {/* Header */}

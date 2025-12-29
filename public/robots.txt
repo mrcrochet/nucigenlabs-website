@@ -3,9 +3,22 @@ User-agent: *
 Allow: /
 
 # Disallow admin or private pages if any
-# Disallow: /admin/
-# Disallow: /private/
+Disallow: /admin/
+Disallow: /private/
+Disallow: /api/
 
-# Sitemap location (update with your actual domain)
-# Sitemap: https://nucigenlabs.com/sitemap.xml
+# Allow important pages
+Allow: /
+Allow: /intelligence
+Allow: /pricing
+Allow: /papers
+Allow: /case-studies
+Allow: /partners
+Allow: /learn-more
+
+# Sitemap location
+Sitemap: https://nucigenlabs.com/sitemap.xml
+
+# Crawl-delay (optional, adjust if needed)
+# Crawl-delay: 1
 

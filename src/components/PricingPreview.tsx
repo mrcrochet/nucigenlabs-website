@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, ArrowRight, TrendingUp, Shield, Zap, Sparkles, Lock, Star } from 'lucide-react';
+import { Check, ArrowRight, TrendingUp, Shield, Zap, Sparkles, Lock, Star, ChevronDown } from 'lucide-react';
 import InstitutionalAccessModal from './InstitutionalAccessModal';
 import LiveNewsTicker from './LiveNewsTicker';
 
 export default function PricingPreview() {
   const [showInstitutionalModal, setShowInstitutionalModal] = useState(false);
+  const [showFeatures, setShowFeatures] = useState<Record<number, boolean>>({ 0: true }); // First plan features visible
 
   return (
     <>
@@ -65,24 +66,41 @@ export default function PricingPreview() {
                   </p>
                 </div>
 
-                <div className="space-y-3.5 mb-8">
-                  {[
-                    'Real-time geopolitical event detection',
-                    'Market impact forecasting (stocks, commodities)',
-                    'Causal event-to-market dashboards',
-                    'Alpha window predictions',
-                    'Supply chain disruption alerts',
-                    'Multi-asset exposure analysis',
-                    'Customizable intelligence feeds'
-                ].map((feature, idx) => (
-                  <div key={idx} className="flex items-start gap-3">
-                      <div className="mt-0.5 flex-shrink-0">
-                        <Check size={18} className="text-[#E1463E]" />
+                <div className="mb-8">
+                  <button
+                    onClick={() => setShowFeatures({ ...showFeatures, 0: !showFeatures[0] })}
+                    className="w-full flex items-center justify-between mb-3 text-left focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 rounded-lg p-2 -m-2"
+                    aria-expanded={showFeatures[0]}
+                  >
+                    <span className="text-sm text-slate-400 font-light">View all features</span>
+                    <ChevronDown
+                      size={16}
+                      className={`text-slate-400 transition-transform duration-300 ${
+                        showFeatures[0] ? 'transform rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+                  <div className={`space-y-3.5 transition-all duration-300 ${
+                    showFeatures[0] ? 'opacity-100 max-h-[500px]' : 'opacity-0 max-h-0 overflow-hidden'
+                  }`}>
+                    {[
+                      'Real-time geopolitical event detection',
+                      'Market impact forecasting (stocks, commodities)',
+                      'Causal event-to-market dashboards',
+                      'Alpha window predictions',
+                      'Supply chain disruption alerts',
+                      'Multi-asset exposure analysis',
+                      'Customizable intelligence feeds'
+                    ].map((feature, idx) => (
+                      <div key={idx} className="flex items-start gap-3">
+                        <div className="mt-0.5 flex-shrink-0">
+                          <Check size={18} className="text-[#E1463E]" />
+                        </div>
+                        <p className="text-sm text-slate-300 font-light leading-relaxed">{feature}</p>
                       </div>
-                      <p className="text-sm text-slate-300 font-light leading-relaxed">{feature}</p>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
 
               <Link
                 to="/request-access"

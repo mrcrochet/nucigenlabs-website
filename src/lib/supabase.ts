@@ -222,6 +222,73 @@ export async function submitInstitutionalRequest(data: InstitutionalRequest) {
   return result;
 }
 
+export interface PartnerApplication {
+  id?: string;
+  name: string;
+  email: string;
+  platform?: string;
+  audience_size?: string;
+  content_focus?: string;
+  why_interested?: string;
+  status?: 'pending' | 'approved' | 'rejected';
+  created_at?: string;
+  reviewed_at?: string;
+  notes?: string;
+}
+
+export async function submitPartnerApplication(data: {
+  name: string;
+  email: string;
+  platform: string;
+  audienceSize: string;
+  contentFocus: string;
+  whyInterested: string;
+}) {
+  // Check if Supabase is properly configured
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('Supabase is not configured. Partner application not submitted.');
+    // Return a mock success response for development
+    return {
+      ...data,
+      id: 'mock-id',
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    };
+  }
+
+  const emailLower = data.email.toLowerCase().trim();
+
+  const applicationData = {
+    name: data.name,
+    email: emailLower,
+    platform: data.platform,
+    audience_size: data.audienceSize,
+    content_focus: data.contentFocus,
+    why_interested: data.whyInterested,
+    status: 'pending' as const,
+  };
+
+  const { data: result, error } = await supabase
+    .from('partner_applications')
+    .insert([applicationData])
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('This email has already submitted an application');
+    }
+    if (error.code === '42P01') {
+      // Table doesn't exist yet
+      console.warn('partner_applications table does not exist. Please create it in Supabase.');
+      throw new Error('Partner applications are temporarily unavailable. Please try again later.');
+    }
+    throw new Error(error.message || 'Failed to submit application');
+  }
+
+  return result;
+}
+
 // Note: Email verification is now handled by Supabase Auth
 // The functions createVerificationCode, verifyEmailCode, and incrementVerificationAttempts
 // have been removed as they are no longer needed.

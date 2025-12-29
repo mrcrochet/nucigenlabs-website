@@ -116,7 +116,8 @@ export default function RequestAccess() {
     <main className="min-h-screen">
       <SEO
         title="Request Access — Nucigen Labs"
-        description="Request professional access to Nucigen Labs. Provide your details for review."
+        description="Request early access to Nucigen Labs strategic intelligence platform. Limited to 1,200 spots. Join analysts, investors, and operators getting market signals before markets react."
+        keywords="request access nucigen labs, early access market intelligence, professional access, strategic intelligence access"
       />
 
       {toast.isVisible && (

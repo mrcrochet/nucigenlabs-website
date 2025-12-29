@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
+import StructuredData from '../components/StructuredData';
 import TypewriterText from '../components/TypewriterText';
 
 export default function CaseStudies() {
@@ -40,7 +41,8 @@ export default function CaseStudies() {
     <main className="min-h-screen">
       <SEO
         title="Case Studies — Nucigen Labs"
-        description="Intelligence built on consequences, not signals. Live event-to-supply-chain causality models."
+        description="Real-world case studies showing how Nucigen Labs predicts market movements through causal analysis. From geopolitical events to supply chain disruptions to market repricing."
+        keywords="market intelligence case studies, predictive analytics examples, geopolitical analysis case studies, supply chain intelligence, market prediction examples"
       />
 
       <section className="relative min-h-screen px-6 py-32">

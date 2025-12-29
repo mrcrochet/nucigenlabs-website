@@ -51,7 +51,8 @@ export default function EarlyAccessConfirmation() {
     <main className="min-h-screen">
       <SEO 
         title="Early Access Confirmed — Nucigen Labs"
-        description="You're on the list! Get ready for early access to Nucigen Labs on January 30, 2026."
+        description="Your early access request has been confirmed. You're on the list for Nucigen Labs launch on January 30, 2026. We'll contact you soon with more details."
+        keywords="early access confirmed, nucigen labs launch, market intelligence access"
       />
 
       <section className="relative min-h-screen flex items-center justify-center px-6 py-24">

@@ -7,11 +7,13 @@ import LiveNewsFeed from '../components/LiveNewsFeed';
 import TypewriterText from '../components/TypewriterText';
 
 export default function LearnMore() {
+  const [expandedFeatures, setExpandedFeatures] = useState<Record<number, boolean>>({});
   return (
     <main className="min-h-screen">
       <SEO
         title="Learn More — Nucigen Labs"
-        description="Discover how Nucigen Labs transforms global news into predictive market intelligence before markets react."
+        description="Learn how Nucigen Labs works, who it's for, and how to get started. Discover real-time market intelligence that predicts movements before they happen."
+        keywords="how nucigen labs works, market intelligence platform, predictive analytics tool, strategic intelligence software, real-time market analysis"
       />
 
       {/* Hero Section */}
@@ -222,8 +224,23 @@ export default function LearnMore() {
                   </div>
                   <h3 className="text-xl font-light text-white">{audience.title}</h3>
                 </div>
-                <p className="text-sm text-slate-400 font-light leading-relaxed mb-6">{audience.description}</p>
-                <ul className="space-y-2">
+                <p className="text-sm text-slate-400 font-light leading-relaxed mb-4">{audience.description}</p>
+                <button
+                  onClick={() => setExpandedFeatures({ ...expandedFeatures, [idx]: !expandedFeatures[idx] })}
+                  className="w-full flex items-center justify-between mb-2 text-left focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 rounded-lg p-2 -m-2"
+                  aria-expanded={expandedFeatures[idx]}
+                >
+                  <span className="text-xs text-slate-500 font-light">View features</span>
+                  <ChevronDown
+                    size={14}
+                    className={`text-slate-500 transition-transform duration-300 ${
+                      expandedFeatures[idx] ? 'transform rotate-180' : ''
+                    }`}
+                  />
+                </button>
+                <ul className={`space-y-2 transition-all duration-300 ${
+                  expandedFeatures[idx] ? 'opacity-100 max-h-96' : 'opacity-0 max-h-0 overflow-hidden'
+                }`}>
                   {audience.features.map((feature, fIdx) => (
                     <li key={fIdx} className="flex items-center gap-2">
                       <CheckCircle2 size={16} className="text-[#E1463E] flex-shrink-0" />

@@ -1,9 +1,11 @@
-import { Activity, Shield, Cpu, Radio } from 'lucide-react';
+import { useState } from 'react';
+import { Activity, Shield, Cpu, Radio, ChevronDown } from 'lucide-react';
 import EnhancedCard from './EnhancedCard';
 import ParallaxSection from './ParallaxSection';
 import TypewriterText from './TypewriterText';
 
 export default function AdvancedFeatures() {
+  const [expandedMetrics, setExpandedMetrics] = useState<Record<number, boolean>>({});
   const features = [
     {
       icon: Activity,
@@ -95,24 +97,41 @@ export default function AdvancedFeatures() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4 pt-6 border-t border-white/[0.08]">
-                      {feature.metrics.map((metric, metricIdx) => (
-                        <div
-                          key={metricIdx}
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.03] border border-white/[0.05]"
-                        >
+                    <div className="pt-6 border-t border-white/[0.08]">
+                      <button
+                        onClick={() => setExpandedMetrics({ ...expandedMetrics, [idx]: !expandedMetrics[idx] })}
+                        className="w-full flex items-center justify-between mb-3 text-left focus:outline-none focus:ring-2 focus:ring-white/20 rounded-lg p-2 -m-2"
+                        aria-expanded={expandedMetrics[idx]}
+                      >
+                        <span className="text-xs text-slate-400 font-light">View metrics</span>
+                        <ChevronDown
+                          size={14}
+                          className={`text-slate-400 transition-transform duration-300 ${
+                            expandedMetrics[idx] ? 'transform rotate-180' : ''
+                          }`}
+                        />
+                      </button>
+                      <div className={`flex flex-wrap items-center gap-4 transition-all duration-300 ${
+                        expandedMetrics[idx] ? 'opacity-100 max-h-32' : 'opacity-0 max-h-0 overflow-hidden'
+                      }`}>
+                        {feature.metrics.map((metric, metricIdx) => (
                           <div
-                            className="w-2 h-2 rounded-full"
-                            style={{
-                              background: feature.glowColor,
-                              boxShadow: `0 0 8px ${feature.glowColor}`,
-                            }}
-                          ></div>
-                          <span className="text-xs text-slate-300 font-light">
-                            {metric}
-                          </span>
-                        </div>
-                      ))}
+                            key={metricIdx}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.03] border border-white/[0.05]"
+                          >
+                            <div
+                              className="w-2 h-2 rounded-full"
+                              style={{
+                                background: feature.glowColor,
+                                boxShadow: `0 0 8px ${feature.glowColor}`,
+                              }}
+                            ></div>
+                            <span className="text-xs text-slate-300 font-light">
+                              {metric}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-xl pointer-events-none"></div>

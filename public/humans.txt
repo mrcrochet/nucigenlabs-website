@@ -1,0 +1,16 @@
+/* TEAM */
+Developer: Nucigen Labs Team
+Contact: contact@nucigenlabs.com
+Location: Remote
+
+/* THANKS */
+Technology: React, TypeScript, Vite, Tailwind CSS, Supabase
+Design: Custom design system inspired by institutional-grade platforms
+Fonts: Playfair Display, Inter
+
+/* SITE */
+Last update: 2025/01/15
+Standards: HTML5, CSS3, JavaScript ES6+
+Components: React 18+
+Software: Vite, TypeScript
+

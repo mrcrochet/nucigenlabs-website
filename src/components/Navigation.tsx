@@ -81,6 +81,19 @@ export default function Navigation({ onRequestClearance }: NavigationProps) {
                   <div className="absolute -bottom-2 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white to-transparent"></div>
                 )}
               </Link>
+              <Link
+                to="/partners"
+                className={`relative text-sm font-light transition-all duration-300 ${
+                  isActive('/partners')
+                    ? 'text-white'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Partners
+                {isActive('/partners') && (
+                  <div className="absolute -bottom-2 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white to-transparent"></div>
+                )}
+              </Link>
               <button
                 onClick={onRequestClearance}
                 className="ml-2 px-6 py-2 text-sm text-white border border-white/20 hover:border-white/40 hover:bg-white/[0.05] rounded-lg transition-all duration-300 font-light tracking-wide"
@@ -146,6 +159,17 @@ export default function Navigation({ onRequestClearance }: NavigationProps) {
                 }`}
               >
                 Papers
+              </Link>
+              <Link
+                to="/partners"
+                onClick={closeMobileMenu}
+                className={`px-4 py-3 rounded-lg text-sm font-light transition-all duration-200 ${
+                  isActive('/partners')
+                    ? 'text-white bg-white/[0.08]'
+                    : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
+                }`}
+              >
+                Partners
               </Link>
               <button
                 onClick={() => {

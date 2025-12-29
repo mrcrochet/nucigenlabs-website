@@ -1,4 +1,5 @@
-import { XCircle } from 'lucide-react';
+import { XCircle, ChevronDown } from 'lucide-react';
+import { useState } from 'react';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
 import SimpleWaitlistForm from '../components/SimpleWaitlistForm';
@@ -10,12 +11,19 @@ import Mission from '../components/Mission';
 import AdvancedFeatures from '../components/AdvancedFeatures';
 import HowPeopleUseNucigen from '../components/HowPeopleUseNucigen';
 import TypewriterText from '../components/TypewriterText';
+import SocialProof from '../components/SocialProof';
 
 export default function Home() {
+  const [openStep, setOpenStep] = useState<number | null>(0); // First step open by default
+  const [isNotOpen, setIsNotOpen] = useState(false);
 
   return (
     <main className="min-h-screen">
-      <SEO />
+      <SEO 
+        title="Nucigen Labs — Strategic Intelligence for Operators"
+        description="We scan the news. We predict the market. Before it moves. Transform global news into predictive market signals in real-time. Limited to 1,200 early access spots."
+        keywords="market intelligence, predictive analytics, geopolitical analysis, financial forecasting, strategic intelligence, market prediction, real-time intelligence, early access"
+      />
 
       <section className="relative min-h-screen flex items-center justify-center px-6 py-32">
         <div className="max-w-5xl mx-auto w-full text-center">
@@ -141,19 +149,43 @@ export default function Home() {
             </h2>
           </div>
 
-          <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-10 mb-10 hover:border-white/[0.18] transition-all duration-300">
-            <div className="grid md:grid-cols-2 gap-6">
-              {[
-                'Not a signal group',
-                'Not a trading bot',
-                'Not a sentiment-based hype tool',
-                'Not a get-rich-quick platform'
-              ].map((item, idx) => (
-                <div key={idx} className="flex items-center gap-3 transition-opacity duration-200 hover:opacity-80">
-                  <XCircle size={20} className="text-[#E1463E]/70 flex-shrink-0" />
-                  <p className="text-base text-slate-400 font-light">{item}</p>
+          <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl overflow-hidden hover:border-white/[0.18] transition-all duration-300">
+            <button
+              onClick={() => setIsNotOpen(!isNotOpen)}
+              className="w-full px-10 py-6 flex items-center justify-between gap-4 text-left focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 focus:ring-offset-2 focus:ring-offset-black"
+              aria-expanded={isNotOpen}
+            >
+              <div className="flex items-center gap-3">
+                <XCircle size={20} className="text-[#E1463E]/70 flex-shrink-0" />
+                <span className="text-base text-slate-400 font-light">What Nucigen Labs is NOT</span>
+              </div>
+              <ChevronDown
+                size={20}
+                className={`text-slate-400 flex-shrink-0 transition-transform duration-300 ${
+                  isNotOpen ? 'transform rotate-180' : ''
+                }`}
+              />
+            </button>
+            <div
+              className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                isNotOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+              }`}
+            >
+              <div className="px-10 pb-6">
+                <div className="grid md:grid-cols-2 gap-6">
+                  {[
+                    'Not a signal group',
+                    'Not a trading bot',
+                    'Not a sentiment-based hype tool',
+                    'Not a get-rich-quick platform'
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-3 transition-opacity duration-200 hover:opacity-80">
+                      <XCircle size={20} className="text-[#E1463E]/70 flex-shrink-0" />
+                      <p className="text-base text-slate-400 font-light">{item}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           </div>
 
@@ -209,90 +241,70 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="space-y-6 mb-8">
-            {/* Step 1 */}
-            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-6 hover:border-white/[0.20] hover:shadow-xl hover:shadow-white/[0.05] transition-all duration-300">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-lg bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110">
-                  <span className="text-[#E1463E] font-bold text-lg">1</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <p className="text-xs text-slate-500 font-medium tracking-wider uppercase">Event Detected</p>
-                    <span className="text-xs text-slate-600">•</span>
-                    <p className="text-xs text-slate-500 font-light">Real-time</p>
+          <div className="space-y-2 mb-8">
+            {[
+              {
+                step: 1,
+                label: 'Event Detected',
+                time: 'Real-time',
+                title: 'A strike shuts down a lithium mine in Chile',
+                description: 'Our system detects this event from global news sources within minutes'
+              },
+              {
+                step: 2,
+                label: 'Impact Predicted',
+                time: 'Within hours',
+                title: 'Battery supply tightens → EV manufacturers face higher costs',
+                description: 'We map the causal chain: mine closure → lithium shortage → battery production impact → EV manufacturing costs'
+              },
+              {
+                step: 3,
+                label: 'Market Signal',
+                time: 'Before market reacts',
+                title: 'EV stocks likely to come under pressure before the market reacts',
+                description: 'You receive this signal hours or days before prices adjust, giving you time to position'
+              }
+            ].map((stepData, idx) => {
+              const isOpen = openStep === idx;
+              return (
+                <div key={idx} className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl overflow-hidden hover:border-white/[0.20] transition-all duration-300">
+                  <button
+                    onClick={() => setOpenStep(isOpen ? null : idx)}
+                    className="w-full px-6 py-4 flex items-center justify-between gap-4 text-left focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 focus:ring-offset-2 focus:ring-offset-black"
+                    aria-expanded={isOpen}
+                  >
+                    <div className="flex items-start gap-4 flex-1">
+                      <div className="w-12 h-12 rounded-lg bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center flex-shrink-0">
+                        <span className="text-[#E1463E] font-bold text-lg">{stepData.step}</span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-xs text-slate-500 font-medium tracking-wider uppercase">{stepData.label}</p>
+                          <span className="text-xs text-slate-600">•</span>
+                          <p className="text-xs text-slate-500 font-light">{stepData.time}</p>
+                        </div>
+                        <p className="text-base text-white font-light">{stepData.title}</p>
+                      </div>
+                    </div>
+                    <ChevronDown
+                      size={20}
+                      className={`text-slate-400 flex-shrink-0 transition-transform duration-300 ${
+                        isOpen ? 'transform rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+                  <div
+                    className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                      isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                    }`}
+                  >
+                    <div className="px-6 pb-4 pl-20">
+                      <p className="text-sm text-slate-400 font-light leading-relaxed">{stepData.description}</p>
+                    </div>
                   </div>
-                  <p className="text-base text-white font-light mb-2">
-                    A strike shuts down a lithium mine in Chile
-                  </p>
-                  <p className="text-sm text-slate-400 font-light">
-                    Our system detects this event from global news sources within minutes
-                  </p>
                 </div>
-              </div>
-            </div>
-
-            {/* Arrow */}
-            <div className="flex items-center justify-center py-2">
-              <div className="w-10 h-10 rounded-full bg-[#E1463E]/10 border border-[#E1463E]/30 flex items-center justify-center animate-pulse">
-                <svg className="w-5 h-5 text-[#E1463E] transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-
-            {/* Step 2 */}
-            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-6 hover:border-white/[0.20] hover:shadow-xl hover:shadow-white/[0.05] transition-all duration-300">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-lg bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110">
-                  <span className="text-[#E1463E] font-bold text-lg">2</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <p className="text-xs text-slate-500 font-medium tracking-wider uppercase">Impact Predicted</p>
-                    <span className="text-xs text-slate-600">•</span>
-                    <p className="text-xs text-slate-500 font-light">Within hours</p>
-                  </div>
-                  <p className="text-base text-white font-light mb-2">
-                    Battery supply tightens → EV manufacturers face higher costs
-                  </p>
-                  <p className="text-sm text-slate-400 font-light">
-                    We map the causal chain: mine closure → lithium shortage → battery production impact → EV manufacturing costs
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Arrow */}
-            <div className="flex items-center justify-center py-2">
-              <div className="w-10 h-10 rounded-full bg-[#E1463E]/10 border border-[#E1463E]/30 flex items-center justify-center animate-pulse">
-                <svg className="w-5 h-5 text-[#E1463E] transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-
-            {/* Step 3 */}
-            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-6 hover:border-white/[0.20] hover:shadow-xl hover:shadow-white/[0.05] transition-all duration-300">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-lg bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-110">
-                  <span className="text-[#E1463E] font-bold text-lg">3</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <p className="text-xs text-slate-500 font-medium tracking-wider uppercase">Market Signal</p>
-                    <span className="text-xs text-slate-600">•</span>
-                    <p className="text-xs text-slate-500 font-light">Before market reacts</p>
-                  </div>
-                  <p className="text-base text-white font-light mb-2">
-                    EV stocks likely to come under pressure before the market reacts
-                  </p>
-                  <p className="text-sm text-slate-400 font-light">
-                    You receive this signal hours or days before prices adjust, giving you time to position
-                  </p>
-                </div>
-              </div>
-            </div>
+              );
+            })}
           </div>
 
           <div className="backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/10 to-[#E1463E]/5 border border-[#E1463E]/30 rounded-xl p-8 text-center hover:border-[#E1463E]/40 hover:shadow-xl hover:shadow-[#E1463E]/10 transition-all duration-300">
@@ -342,6 +354,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <SocialProof />
 
       <div className="section-light">
         <SimpleWaitlistForm variant="section" className="" />

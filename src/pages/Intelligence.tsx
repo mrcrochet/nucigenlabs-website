@@ -8,7 +8,8 @@ export default function Intelligence() {
     <main className="min-h-screen">
       <SEO
         title="Intelligence — Nucigen Labs"
-        description="We don't predict markets, we predict consequences. Geopolitical vectors, industrial chains, and supply corridors analyzed before markets reprice."
+        description="Strategic intelligence platform that predicts market consequences before they happen. Real-time analysis of geopolitical events, industrial chains, and supply corridors."
+        keywords="strategic intelligence, market prediction, geopolitical analysis, real-time intelligence, market forecasting, predictive analytics"
       />
       <section className="relative min-h-screen flex items-center justify-center px-6 py-32">
         <div className="max-w-5xl mx-auto w-full">

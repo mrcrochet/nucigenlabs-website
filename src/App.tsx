@@ -1,9 +1,16 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import PremiumNavigation from './components/PremiumNavigation';
 import AnimatedBackground from './components/AnimatedBackground';
 import Toast from './components/Toast';
 import { useToast } from './hooks/useToast';
+import ExitIntentModal from './components/ExitIntentModal';
+import StickyCTA from './components/StickyCTA';
+import { useExitIntent } from './hooks/useExitIntent';
+import { useEffect } from 'react';
+import StructuredData from './components/StructuredData';
+import Breadcrumbs from './components/Breadcrumbs';
+import { prefetchCriticalRoutes } from './utils/prefetch';
 import Home from './pages/Home';
 
 // Lazy load routes for better performance
@@ -15,6 +22,7 @@ const LevelNews = lazy(() => import('./pages/LevelNews'));
 const EarlyAccessConfirmation = lazy(() => import('./pages/EarlyAccessConfirmation'));
 const RequestAccess = lazy(() => import('./pages/RequestAccess'));
 const LearnMore = lazy(() => import('./pages/LearnMore'));
+const PartnerProgram = lazy(() => import('./pages/PartnerProgram'));
 
 // Loading component for Suspense fallback
 const PageLoader = () => (
@@ -28,11 +36,29 @@ const PageLoader = () => (
 
 function App() {
   const { toast, showToast, hideToast } = useToast();
+  const [showExitModal, setShowExitModal] = useState(false);
+
+  // Prefetch critical routes on mount
+  useEffect(() => {
+    prefetchCriticalRoutes();
+  }, []);
+
+  useExitIntent(() => {
+    // Only show if user hasn't already submitted
+    const hasSubmitted = localStorage.getItem('access-request-submitted');
+    if (!hasSubmitted && !showExitModal) {
+      setShowExitModal(true);
+    }
+  });
 
   return (
     <div className="relative min-h-screen">
+      <StructuredData type="Organization" />
+      <StructuredData type="WebSite" />
       <AnimatedBackground />
       <PremiumNavigation />
+      <Breadcrumbs />
+      <StickyCTA />
 
       {toast.isVisible && (
         <Toast
@@ -41,6 +67,11 @@ function App() {
           onClose={hideToast}
         />
       )}
+
+      <ExitIntentModal
+        isOpen={showExitModal}
+        onClose={() => setShowExitModal(false)}
+      />
 
       <Suspense fallback={<PageLoader />}>
       <Routes>
@@ -76,6 +107,10 @@ function App() {
           <Route 
             path="/learn-more" 
             element={<LearnMore />} 
+          />
+          <Route 
+            path="/partners" 
+            element={<PartnerProgram />} 
           />
       </Routes>
       </Suspense>
