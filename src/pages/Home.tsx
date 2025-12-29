@@ -25,18 +25,18 @@ export default function Home() {
         keywords="market intelligence, predictive analytics, geopolitical analysis, financial forecasting, strategic intelligence, market prediction, real-time intelligence, early access"
       />
 
-      <section className="relative min-h-screen flex items-center justify-center px-6 py-32">
+      <section className="relative min-h-screen flex items-center justify-center px-4 sm:px-6 py-20 sm:py-32">
         <div className="max-w-5xl mx-auto w-full text-center">
-          <div className="inline-block backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/10 to-[#E1463E]/5 border border-[#E1463E]/20 rounded-full px-6 py-2 mb-8">
-            <p className="text-sm text-[#E1463E] font-light tracking-[0.15em]">PREDICTIVE NEWS ANALYSIS</p>
+          <div className="inline-block backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/10 to-[#E1463E]/5 border border-[#E1463E]/20 rounded-full px-4 sm:px-6 py-2 mb-6 sm:mb-8">
+            <p className="text-xs sm:text-sm text-[#E1463E] font-light tracking-[0.15em]">PREDICTIVE NEWS ANALYSIS</p>
           </div>
 
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-light mb-10 leading-[1.1] text-white">
-            We scan the news.<br />We predict the market.<br />
+          <h1 className="text-3xl sm:text-5xl md:text-7xl lg:text-8xl font-light mb-6 sm:mb-10 leading-[1.1] text-white px-2">
+            We scan the news.<br className="hidden sm:block" /> We predict the market.<br className="hidden sm:block" />
             <span className="text-[#E1463E]">Before it moves.</span>
           </h1>
 
-          <p className="text-lg md:text-xl text-slate-400 leading-relaxed font-light mb-6 max-w-4xl mx-auto">
+          <p className="text-base sm:text-lg md:text-xl text-slate-400 leading-relaxed font-light mb-4 sm:mb-6 max-w-4xl mx-auto px-4">
             Nucigen Labs transforms global news into predictive market signals in real-time.
           </p>
 
@@ -97,18 +97,18 @@ export default function Home() {
       <LiveNewsFeed />
 
       {/* Who is this for - Early section */}
-      <section className="relative px-6 py-24">
+      <section className="relative px-4 sm:px-6 py-16 sm:py-24">
         <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-light mb-6 text-white">
+          <div className="text-center mb-8 sm:mb-12">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-light mb-4 sm:mb-6 text-white px-2">
               Who is Nucigen Labs for?
             </h2>
-            <p className="text-lg text-slate-400 font-light max-w-2xl mx-auto leading-relaxed mb-8">
+            <p className="text-base sm:text-lg text-slate-400 font-light max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-8 px-4">
               If you care about understanding why markets move — not just reacting after — Nucigen Labs is for you.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mb-8">
+          <div className="grid md:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
             {[
               {
                 title: 'Everyone who\'s curious',
@@ -123,28 +123,28 @@ export default function Home() {
                 description: 'Monitor structural signals and risk thresholds in real-time'
               }
             ].map((item, idx) => (
-              <div key={idx} className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] rounded-xl p-6 text-center hover:border-white/[0.15] hover:shadow-xl hover:shadow-white/[0.03] hover:-translate-y-1 transition-all duration-300">
-                <h3 className="text-lg text-white font-light mb-3">{item.title}</h3>
-                <p className="text-sm text-slate-400 font-light leading-relaxed">{item.description}</p>
+              <div key={idx} className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] rounded-xl p-4 sm:p-6 text-center hover:border-white/[0.15] hover:shadow-xl hover:shadow-white/[0.03] hover:-translate-y-1 transition-all duration-300">
+                <h3 className="text-base sm:text-lg text-white font-light mb-2 sm:mb-3">{item.title}</h3>
+                <p className="text-xs sm:text-sm text-slate-400 font-light leading-relaxed">{item.description}</p>
               </div>
             ))}
           </div>
 
-          <div className="text-center space-y-4">
-            <p className="text-base text-slate-300 font-light italic">
+          <div className="text-center space-y-3 sm:space-y-4 px-4">
+            <p className="text-sm sm:text-base text-slate-300 font-light italic">
               You don't need to be a specialist. We offer the same technology that specialists use.
             </p>
-            <p className="text-sm text-slate-400 font-light">
+            <p className="text-xs sm:text-sm text-slate-400 font-light">
               The same intelligence used by professionals — now accessible to everyone who's curious about how the world works.
             </p>
           </div>
         </div>
       </section>
 
-      <section className="relative px-6 py-24">
+      <section className="relative px-4 sm:px-6 py-16 sm:py-24">
         <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-light mb-12">
+          <div className="text-center mb-10 sm:mb-16">
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-light mb-8 sm:mb-12 px-2">
               What Nucigen Labs is NOT
             </h2>
           </div>
@@ -207,16 +207,16 @@ export default function Home() {
       <AdvancedFeatures />
 
       {/* Simple Example Section */}
-      <section className="relative px-6 py-24">
+      <section className="relative px-4 sm:px-6 py-16 sm:py-24">
         <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
-            <div className="inline-block mb-6 px-4 py-1 rounded-full border border-white/10 bg-white/[0.02] backdrop-blur-sm">
+          <div className="text-center mb-8 sm:mb-12">
+            <div className="inline-block mb-4 sm:mb-6 px-3 sm:px-4 py-1 rounded-full border border-white/10 bg-white/[0.02] backdrop-blur-sm">
               <span className="text-[10px] text-slate-600 font-light tracking-[0.25em]">EXAMPLE</span>
             </div>
-            <h3 className="text-3xl md:text-4xl font-light text-white mb-4">
+            <h3 className="text-2xl sm:text-3xl md:text-4xl font-light text-white mb-3 sm:mb-4 px-2">
               How it works in practice
             </h3>
-            <p className="text-base text-slate-400 font-light max-w-2xl mx-auto mb-6">
+            <p className="text-sm sm:text-base text-slate-400 font-light max-w-2xl mx-auto mb-4 sm:mb-6 px-4">
               See how we transform a real-world event into actionable market intelligence
             </p>
             <div className="max-w-2xl mx-auto mb-8">
@@ -270,20 +270,20 @@ export default function Home() {
                 <div key={idx} className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl overflow-hidden hover:border-white/[0.20] transition-all duration-300">
                   <button
                     onClick={() => setOpenStep(isOpen ? null : idx)}
-                    className="w-full px-6 py-4 flex items-center justify-between gap-4 text-left focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 focus:ring-offset-2 focus:ring-offset-black"
+                    className="w-full px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between gap-3 sm:gap-4 text-left focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 focus:ring-offset-2 focus:ring-offset-black min-h-[44px]"
                     aria-expanded={isOpen}
                   >
-                    <div className="flex items-start gap-4 flex-1">
-                      <div className="w-12 h-12 rounded-lg bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center flex-shrink-0">
-                        <span className="text-[#E1463E] font-bold text-lg">{stepData.step}</span>
+                    <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center flex-shrink-0">
+                        <span className="text-[#E1463E] font-bold text-base sm:text-lg">{stepData.step}</span>
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <p className="text-xs text-slate-500 font-medium tracking-wider uppercase">{stepData.label}</p>
                           <span className="text-xs text-slate-600">•</span>
                           <p className="text-xs text-slate-500 font-light">{stepData.time}</p>
                         </div>
-                        <p className="text-base text-white font-light">{stepData.title}</p>
+                        <p className="text-sm sm:text-base text-white font-light">{stepData.title}</p>
                       </div>
                     </div>
                     <ChevronDown
@@ -298,8 +298,8 @@ export default function Home() {
                       isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
                     }`}
                   >
-                    <div className="px-6 pb-4 pl-20">
-                      <p className="text-sm text-slate-400 font-light leading-relaxed">{stepData.description}</p>
+                    <div className="px-4 sm:px-6 pb-3 sm:pb-4 pl-14 sm:pl-20">
+                      <p className="text-xs sm:text-sm text-slate-400 font-light leading-relaxed">{stepData.description}</p>
                     </div>
                   </div>
                 </div>

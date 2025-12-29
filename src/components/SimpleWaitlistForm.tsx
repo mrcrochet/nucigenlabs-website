@@ -95,7 +95,7 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
               onChange={(e) => setName(e.target.value)}
               disabled={isSubmitting}
               placeholder="Your name"
-              className="w-full px-4 py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-[#E1463E]/50 focus:ring-2 focus:ring-[#E1463E]/20 transition-all duration-200 text-sm font-light disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-4 py-3.5 sm:py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-[#E1463E]/50 focus:ring-2 focus:ring-[#E1463E]/20 transition-all duration-200 text-base sm:text-sm font-light disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
             />
           </div>
         )}
@@ -111,6 +111,8 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
               />
               <input
                 type="email"
+                inputMode="email"
+                autoComplete="email"
                 placeholder={variant === 'inline' ? "Enter your email" : "your@email.com"}
                 value={email}
                 onChange={(e) => {
@@ -119,7 +121,7 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
                 }}
                 onBlur={() => setIsEmailValid(validateEmail(email))}
                 disabled={isSubmitting}
-                className={`w-full ${variant === 'inline' ? `pl-12 ${isEmailValid && email ? 'pr-10' : 'pr-4'} py-4 bg-transparent border-0 text-white placeholder:text-slate-500 focus:outline-none focus:placeholder:text-slate-400` : `pl-10 ${isEmailValid && email ? 'pr-10' : 'pr-4'} py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-[#E1463E]/50 focus:ring-2 focus:ring-[#E1463E]/20`} ${isEmailValid && email ? 'border-green-500/50' : ''} transition-all duration-200 text-sm font-light disabled:opacity-50 disabled:cursor-not-allowed`}
+                className={`w-full min-h-[44px] ${variant === 'inline' ? `pl-12 ${isEmailValid && email ? 'pr-10' : 'pr-4'} py-3.5 sm:py-4 bg-transparent border-0 text-white placeholder:text-slate-500 focus:outline-none focus:placeholder:text-slate-400 text-base sm:text-sm` : `pl-10 ${isEmailValid && email ? 'pr-10' : 'pr-4'} py-3.5 sm:py-3 bg-black/60 backdrop-blur-xl border border-white/10 rounded-lg text-white placeholder:text-slate-700 focus:outline-none focus:border-[#E1463E]/50 focus:ring-2 focus:ring-[#E1463E]/20 text-base sm:text-sm`} ${isEmailValid && email ? 'border-green-500/50' : ''} transition-all duration-200 font-light disabled:opacity-50 disabled:cursor-not-allowed`}
                 aria-label="Email address"
                 required
               />
@@ -132,11 +134,11 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
             type="submit"
             disabled={isSubmitting}
             className={`${variant === 'inline' 
-              ? 'w-full sm:w-auto px-8 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-medium rounded-lg' 
-              : 'w-full px-6 py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg'} transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(225,70,62,0.4)] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 focus:ring-offset-2 focus:ring-offset-black text-sm whitespace-nowrap tracking-wide disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2`}
+              ? 'w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-medium rounded-lg min-h-[44px]' 
+              : 'w-full px-6 py-3.5 sm:py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg min-h-[44px]'} transition-all duration-200 hover:scale-[1.02] hover:shadow-[0_0_20px_rgba(225,70,62,0.4)] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 focus:ring-offset-2 focus:ring-offset-black text-sm sm:text-base whitespace-nowrap tracking-wide disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2`}
           >
             {isSubmitting ? 'Submitting...' : variant === 'section' ? 'Get early access to market intelligence' : 'Get early access to market intelligence'}
-            {!isSubmitting && <ArrowRight size={18} />}
+            {!isSubmitting && <ArrowRight size={18} className="flex-shrink-0" />}
           </button>
         </div>
 
@@ -146,20 +148,20 @@ export default function SimpleWaitlistForm({ variant = 'inline', className = '' 
 
   if (variant === 'section') {
     return (
-      <section className={`relative px-6 py-24 ${className}`}>
+      <section className={`relative px-4 sm:px-6 py-16 sm:py-24 ${className}`}>
         <div className="max-w-4xl mx-auto">
-          <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-2xl p-12">
-            <div className="text-center mb-10">
+          <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-2xl p-6 sm:p-12">
+            <div className="text-center mb-8 sm:mb-10">
               <div className="mb-4 flex justify-center">
                 <UrgencyBadge type="spots" />
               </div>
-              <h2 className="text-4xl md:text-5xl font-light mb-4">
+              <h2 className="text-2xl sm:text-4xl md:text-5xl font-light mb-3 sm:mb-4 px-2">
                 Get early access to market intelligence
               </h2>
-              <p className="text-base text-slate-400 font-light mb-4">
+              <p className="text-sm sm:text-base text-slate-400 font-light mb-3 sm:mb-4 px-2">
                 Join the early analyst cohort. Be ahead of the market, not behind it.
               </p>
-              <p className="text-sm text-slate-500 font-light">
+              <p className="text-xs sm:text-sm text-slate-500 font-light px-2">
                 Limited to 1,200 spots for technical reasons and quality assurance. Apply now for priority access.
               </p>
             </div>

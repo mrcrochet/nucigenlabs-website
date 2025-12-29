@@ -283,6 +283,34 @@
     * {
       cursor: auto !important;
     }
+    
+    /* Improve touch targets on mobile */
+    button,
+    a,
+    input,
+    select,
+    textarea {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    
+    /* Better text readability on mobile */
+    body {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+    
+    /* Prevent horizontal scroll */
+    html, body {
+      overflow-x: hidden;
+      width: 100%;
+    }
+    
+    /* Improve tap highlight */
+    a, button {
+      -webkit-tap-highlight-color: rgba(225, 70, 62, 0.2);
+      tap-highlight-color: rgba(225, 70, 62, 0.2);
+    }
   }
 
   /* Respect user's motion preferences */

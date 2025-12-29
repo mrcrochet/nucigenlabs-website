@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Terminal, TrendingUp, FileText, DollarSign, Layers, Users } from 'lucide-react';
+import { Terminal, TrendingUp, FileText, DollarSign, Layers, Users, Menu, X } from 'lucide-react';
 
 export default function PremiumNavigation() {
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -34,27 +35,29 @@ export default function PremiumNavigation() {
       }`}
       role="banner"
     >
-      <nav className="max-w-7xl mx-auto px-6 py-4" aria-label="Main navigation">
+      <nav className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4" aria-label="Main navigation">
         <div className="flex items-center justify-between">
           <Link
             to="/"
-            className="group flex items-center gap-2 text-white font-light text-xl tracking-tight"
+            className="group flex items-center gap-2 text-white font-light text-lg sm:text-xl tracking-tight min-h-[44px] min-w-[44px] flex items-center justify-center"
             aria-label="Nucigen Labs - Home"
+            onClick={() => setMobileMenuOpen(false)}
           >
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-red-500/20 to-orange-500/20 blur-lg group-hover:blur-xl transition-all duration-300"></div>
               <Terminal
-                size={24}
-                className="relative text-red-400 group-hover:text-red-300 transition-colors"
+                size={20}
+                className="sm:w-6 sm:h-6 relative text-red-400 group-hover:text-red-300 transition-colors"
               />
             </div>
-            <span className="relative">
+            <span className="relative hidden sm:inline">
               NUCIGEN
               <div className="absolute -bottom-1 left-0 w-0 h-[1px] bg-gradient-to-r from-red-400 to-orange-400 group-hover:w-full transition-all duration-300"></div>
             </span>
           </Link>
 
-          <div className="flex items-center gap-1">
+          {/* Desktop Navigation */}
+          <div className="hidden lg:flex items-center gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
@@ -63,7 +66,7 @@ export default function PremiumNavigation() {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`group relative px-4 py-2 rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 focus:ring-offset-2 focus:ring-offset-black ${
+                  className={`group relative px-4 py-2 rounded-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 focus:ring-offset-2 focus:ring-offset-black min-h-[44px] flex items-center ${
                     isActive
                       ? 'text-white'
                       : 'text-slate-400 hover:text-white'
@@ -94,15 +97,64 @@ export default function PremiumNavigation() {
             })}
           </div>
 
+          {/* Desktop CTA */}
           <Link
             to="/request-access"
-            className="group relative px-6 py-2 bg-gradient-to-r from-red-600/90 to-red-500/90 hover:from-red-500 hover:to-red-400 text-white rounded-lg text-sm font-light tracking-wide transition-all duration-300 overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#E1463E] focus:ring-offset-2 focus:ring-offset-black"
+            className="hidden lg:block group relative px-6 py-2 bg-gradient-to-r from-red-600/90 to-red-500/90 hover:from-red-500 hover:to-red-400 text-white rounded-lg text-sm font-light tracking-wide transition-all duration-300 overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#E1463E] focus:ring-offset-2 focus:ring-offset-black min-h-[44px] flex items-center"
             aria-label="Request access to Nucigen Labs"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
             <span className="relative">Request Access</span>
           </Link>
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="lg:hidden text-white p-2 hover:bg-white/[0.05] rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Toggle menu"
+            aria-expanded={mobileMenuOpen}
+          >
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
         </div>
+
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden mt-4 pb-4 border-t border-white/[0.08] pt-4 animate-in fade-in duration-200">
+            <div className="flex flex-col space-y-2">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = location.pathname === item.path;
+
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`group relative px-4 py-3 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 min-h-[44px] flex items-center ${
+                      isActive
+                        ? 'text-white bg-white/[0.08]'
+                        : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
+                    }`}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon size={18} />
+                      <span className="text-sm font-light">{item.label}</span>
+                    </div>
+                  </Link>
+                );
+              })}
+              <Link
+                to="/request-access"
+                onClick={() => setMobileMenuOpen(false)}
+                className="mt-2 px-4 py-3 bg-gradient-to-r from-red-600/90 to-red-500/90 hover:from-red-500 hover:to-red-400 text-white rounded-lg text-sm font-light tracking-wide transition-all duration-300 min-h-[44px] flex items-center justify-center"
+              >
+                Request Access
+              </Link>
+            </div>
+          </div>
+        )}
       </nav>
 
       {scrolled && (

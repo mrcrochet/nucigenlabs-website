@@ -29,32 +29,32 @@ export default function SocialProof() {
   ];
 
   return (
-    <section className="relative px-6 py-16">
+    <section className="relative px-4 sm:px-6 py-12 sm:py-16">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-12">
-          <p className="text-sm text-slate-500 font-light mb-3 tracking-[0.15em] uppercase">
+        <div className="text-center mb-8 sm:mb-12">
+          <p className="text-xs sm:text-sm text-slate-500 font-light mb-2 sm:mb-3 tracking-[0.15em] uppercase">
             Trusted by analysts and operators
           </p>
-          <h2 className="text-2xl md:text-3xl font-light text-white mb-4">
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-light text-white mb-3 sm:mb-4 px-2">
             Join a growing network of intelligence-driven professionals
           </h2>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
           {stats.map((stat, idx) => {
             const Icon = stat.icon;
             return (
               <div
                 key={idx}
-                className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-6 hover:border-white/[0.20] transition-all duration-300 text-center"
+                className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.03] border border-white/[0.12] rounded-xl p-4 sm:p-6 hover:border-white/[0.20] transition-all duration-300 text-center"
               >
-                <div className={`w-12 h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-4`}>
-                  <Icon size={24} className={stat.color} />
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-3 sm:mb-4`}>
+                  <Icon size={20} className={`sm:w-6 sm:h-6 ${stat.color}`} />
                 </div>
-                <div className={`text-3xl font-light mb-2 ${stat.color}`}>
+                <div className={`text-2xl sm:text-3xl font-light mb-1 sm:mb-2 ${stat.color}`}>
                   {stat.value}
                 </div>
-                <p className="text-xs text-slate-400 font-light">
+                <p className="text-xs text-slate-400 font-light leading-tight">
                   {stat.label}
                 </p>
               </div>
