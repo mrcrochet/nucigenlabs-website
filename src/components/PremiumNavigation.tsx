@@ -1,12 +1,23 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Terminal, TrendingUp, FileText, DollarSign, Layers, Users, Menu, X } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Terminal, TrendingUp, FileText, DollarSign, Layers, Users, Menu, X, LogOut } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 
 export default function PremiumNavigation() {
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
+  const { user, isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
+
+  // Hide navigation on auth and app pages
+  const hideNavPaths = ['/login', '/register', '/auth', '/app', '/onboarding'];
+  const shouldHideNav = hideNavPaths.some(path => location.pathname.startsWith(path));
+  
+  if (shouldHideNav) {
+    return null;
+  }
 
   useEffect(() => {
     const handleScroll = () => {
@@ -97,15 +108,45 @@ export default function PremiumNavigation() {
             })}
           </div>
 
-          {/* Desktop CTA */}
-          <Link
-            to="/request-access"
-            className="hidden lg:block group relative px-6 py-2 bg-gradient-to-r from-red-600/90 to-red-500/90 hover:from-red-500 hover:to-red-400 text-white rounded-lg text-sm font-light tracking-wide transition-all duration-300 overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#E1463E] focus:ring-offset-2 focus:ring-offset-black min-h-[44px] flex items-center"
-            aria-label="Request access to Nucigen Labs"
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-            <span className="relative">Request Access</span>
-          </Link>
+          {/* Desktop Auth Buttons */}
+          <div className="hidden lg:flex items-center gap-3">
+            {isAuthenticated ? (
+              <>
+                <Link
+                  to="/app"
+                  className="px-4 py-2 text-slate-300 hover:text-white text-sm font-light transition-colors min-h-[44px] flex items-center"
+                >
+                  Dashboard
+                </Link>
+                <button
+                  onClick={async () => {
+                    await logout();
+                    navigate('/');
+                  }}
+                  className="px-4 py-2 text-slate-300 hover:text-white text-sm font-light transition-colors min-h-[44px] flex items-center gap-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="px-4 py-2 text-slate-300 hover:text-white text-sm font-light transition-colors min-h-[44px] flex items-center"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/register"
+                  className="group relative px-6 py-2 bg-gradient-to-r from-red-600/90 to-red-500/90 hover:from-red-500 hover:to-red-400 text-white rounded-lg text-sm font-light tracking-wide transition-all duration-300 overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#E1463E] focus:ring-offset-2 focus:ring-offset-black min-h-[44px] flex items-center"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                  <span className="relative">Register</span>
+                </Link>
+              </>
+            )}
+          </div>
 
           {/* Mobile Menu Button */}
           <button
@@ -145,13 +186,45 @@ export default function PremiumNavigation() {
                   </Link>
                 );
               })}
-              <Link
-                to="/request-access"
-                onClick={() => setMobileMenuOpen(false)}
-                className="mt-2 px-4 py-3 bg-gradient-to-r from-red-600/90 to-red-500/90 hover:from-red-500 hover:to-red-400 text-white rounded-lg text-sm font-light tracking-wide transition-all duration-300 min-h-[44px] flex items-center justify-center"
-              >
-                Request Access
-              </Link>
+              {isAuthenticated ? (
+                <>
+                  <Link
+                    to="/app"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="mt-2 px-4 py-3 text-slate-300 hover:text-white hover:bg-white/[0.05] rounded-lg text-sm font-light transition-all min-h-[44px] flex items-center"
+                  >
+                    Dashboard
+                  </Link>
+                  <button
+                    onClick={async () => {
+                      await logout();
+                      setMobileMenuOpen(false);
+                      navigate('/');
+                    }}
+                    className="mt-2 px-4 py-3 text-slate-300 hover:text-white hover:bg-white/[0.05] rounded-lg text-sm font-light transition-all min-h-[44px] flex items-center gap-2 w-full"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Logout
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="mt-2 px-4 py-3 text-slate-300 hover:text-white hover:bg-white/[0.05] rounded-lg text-sm font-light transition-all min-h-[44px] flex items-center"
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    to="/register"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="mt-2 px-4 py-3 bg-gradient-to-r from-red-600/90 to-red-500/90 hover:from-red-500 hover:to-red-400 text-white rounded-lg text-sm font-light tracking-wide transition-all duration-300 min-h-[44px] flex items-center justify-center"
+                  >
+                    Register
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}

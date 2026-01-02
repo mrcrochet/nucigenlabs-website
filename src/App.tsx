@@ -1,5 +1,5 @@
 import { Suspense, lazy, useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import PremiumNavigation from './components/PremiumNavigation';
 import AnimatedBackground from './components/AnimatedBackground';
 import Toast from './components/Toast';
@@ -23,6 +23,11 @@ const EarlyAccessConfirmation = lazy(() => import('./pages/EarlyAccessConfirmati
 const RequestAccess = lazy(() => import('./pages/RequestAccess'));
 const LearnMore = lazy(() => import('./pages/LearnMore'));
 const PartnerProgram = lazy(() => import('./pages/PartnerProgram'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
+const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 
 // Loading component for Suspense fallback
 const PageLoader = () => (
@@ -37,6 +42,7 @@ const PageLoader = () => (
 function App() {
   const { toast, showToast, hideToast } = useToast();
   const [showExitModal, setShowExitModal] = useState(false);
+  const location = useLocation();
 
   // Prefetch critical routes on mount
   useEffect(() => {
@@ -51,14 +57,18 @@ function App() {
     }
   });
 
+  // Hide navigation and marketing components on auth/app pages
+  const hideMarketingPaths = ['/login', '/register', '/auth', '/app', '/onboarding'];
+  const shouldHideMarketing = hideMarketingPaths.some(path => location.pathname.startsWith(path));
+
   return (
     <div className="relative min-h-screen">
       <StructuredData type="Organization" />
       <StructuredData type="WebSite" />
-      <AnimatedBackground />
-      <PremiumNavigation />
-      <Breadcrumbs />
-      <StickyCTA />
+      {!shouldHideMarketing && <AnimatedBackground />}
+      {!shouldHideMarketing && <PremiumNavigation />}
+      {!shouldHideMarketing && <Breadcrumbs />}
+      {!shouldHideMarketing && <StickyCTA />}
 
       {toast.isVisible && (
         <Toast
@@ -75,43 +85,26 @@ function App() {
 
       <Suspense fallback={<PageLoader />}>
       <Routes>
+        {/* Public Marketing Routes */}
         <Route path="/" element={<Home />} />
-          <Route 
-            path="/intelligence" 
-            element={<Intelligence />} 
-          />
-          <Route 
-            path="/case-studies" 
-            element={<CaseStudies />} 
-          />
-          <Route 
-            path="/pricing" 
-            element={<Pricing />} 
-          />
-          <Route 
-            path="/papers" 
-            element={<Papers />} 
-          />
-          <Route 
-            path="/level/:level" 
-            element={<LevelNews />} 
-          />
-          <Route 
-            path="/early-access-confirmation" 
-            element={<EarlyAccessConfirmation />} 
-          />
-          <Route 
-            path="/request-access" 
-            element={<RequestAccess />} 
-          />
-          <Route 
-            path="/learn-more" 
-            element={<LearnMore />} 
-          />
-          <Route 
-            path="/partners" 
-            element={<PartnerProgram />} 
-          />
+        <Route path="/intelligence" element={<Intelligence />} />
+        <Route path="/case-studies" element={<CaseStudies />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/papers" element={<Papers />} />
+        <Route path="/level/:level" element={<LevelNews />} />
+        <Route path="/early-access-confirmation" element={<EarlyAccessConfirmation />} />
+        <Route path="/request-access" element={<RequestAccess />} />
+        <Route path="/learn-more" element={<LearnMore />} />
+        <Route path="/partners" element={<PartnerProgram />} />
+        
+        {/* Auth Routes (no navigation) */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        
+        {/* Protected App Routes (no navigation) */}
+        <Route path="/app" element={<Dashboard />} />
+        <Route path="/onboarding" element={<Onboarding />} />
       </Routes>
       </Suspense>
     </div>

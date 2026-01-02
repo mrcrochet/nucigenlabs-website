@@ -1,8 +1,8 @@
 import { XCircle, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import Footer from '../components/Footer';
 import SEO from '../components/SEO';
-import SimpleWaitlistForm from '../components/SimpleWaitlistForm';
 import CountdownTimer from '../components/CountdownTimer';
 import LiveNewsFeed from '../components/LiveNewsFeed';
 import FourLevels from '../components/FourLevels';
@@ -12,10 +12,12 @@ import AdvancedFeatures from '../components/AdvancedFeatures';
 import HowPeopleUseNucigen from '../components/HowPeopleUseNucigen';
 import TypewriterText from '../components/TypewriterText';
 import SocialProof from '../components/SocialProof';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Home() {
   const [openStep, setOpenStep] = useState<number | null>(0); // First step open by default
   const [isNotOpen, setIsNotOpen] = useState(false);
+  const { isAuthenticated } = useAuth();
 
   return (
     <main className="min-h-screen">
@@ -86,7 +88,31 @@ export default function Home() {
           </div>
 
           <div className="mb-12 max-w-2xl mx-auto">
-            <SimpleWaitlistForm variant="inline" />
+            {isAuthenticated ? (
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link
+                  to="/app"
+                  className="px-8 py-4 bg-gradient-to-r from-[#E1463E] to-[#E1463E]/90 hover:from-[#E1463E]/90 hover:to-[#E1463E] text-white rounded-lg text-base font-light tracking-wide transition-all duration-300 text-center min-h-[48px] flex items-center justify-center"
+                >
+                  Go to Dashboard
+                </Link>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link
+                  to="/login"
+                  className="px-8 py-4 border border-white/20 hover:border-white/30 text-white rounded-lg text-base font-light tracking-wide transition-all duration-300 text-center min-h-[48px] flex items-center justify-center hover:bg-white/5"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/register"
+                  className="px-8 py-4 bg-gradient-to-r from-[#E1463E] to-[#E1463E]/90 hover:from-[#E1463E]/90 hover:to-[#E1463E] text-white rounded-lg text-base font-light tracking-wide transition-all duration-300 text-center min-h-[48px] flex items-center justify-center"
+                >
+                  Get Started
+                </Link>
+              </div>
+            )}
             <p className="text-xs text-slate-500 font-light mt-4 text-center">
               Be ahead of the market, not behind it.
             </p>
@@ -358,7 +384,22 @@ export default function Home() {
       <SocialProof />
 
       <div className="section-light">
-        <SimpleWaitlistForm variant="section" className="" />
+        {!isAuthenticated && (
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link
+              to="/login"
+              className="px-8 py-4 border border-white/20 hover:border-white/30 text-white rounded-lg text-base font-light tracking-wide transition-all duration-300 text-center min-h-[48px] flex items-center justify-center hover:bg-white/5"
+            >
+              Login
+            </Link>
+            <Link
+              to="/register"
+              className="px-8 py-4 bg-gradient-to-r from-[#E1463E] to-[#E1463E]/90 hover:from-[#E1463E]/90 hover:to-[#E1463E] text-white rounded-lg text-base font-light tracking-wide transition-all duration-300 text-center min-h-[48px] flex items-center justify-center"
+            >
+              Get Started
+            </Link>
+          </div>
+        )}
       </div>
 
       <Mission />

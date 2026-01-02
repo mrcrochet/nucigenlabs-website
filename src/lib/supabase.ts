@@ -289,6 +289,224 @@ export async function submitPartnerApplication(data: {
   return result;
 }
 
-// Note: Email verification is now handled by Supabase Auth
-// The functions createVerificationCode, verifyEmailCode, and incrementVerificationAttempts
-// have been removed as they are no longer needed.
+// ============================================
+// AUTHENTICATION FUNCTIONS
+// ============================================
+
+export interface User {
+  id: string;
+  email: string;
+  name?: string;
+  role?: 'user' | 'early' | 'admin';
+  professional_role?: string; // Job role: analyst, trader, etc.
+  company?: string;
+  sector?: string;
+  intended_use?: string;
+  exposure?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Sign up with email and password
+ */
+export async function signUp(email: string, password: string, name?: string) {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data, error } = await supabase.auth.signUp({
+    email: email.toLowerCase().trim(),
+    password,
+    options: {
+      data: {
+        name: name || email.split('@')[0],
+      },
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to sign up');
+  }
+
+  return data;
+}
+
+/**
+ * Sign in with email and password
+ */
+export async function signIn(email: string, password: string) {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email.toLowerCase().trim(),
+    password,
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to sign in');
+  }
+
+  return data;
+}
+
+/**
+ * Sign out
+ */
+export async function signOut() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return;
+  }
+
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    throw new Error(error.message || 'Failed to sign out');
+  }
+}
+
+/**
+ * Sign in with OAuth provider
+ */
+export async function signInWithOAuth(provider: 'google' | 'linkedin') {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`,
+    },
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to sign in with OAuth');
+  }
+
+  return data;
+}
+
+/**
+ * Get current user
+ */
+export async function getCurrentUser(): Promise<User | null> {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+
+  const { data: { user }, error } = await supabase.auth.getUser();
+  
+  if (error || !user) {
+    return null;
+  }
+
+  // Get user profile from public.users table
+  const { data: profile, error: profileError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (profileError && profileError.code !== 'PGRST116') {
+    console.error('Error fetching user profile:', profileError);
+  }
+
+  return profile || {
+    id: user.id,
+    email: user.email || '',
+    name: user.user_metadata?.name || user.email?.split('@')[0] || '',
+    role: 'user' as const,
+  };
+}
+
+/**
+ * Get current session
+ */
+export async function getSession() {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return null;
+  }
+
+  const { data: { session }, error } = await supabase.auth.getSession();
+  
+  if (error) {
+    console.error('Error getting session:', error);
+    return null;
+  }
+
+  return session;
+}
+
+/**
+ * Update user profile
+ */
+export async function updateUserProfile(updates: Partial<User>) {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
+  // Separate system role from professional role
+  // The 'role' field in updates might be a professional role from onboarding form
+  const { role, ...otherUpdates } = updates;
+  
+  // Map role to professional_role if it's not a system role
+  const systemRoles = ['user', 'early', 'admin'];
+  const cleanUpdates: any = { ...otherUpdates };
+  
+  if (role && !systemRoles.includes(role)) {
+    // This is a professional role, not a system role
+    cleanUpdates.professional_role = role;
+  } else if (role && systemRoles.includes(role)) {
+    // This is a valid system role, keep it
+    cleanUpdates.role = role;
+  }
+  // If role is not provided or is undefined, don't update it
+
+  const { data, error } = await supabase
+    .from('users')
+    .update(cleanUpdates)
+    .eq('id', user.id)
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || 'Failed to update profile');
+  }
+
+  return data;
+}
+
+/**
+ * Reset password
+ */
+export async function resetPassword(email: string) {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email.toLowerCase().trim(), {
+    redirectTo: `${window.location.origin}/auth/reset-password`,
+  });
+
+  if (error) {
+    throw new Error(error.message || 'Failed to send password reset email');
+  }
+}
+
+/**
+ * Check if user has completed onboarding
+ */
+export async function hasCompletedOnboarding(): Promise<boolean> {
+  const user = await getCurrentUser();
+  if (!user) return false;
+
+  // Check if user has filled required onboarding fields
+  return !!(user.company && user.sector && user.intended_use);
+}

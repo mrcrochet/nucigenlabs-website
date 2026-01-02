@@ -74,3 +74,4 @@ CREATE POLICY "Allow authenticated update partner applications"
 ALTER FUNCTION update_partner_applications_updated_at() SET search_path = public;
 
 
+

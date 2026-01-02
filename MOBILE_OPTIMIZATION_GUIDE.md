@@ -171,3 +171,4 @@
 - Text is readable without zooming
 - No horizontal scrolling issues
 
+
