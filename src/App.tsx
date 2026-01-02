@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useState, useEffect } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import PremiumNavigation from './components/PremiumNavigation';
 import AnimatedBackground from './components/AnimatedBackground';
@@ -7,28 +7,32 @@ import { useToast } from './hooks/useToast';
 import ExitIntentModal from './components/ExitIntentModal';
 import StickyCTA from './components/StickyCTA';
 import { useExitIntent } from './hooks/useExitIntent';
-import { useEffect } from 'react';
 import StructuredData from './components/StructuredData';
 import Breadcrumbs from './components/Breadcrumbs';
 import { prefetchCriticalRoutes } from './utils/prefetch';
+import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home';
 
 // Lazy load routes for better performance
-const Intelligence = lazy(() => import('./pages/Intelligence'));
+// Public marketing routes
 const Pricing = lazy(() => import('./pages/Pricing'));
-const Papers = lazy(() => import('./pages/Papers'));
-const CaseStudies = lazy(() => import('./pages/CaseStudies'));
-const LevelNews = lazy(() => import('./pages/LevelNews'));
-const EarlyAccessConfirmation = lazy(() => import('./pages/EarlyAccessConfirmation'));
-const RequestAccess = lazy(() => import('./pages/RequestAccess'));
-const LearnMore = lazy(() => import('./pages/LearnMore'));
 const PartnerProgram = lazy(() => import('./pages/PartnerProgram'));
+// Auth routes
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
-const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const AuthCallback = lazy(() => import('./pages/AuthCallback'));
+// Application core routes (PHASE 2D)
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const IntelligenceFeed = lazy(() => import('./pages/IntelligenceFeed'));
 const Events = lazy(() => import('./pages/Events'));
+const EventDetail = lazy(() => import('./pages/EventDetail'));
+// Modules (Beta / Locked)
+const Alerts = lazy(() => import('./pages/Alerts'));
+const Research = lazy(() => import('./pages/Research'));
+// User / System
+const Profile = lazy(() => import('./pages/Profile'));
+const Settings = lazy(() => import('./pages/Settings'));
 
 // Loading component for Suspense fallback
 const PageLoader = () => (
@@ -59,7 +63,7 @@ function App() {
   });
 
   // Hide navigation and marketing components on auth/app pages
-  const hideMarketingPaths = ['/login', '/register', '/auth', '/app', '/onboarding'];
+  const hideMarketingPaths = ['/login', '/register', '/auth', '/app', '/dashboard', '/intelligence', '/events', '/alerts', '/research', '/profile', '/settings', '/onboarding'];
   const shouldHideMarketing = hideMarketingPaths.some(path => location.pathname.startsWith(path));
 
   return (
@@ -88,25 +92,32 @@ function App() {
       <Routes>
         {/* Public Marketing Routes */}
         <Route path="/" element={<Home />} />
-        <Route path="/intelligence" element={<Intelligence />} />
-        <Route path="/case-studies" element={<CaseStudies />} />
         <Route path="/pricing" element={<Pricing />} />
-        <Route path="/papers" element={<Papers />} />
-        <Route path="/level/:level" element={<LevelNews />} />
-        <Route path="/early-access-confirmation" element={<EarlyAccessConfirmation />} />
-        <Route path="/request-access" element={<RequestAccess />} />
-        <Route path="/learn-more" element={<LearnMore />} />
         <Route path="/partners" element={<PartnerProgram />} />
         
-        {/* Auth Routes (no navigation) */}
+        {/* Auth Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         
-        {/* Protected App Routes (no navigation) */}
-        <Route path="/app" element={<Dashboard />} />
-        <Route path="/events" element={<Events />} />
-        <Route path="/onboarding" element={<Onboarding />} />
+        {/* Protected App Routes - PHASE 2D SITEMAP */}
+        {/* Level 1 - Application Core */}
+        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/app" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} /> {/* Legacy redirect */}
+        <Route path="/intelligence" element={<ProtectedRoute><IntelligenceFeed /></ProtectedRoute>} />
+        <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
+        <Route path="/events/:event_id" element={<ProtectedRoute><EventDetail /></ProtectedRoute>} />
+        
+        {/* Level 2 - Modules (Beta / Locked) */}
+        <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
+        <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} />
+        
+        {/* Level 3 - User / System */}
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        
+        {/* Onboarding */}
+        <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
       </Routes>
       </Suspense>
     </div>

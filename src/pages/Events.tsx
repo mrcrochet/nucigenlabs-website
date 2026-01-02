@@ -9,7 +9,8 @@ import { useNavigate } from 'react-router-dom';
 import { getEventsWithCausalChains } from '../lib/supabase';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
-import { ArrowLeft, MapPin, Building2, TrendingUp, Clock, Search, Filter, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import AppSidebar from '../components/AppSidebar';
+import { MapPin, Building2, TrendingUp, Clock, Search, Filter, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface CausalChain {
   id: string;
@@ -243,23 +244,21 @@ function EventsContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A]">
+    <div className="min-h-screen bg-[#0A0A0A] flex">
       <SEO 
         title="Events — Nucigen Labs"
         description="Structured events with causal chains"
       />
 
-      {/* Header */}
-      <header className="border-b border-white/[0.02] bg-[#0F0F0F]/30 backdrop-blur-xl">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => navigate('/app')}
-                className="p-2 text-slate-600 hover:text-white hover:bg-white/[0.02] rounded-xl transition-all"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
+      {/* Sidebar */}
+      <AppSidebar />
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col lg:ml-64">
+        {/* Header */}
+        <header className="border-b border-white/[0.02] bg-[#0F0F0F]/30 backdrop-blur-xl">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+            <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl sm:text-4xl font-light text-white leading-tight mb-1">
                   Events
@@ -270,11 +269,10 @@ function EventsContent() {
               </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-12">
+        {/* Main Content */}
+        <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-12 w-full">
         {/* Search and Filters */}
         <div className="mb-8 space-y-4">
           {/* Search Bar */}
@@ -467,7 +465,8 @@ function EventsContent() {
               return (
                 <article
                   key={event.id}
-                  className="bg-white/[0.02] rounded-2xl p-8 border border-white/[0.02]"
+                  className="bg-white/[0.02] rounded-2xl p-8 border border-white/[0.02] hover:bg-white/[0.03] hover:border-white/[0.05] transition-all cursor-pointer"
+                  onClick={() => navigate(`/events/${event.id}`)}
                 >
                   {/* Event Header */}
                   <div className="mb-6">
@@ -666,7 +665,8 @@ function EventsContent() {
             )}
           </>
         )}
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

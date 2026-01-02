@@ -478,6 +478,27 @@ export async function getSession() {
 }
 
 /**
+ * Get user profile by user ID
+ */
+export async function getUserProfile(userId: string) {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (error) {
+    throw new Error(error.message || 'Failed to fetch user profile');
+  }
+
+  return data;
+}
+
+/**
  * Update user profile
  */
 export async function updateUserProfile(updates: Partial<User>) {
@@ -606,6 +627,63 @@ export async function getEventsWithCausalChains() {
 
   console.log(`Filtered ${filtered.length} events with causal chains from ${data.length} total`);
   return filtered;
+}
+
+/**
+ * Get a single event by ID with its causal chain
+ */
+export async function getEventById(eventId: string) {
+  if (!isConfigured) {
+    throw new Error(
+      'Supabase is not configured. ' +
+      'Please check your .env file and ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set. ' +
+      'Then restart your development server with: npm run dev'
+    );
+  }
+
+  // Check if user is authenticated
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error('Session error:', sessionError);
+    throw new Error('Failed to verify authentication');
+  }
+  if (!session) {
+    throw new Error('User not authenticated. Please log in to view events.');
+  }
+
+  const { data, error } = await supabase
+    .from('nucigen_events')
+    .select(`
+      *,
+      nucigen_causal_chains (
+        id,
+        cause,
+        first_order_effect,
+        second_order_effect,
+        affected_sectors,
+        affected_regions,
+        time_horizon,
+        confidence
+      )
+    `)
+    .eq('id', eventId)
+    .single();
+
+  if (error) {
+    console.error('Supabase error:', error);
+    throw new Error(error.message || 'Failed to fetch event');
+  }
+
+  if (!data) {
+    throw new Error('Event not found');
+  }
+
+  // Ensure event has at least one causal chain
+  if (!data.nucigen_causal_chains || data.nucigen_causal_chains.length === 0) {
+    throw new Error('Event has no causal chain');
+  }
+
+  return data;
 }
 
 /**

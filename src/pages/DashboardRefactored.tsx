@@ -8,10 +8,10 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 import { getEventsWithCausalChains } from '../lib/supabase';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
-import AppSidebar from '../components/AppSidebar';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Metric from '../components/ui/Metric';
@@ -32,6 +32,7 @@ interface EventWithChain {
 
 function DashboardContent() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [events, setEvents] = useState<EventWithChain[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -92,29 +93,24 @@ function DashboardContent() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex">
+    <div className="min-h-screen bg-[#0A0A0A]">
       <SEO 
         title="Dashboard — Nucigen Labs"
         description="Overview of what matters now"
       />
 
-      {/* Sidebar */}
-      <AppSidebar />
+      {/* Header */}
+      <header className="border-b border-white/[0.02] bg-[#0F0F0F]/30 backdrop-blur-xl">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
+          <SectionHeader
+            title="Dashboard"
+            subtitle={`Live intelligence · Updated ${formatTimeAgo(lastUpdate)}`}
+          />
+        </div>
+      </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col lg:ml-64">
-        {/* Header */}
-        <header className="border-b border-white/[0.02] bg-[#0F0F0F]/30 backdrop-blur-xl">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
-            <SectionHeader
-              title="Dashboard"
-              subtitle={`Live intelligence · Updated ${formatTimeAgo(lastUpdate)}`}
-            />
-          </div>
-        </header>
-
-        {/* Main Content */}
-        <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-12 w-full">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-12">
         {/* Real Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
           <Metric
@@ -205,8 +201,7 @@ function DashboardContent() {
             ))}
           </div>
         )}
-        </main>
-      </div>
+      </main>
     </div>
   );
 }
