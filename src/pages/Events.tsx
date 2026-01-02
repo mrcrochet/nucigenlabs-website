@@ -10,6 +10,10 @@ import { getEventsWithCausalChains } from '../lib/supabase';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import AppSidebar from '../components/AppSidebar';
+import Card from '../components/ui/Card';
+import Badge from '../components/ui/Badge';
+import SectionHeader from '../components/ui/SectionHeader';
+import MetaRow from '../components/ui/MetaRow';
 import { MapPin, Building2, TrendingUp, Clock, Search, Filter, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface CausalChain {
@@ -91,17 +95,6 @@ function EventsContent() {
     }
   };
 
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.8) return 'text-green-500/80';
-    if (confidence >= 0.6) return 'text-yellow-500/80';
-    return 'text-orange-500/80';
-  };
-
-  const getImpactColor = (impact: number) => {
-    if (impact >= 0.8) return 'text-red-500/80';
-    if (impact >= 0.6) return 'text-orange-500/80';
-    return 'text-yellow-500/80';
-  };
 
   // Extract unique filter options
   const filterOptions = useMemo(() => {
@@ -463,10 +456,11 @@ function EventsContent() {
               }
 
               return (
-                <article
+                <Card
                   key={event.id}
-                  className="bg-white/[0.02] rounded-2xl p-8 border border-white/[0.02] hover:bg-white/[0.03] hover:border-white/[0.05] transition-all cursor-pointer"
+                  hover
                   onClick={() => navigate(`/events/${event.id}`)}
+                  className="p-8"
                 >
                   {/* Event Header */}
                   <div className="mb-6">
@@ -475,54 +469,47 @@ function EventsContent() {
                         <h2 className="text-2xl font-light text-white mb-3 leading-snug">
                           {event.summary}
                         </h2>
-                        <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 font-light">
-                          {event.country && (
-                            <div className="flex items-center gap-1.5">
-                              <MapPin className="w-4 h-4" />
-                              <span>{event.country}</span>
-                              {event.region && <span>• {event.region}</span>}
-                            </div>
-                          )}
+                        <div className="flex flex-wrap items-center gap-3 mb-4">
                           {event.sector && (
-                            <div className="flex items-center gap-1.5">
-                              <Building2 className="w-4 h-4" />
-                              <span>{event.sector}</span>
-                            </div>
+                            <Badge variant="sector">
+                              <Building2 className="w-3 h-3 mr-1.5" />
+                              {event.sector}
+                            </Badge>
+                          )}
+                          {event.region && (
+                            <Badge variant="region">
+                              <MapPin className="w-3 h-3 mr-1.5" />
+                              {event.region}
+                            </Badge>
                           )}
                           {event.event_type && (
-                            <div className="flex items-center gap-1.5">
-                              <TrendingUp className="w-4 h-4" />
-                              <span>{event.event_type}</span>
-                            </div>
+                            <Badge variant="level">
+                              <TrendingUp className="w-3 h-3 mr-1.5" />
+                              {event.event_type}
+                            </Badge>
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 ml-4">
-                        {event.confidence !== null && (
-                          <div className="text-right">
-                            <div className={`text-sm font-light ${getConfidenceColor(event.confidence)}`}>
-                              {(event.confidence * 100).toFixed(0)}%
-                            </div>
-                            <div className="text-xs text-slate-600">confidence</div>
-                          </div>
-                        )}
-                        {event.impact_score !== null && (
-                          <div className="text-right">
-                            <div className={`text-sm font-light ${getImpactColor(event.impact_score)}`}>
-                              {(event.impact_score * 100).toFixed(0)}%
-                            </div>
-                            <div className="text-xs text-slate-600">impact</div>
-                          </div>
-                        )}
-                      </div>
                     </div>
+                    <MetaRow
+                      items={[
+                        ...(event.confidence !== null ? [{
+                          label: 'Confidence',
+                          value: event.confidence,
+                          variant: 'confidence' as const,
+                        }] : []),
+                        ...(event.impact_score !== null ? [{
+                          label: 'Impact',
+                          value: event.impact_score,
+                          variant: 'impact' as const,
+                        }] : []),
+                      ]}
+                    />
                   </div>
 
                   {/* Why It Matters */}
                   <div className="mb-8 pb-8 border-b border-white/[0.02]">
-                    <h3 className="text-sm font-medium text-slate-400 mb-3 uppercase tracking-wide">
-                      Why It Matters
-                    </h3>
+                    <SectionHeader title="Why It Matters" />
                     <p className="text-base text-slate-300 font-light leading-relaxed">
                       {event.why_it_matters}
                     </p>
@@ -531,9 +518,7 @@ function EventsContent() {
                   {/* Causal Chain */}
                   {chain && (
                     <div>
-                      <h3 className="text-sm font-medium text-slate-400 mb-6 uppercase tracking-wide">
-                        Causal Chain
-                      </h3>
+                      <SectionHeader title="Causal Chain" />
                       <div className="space-y-6">
                         {/* Cause */}
                         <div>
@@ -579,35 +564,33 @@ function EventsContent() {
 
                         {/* Metadata */}
                         <div className="pt-6 mt-6 border-t border-white/[0.02]">
-                          <div className="flex flex-wrap items-center gap-6 text-sm text-slate-500 font-light">
-                            <div className="flex items-center gap-1.5">
-                              <Clock className="w-4 h-4" />
-                              <span>Time horizon: {getTimeHorizonLabel(chain.time_horizon)}</span>
-                            </div>
-                            {chain.affected_sectors.length > 0 && (
-                              <div>
-                                <span className="text-slate-600">Sectors: </span>
-                                <span>{chain.affected_sectors.join(', ')}</span>
-                              </div>
-                            )}
-                            {chain.affected_regions.length > 0 && (
-                              <div>
-                                <span className="text-slate-600">Regions: </span>
-                                <span>{chain.affected_regions.join(', ')}</span>
-                              </div>
-                            )}
-                            <div className="ml-auto">
-                              <span className="text-slate-600">Chain confidence: </span>
-                              <span className={getConfidenceColor(chain.confidence)}>
-                                {(chain.confidence * 100).toFixed(0)}%
-                              </span>
-                            </div>
-                          </div>
+                          <MetaRow
+                            items={[
+                              {
+                                label: 'Time horizon',
+                                value: getTimeHorizonLabel(chain.time_horizon),
+                                icon: Clock,
+                              },
+                              ...(chain.affected_sectors.length > 0 ? [{
+                                label: 'Sectors',
+                                value: chain.affected_sectors.join(', '),
+                              }] : []),
+                              ...(chain.affected_regions.length > 0 ? [{
+                                label: 'Regions',
+                                value: chain.affected_regions.join(', '),
+                              }] : []),
+                              {
+                                label: 'Chain confidence',
+                                value: chain.confidence,
+                                variant: 'confidence' as const,
+                              },
+                            ]}
+                          />
                         </div>
                       </div>
                     </div>
                   )}
-                </article>
+                </Card>
               );
               })}
             </div>

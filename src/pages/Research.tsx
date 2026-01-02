@@ -36,25 +36,25 @@ function ResearchContent() {
           </div>
         </header>
 
-        {/* Main Content */}
-        <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-12 w-full">
-        <Card className="p-12 text-center">
-          <div className="mb-6">
-            <div className="w-16 h-16 bg-white/[0.02] border border-white/[0.05] rounded-full flex items-center justify-center mx-auto mb-4">
-              <BookOpen className="w-8 h-8 text-slate-500" />
+      {/* Main Content */}
+      <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-10 py-16 w-full">
+        <Card className="p-16 text-center">
+          <div className="max-w-xl mx-auto">
+            <div className="w-20 h-20 bg-white/[0.02] border border-white/[0.05] rounded-full flex items-center justify-center mx-auto mb-6">
+              <BookOpen className="w-10 h-10 text-slate-500" />
             </div>
-            <h2 className="text-2xl font-light text-white mb-4">
+            <h2 className="text-3xl font-light text-white mb-6">
               Research & Analysis
             </h2>
-            <p className="text-base text-slate-400 font-light max-w-2xl mx-auto leading-relaxed mb-6">
-              Deep-dive case studies and thematic analysis based on multiple events.
+            <p className="text-base text-slate-300 font-light leading-relaxed mb-8">
+              This module will provide deep-dive case studies and thematic analysis based on multiple events, helping you understand patterns and long-term implications.
             </p>
-            <p className="text-sm text-slate-600 font-light">
+            <p className="text-sm text-slate-500 font-light">
               Premium content coming soon.
             </p>
           </div>
         </Card>
-        </main>
+      </main>
       </div>
     </div>
   );

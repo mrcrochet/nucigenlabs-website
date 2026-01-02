@@ -14,7 +14,9 @@ import AppSidebar from '../components/AppSidebar';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Timeline from '../components/ui/Timeline';
-import { ArrowLeft, MapPin, Building2, TrendingUp, Clock, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import SectionHeader from '../components/ui/SectionHeader';
+import MetaRow from '../components/ui/MetaRow';
+import { ArrowLeft, MapPin, Building2, TrendingUp, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface CausalChain {
   id: string;
@@ -86,17 +88,6 @@ function EventDetailContent() {
     }
   };
 
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 0.8) return 'text-green-500/80';
-    if (confidence >= 0.6) return 'text-yellow-500/80';
-    return 'text-orange-500/80';
-  };
-
-  const getImpactColor = (impact: number) => {
-    if (impact >= 0.8) return 'text-red-500/80';
-    if (impact >= 0.6) return 'text-orange-500/80';
-    return 'text-yellow-500/80';
-  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -192,14 +183,14 @@ function EventDetailContent() {
         {/* Main Content */}
         <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-10 py-12 w-full">
         <Card className="p-8">
-          {/* Event Header */}
-          <div className="mb-8 pb-8 border-b border-white/[0.02]">
-            <h2 className="text-2xl font-light text-white mb-4 leading-snug">
+          {/* 1. Event Header */}
+          <div className="mb-10 pb-10 border-b border-white/[0.02]">
+            <h2 className="text-2xl font-light text-white mb-6 leading-snug">
               {event.summary}
             </h2>
 
             {/* Tags */}
-            <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div className="flex flex-wrap items-center gap-3 mb-6">
               {event.sector && (
                 <Badge variant="sector">
                   <Building2 className="w-3 h-3 mr-1.5" />
@@ -221,33 +212,31 @@ function EventDetailContent() {
             </div>
 
             {/* Confidence & Impact */}
-            <div className="flex items-center gap-6">
-              {event.confidence !== null && (
-                <div>
-                  <div className="text-xs text-slate-600 mb-1 font-light">Confidence</div>
-                  <div className={`text-lg font-light ${getConfidenceColor(event.confidence)}`}>
-                    {(event.confidence * 100).toFixed(0)}%
-                  </div>
-                </div>
-              )}
-              {event.impact_score !== null && (
-                <div>
-                  <div className="text-xs text-slate-600 mb-1 font-light">Impact</div>
-                  <div className={`text-lg font-light ${getImpactColor(event.impact_score)}`}>
-                    {(event.impact_score * 100).toFixed(0)}%
-                  </div>
-                </div>
-              )}
-            </div>
+            <MetaRow
+              items={[
+                ...(event.confidence !== null ? [{
+                  label: 'Confidence',
+                  value: event.confidence,
+                  variant: 'confidence' as const,
+                }] : []),
+                ...(event.impact_score !== null ? [{
+                  label: 'Impact',
+                  value: event.impact_score,
+                  variant: 'impact' as const,
+                }] : []),
+                {
+                  label: 'Published',
+                  value: formatDate(event.created_at),
+                },
+              ]}
+            />
           </div>
 
-          {/* Why It Matters */}
-          <div className="mb-8 pb-8 border-b border-white/[0.02]">
-            <div className="flex items-start justify-between mb-3">
-              <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wide">
-                Why It Matters
-              </h3>
-              {shouldTruncate && (
+          {/* 2. Why It Matters */}
+          <div className="mb-10 pb-10 border-b border-white/[0.02]">
+            <SectionHeader
+              title="Why It Matters"
+              action={shouldTruncate ? (
                 <button
                   onClick={() => setWhyExpanded(!whyExpanded)}
                   className="text-xs text-slate-500 hover:text-white transition-colors flex items-center gap-1"
@@ -264,57 +253,51 @@ function EventDetailContent() {
                     </>
                   )}
                 </button>
-              )}
-            </div>
+              ) : undefined}
+            />
             <p className="text-base text-slate-300 font-light leading-relaxed">
               {displayText}
             </p>
           </div>
 
-          {/* Causal Chain */}
-          <div className="mb-8 pb-8 border-b border-white/[0.02]">
-            <h3 className="text-sm font-medium text-slate-400 mb-6 uppercase tracking-wide">
-              Causal Chain
-            </h3>
+          {/* 3. Causal Chain */}
+          <div className="mb-10 pb-10 border-b border-white/[0.02]">
+            <SectionHeader title="Causal Chain" />
             <Timeline items={timelineItems} />
 
             {/* Chain Metadata */}
             <div className="pt-6 mt-6 border-t border-white/[0.02]">
-              <div className="flex flex-wrap items-center gap-6 text-sm text-slate-500 font-light">
-                <div className="flex items-center gap-1.5">
-                  <Clock className="w-4 h-4" />
-                  <span>Time horizon: {getTimeHorizonLabel(chain.time_horizon)}</span>
-                </div>
-                {chain.affected_sectors.length > 0 && (
-                  <div>
-                    <span className="text-slate-600">Affected sectors: </span>
-                    <span>{chain.affected_sectors.join(', ')}</span>
-                  </div>
-                )}
-                {chain.affected_regions.length > 0 && (
-                  <div>
-                    <span className="text-slate-600">Affected regions: </span>
-                    <span>{chain.affected_regions.join(', ')}</span>
-                  </div>
-                )}
-                <div className="ml-auto">
-                  <span className="text-slate-600">Chain confidence: </span>
-                  <span className={getConfidenceColor(chain.confidence)}>
-                    {(chain.confidence * 100).toFixed(0)}%
-                  </span>
-                </div>
-              </div>
+              <MetaRow
+                items={[
+                  {
+                    label: 'Time horizon',
+                    value: getTimeHorizonLabel(chain.time_horizon),
+                    icon: Clock,
+                  },
+                  ...(chain.affected_sectors.length > 0 ? [{
+                    label: 'Affected sectors',
+                    value: chain.affected_sectors.join(', '),
+                  }] : []),
+                  ...(chain.affected_regions.length > 0 ? [{
+                    label: 'Affected regions',
+                    value: chain.affected_regions.join(', '),
+                  }] : []),
+                  {
+                    label: 'Chain confidence',
+                    value: chain.confidence,
+                    variant: 'confidence' as const,
+                  },
+                ]}
+              />
             </div>
           </div>
 
-          {/* Exposure (v1 simple) */}
-          <div className="mb-8 pb-8 border-b border-white/[0.02]">
-            <h3 className="text-sm font-medium text-slate-400 mb-4 uppercase tracking-wide">
-              Exposure
-            </h3>
-            <div className="space-y-4">
+          {/* 4. Exposure */}
+          <div className="mb-10 pb-10 border-b border-white/[0.02]">
+            <SectionHeader title="Exposure" />
+            <div className="space-y-6">
               <div>
-                <div className="text-xs text-slate-600 mb-2 font-light">Most exposed sectors</div>
+                <div className="text-xs text-slate-600 mb-3 font-light uppercase tracking-wide">Most exposed sectors</div>
                 <div className="flex flex-wrap gap-2">
                   {chain.affected_sectors.map(sector => (
                     <Badge key={sector} variant="sector">{sector}</Badge>
@@ -322,7 +305,7 @@ function EventDetailContent() {
                 </div>
               </div>
               <div>
-                <div className="text-xs text-slate-600 mb-2 font-light">Potentially affected regions</div>
+                <div className="text-xs text-slate-600 mb-3 font-light uppercase tracking-wide">Potentially affected regions</div>
                 <div className="flex flex-wrap gap-2">
                   {chain.affected_regions.map(region => (
                     <Badge key={region} variant="region">{region}</Badge>
@@ -332,13 +315,11 @@ function EventDetailContent() {
             </div>
           </div>
 
-          {/* Sources & Evidence */}
+          {/* 5. Sources & Evidence */}
           <div>
-            <h3 className="text-sm font-medium text-slate-400 mb-4 uppercase tracking-wide">
-              Sources & Evidence
-            </h3>
-            <div className="space-y-2">
-              <p className="text-sm text-slate-500 font-light">
+            <SectionHeader title="Sources & Evidence" />
+            <div className="space-y-3">
+              <p className="text-sm text-slate-400 font-light leading-relaxed">
                 Source data is collected from verified news and intelligence feeds.
               </p>
               <p className="text-xs text-slate-600 font-light italic">

@@ -12,7 +12,16 @@
     "check-env": "node check-env.js",
     "phase1:insert-test": "npx tsx src/server/phase1/insert-test-events.ts",
     "phase1:validate": "npx tsx src/server/phase1/phase1_validate.ts",
-    "phase2b:validate": "npx tsx src/server/phase2b/phase2b_validate.ts"
+    "phase2b:validate": "npx tsx src/server/phase2b/phase2b_validate.ts",
+    "pipeline:collect": "npx tsx src/server/workers/data-collector.ts",
+    "pipeline:process": "npx tsx src/server/workers/event-processor.ts",
+    "pipeline:run": "npx tsx src/server/workers/pipeline-orchestrator.ts",
+    "pipeline:run-once": "RUN_ONCE=true npx tsx src/server/workers/pipeline-orchestrator.ts",
+    "quality:metrics": "npx tsx src/server/phase3b/quality-metrics-calculator.ts",
+    "quality:metrics-range": "npx tsx src/server/phase3b/quality-metrics-calculator.ts range",
+    "alerts:generate": "npx tsx src/server/workers/alerts-generator.ts",
+    "alerts:generate:debug": "DEBUG=true npx tsx src/server/workers/alerts-generator.ts",
+    "alerts:init": "npx tsx src/server/phase3c/init-alert-preferences.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

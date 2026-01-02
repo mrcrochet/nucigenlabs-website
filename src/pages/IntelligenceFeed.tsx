@@ -14,7 +14,8 @@ import AppSidebar from '../components/AppSidebar';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SectionHeader from '../components/ui/SectionHeader';
-import { Search, MapPin, Building2, TrendingUp, Clock, AlertCircle } from 'lucide-react';
+import MetaRow from '../components/ui/MetaRow';
+import { Search, MapPin, Building2, TrendingUp, Clock } from 'lucide-react';
 
 interface CausalChain {
   id: string;
@@ -305,9 +306,18 @@ function IntelligenceFeedContent() {
                     </div>
                   </div>
                   
-                  <div className="mt-4 pt-4 border-t border-white/[0.02] flex items-center justify-between text-xs text-slate-600 font-light">
-                    <span>{formatTimeAgo(event.created_at)}</span>
-                    <span className="text-slate-500">Click to view details →</span>
+                  <div className="mt-4 pt-4 border-t border-white/[0.02]">
+                    <MetaRow
+                      items={[
+                        {
+                          label: 'Time',
+                          value: formatTimeAgo(event.created_at),
+                        },
+                      ]}
+                    />
+                    <div className="mt-2 text-xs text-slate-500 font-light text-right">
+                      Click to view details →
+                    </div>
                   </div>
                 </Card>
               );

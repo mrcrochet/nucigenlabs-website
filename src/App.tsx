@@ -33,6 +33,10 @@ const Research = lazy(() => import('./pages/Research'));
 // User / System
 const Profile = lazy(() => import('./pages/Profile'));
 const Settings = lazy(() => import('./pages/Settings'));
+// Quality (PHASE 3B)
+const QualityDashboard = lazy(() => import('./pages/QualityDashboard'));
+// Alerts (PHASE 3C)
+const AlertSettings = lazy(() => import('./pages/AlertSettings'));
 
 // Loading component for Suspense fallback
 const PageLoader = () => (
@@ -115,6 +119,9 @@ function App() {
         {/* Level 3 - User / System */}
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+        <Route path="/settings/alerts" element={<ProtectedRoute><AlertSettings /></ProtectedRoute>} />
+        {/* Quality (PHASE 3B) */}
+        <Route path="/quality" element={<ProtectedRoute><QualityDashboard /></ProtectedRoute>} />
         
         {/* Onboarding */}
         <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />

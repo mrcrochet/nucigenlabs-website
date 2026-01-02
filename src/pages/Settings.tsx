@@ -14,6 +14,8 @@ import SectionHeader from '../components/ui/SectionHeader';
 import { Settings as SettingsIcon, Lock } from 'lucide-react';
 
 function SettingsContent() {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-[#0A0A0A] flex">
       <SEO 

@@ -17,7 +17,8 @@ import {
   Settings, 
   LogOut,
   Menu,
-  X
+  X,
+  BarChart3
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -38,6 +39,7 @@ export default function AppSidebar() {
     { path: '/events', label: 'Events', icon: FileText },
     { path: '/alerts', label: 'Alerts', icon: Bell },
     { path: '/research', label: 'Research', icon: BookOpen },
+    { path: '/quality', label: 'Quality', icon: BarChart3 },
   ];
 
   const userItems = [
