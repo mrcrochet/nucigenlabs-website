@@ -28,6 +28,7 @@ const Register = lazy(() => import('./pages/Register'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const AuthCallback = lazy(() => import('./pages/AuthCallback'));
+const Events = lazy(() => import('./pages/Events'));
 
 // Loading component for Suspense fallback
 const PageLoader = () => (
@@ -104,6 +105,7 @@ function App() {
         
         {/* Protected App Routes (no navigation) */}
         <Route path="/app" element={<Dashboard />} />
+        <Route path="/events" element={<Events />} />
         <Route path="/onboarding" element={<Onboarding />} />
       </Routes>
       </Suspense>

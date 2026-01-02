@@ -543,6 +543,72 @@ export async function resetPassword(email: string) {
 }
 
 /**
+ * Get events with causal chains for the Events page
+ * Returns only events that have a causal chain
+ */
+export async function getEventsWithCausalChains() {
+  if (!isConfigured) {
+    throw new Error(
+      'Supabase is not configured. ' +
+      'Please check your .env file and ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set. ' +
+      'Then restart your development server with: npm run dev'
+    );
+  }
+
+  // Check if user is authenticated
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error('Session error:', sessionError);
+    throw new Error('Failed to verify authentication');
+  }
+  if (!session) {
+    throw new Error('User not authenticated. Please log in to view events.');
+  }
+
+  // First, get all events with their causal chains
+  const { data, error } = await supabase
+    .from('nucigen_events')
+    .select(`
+      *,
+      nucigen_causal_chains (
+        id,
+        cause,
+        first_order_effect,
+        second_order_effect,
+        affected_sectors,
+        affected_regions,
+        time_horizon,
+        confidence
+      )
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Supabase error:', error);
+    throw new Error(error.message || 'Failed to fetch events');
+  }
+
+  if (!data) {
+    console.warn('No data returned from Supabase');
+    return [];
+  }
+
+  // Filter out events without causal chains (only show events that have been processed)
+  const filtered = data.filter((event: any) => {
+    const hasChains = event.nucigen_causal_chains && 
+                     Array.isArray(event.nucigen_causal_chains) && 
+                     event.nucigen_causal_chains.length > 0;
+    if (!hasChains) {
+      console.log(`Event ${event.id} filtered out: no causal chains`);
+    }
+    return hasChains;
+  });
+
+  console.log(`Filtered ${filtered.length} events with causal chains from ${data.length} total`);
+  return filtered;
+}
+
+/**
  * Check if user has completed onboarding
  */
 export async function hasCompletedOnboarding(): Promise<boolean> {
