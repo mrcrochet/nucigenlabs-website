@@ -8,7 +8,8 @@
     "build": "npx vite build",
     "lint": "npx eslint .",
     "preview": "npx vite preview",
-    "typecheck": "npx tsc --noEmit -p tsconfig.app.json"
+    "typecheck": "npx tsc --noEmit -p tsconfig.app.json",
+    "check-env": "node check-env.js"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

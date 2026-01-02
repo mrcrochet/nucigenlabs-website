@@ -3,11 +3,22 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Check if environment variables are properly configured
+const isConfigured = supabaseUrl && 
+                    supabaseAnonKey && 
+                    supabaseUrl !== 'https://votre-projet.supabase.co' &&
+                    supabaseUrl !== 'your_supabase_project_url' &&
+                    supabaseAnonKey !== 'your_supabase_anon_key' &&
+                    supabaseAnonKey !== 'votre-anon-key-ici';
+
 // Create Supabase client only if environment variables are available
 // Otherwise, create a mock client that will fail gracefully
-export const supabase = supabaseUrl && supabaseAnonKey
+export const supabase = isConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : createClient('https://placeholder.supabase.co', 'placeholder-key');
+
+// Export a helper to check if Supabase is configured
+export const isSupabaseConfigured = () => isConfigured;
 
 export interface AccessRequest {
   id?: string;
@@ -311,8 +322,12 @@ export interface User {
  * Sign up with email and password
  */
 export async function signUp(email: string, password: string, name?: string) {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase is not configured');
+  if (!isConfigured) {
+    throw new Error(
+      'Supabase is not configured. ' +
+      'Please check your .env file and ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set. ' +
+      'Then restart your development server with: npm run dev'
+    );
   }
 
   const { data, error } = await supabase.auth.signUp({
@@ -336,8 +351,12 @@ export async function signUp(email: string, password: string, name?: string) {
  * Sign in with email and password
  */
 export async function signIn(email: string, password: string) {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase is not configured');
+  if (!isConfigured) {
+    throw new Error(
+      'Supabase is not configured. ' +
+      'Please check your .env file and ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set. ' +
+      'Then restart your development server with: npm run dev'
+    );
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -370,18 +389,34 @@ export async function signOut() {
  * Sign in with OAuth provider
  */
 export async function signInWithOAuth(provider: 'google' | 'linkedin') {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase is not configured');
+  if (!isConfigured) {
+    throw new Error(
+      'Supabase is not configured. ' +
+      'Please check your .env file and ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set. ' +
+      'Then restart your development server with: npm run dev'
+    );
   }
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
       redirectTo: `${window.location.origin}/auth/callback`,
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+      },
     },
   });
 
   if (error) {
+    // Provide more helpful error messages
+    if (error.message?.includes('not enabled') || error.message?.includes('validation_failed')) {
+      throw new Error(
+        `Le provider ${provider} n'est pas activé dans Supabase. ` +
+        `Veuillez aller dans Supabase Dashboard → Authentication → Providers ` +
+        `et activer le toggle pour ${provider === 'google' ? 'Google' : 'LinkedIn'}.`
+      );
+    }
     throw new Error(error.message || 'Failed to sign in with OAuth');
   }
 
@@ -443,8 +478,12 @@ export async function getSession() {
  * Update user profile
  */
 export async function updateUserProfile(updates: Partial<User>) {
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase is not configured');
+  if (!isConfigured) {
+    throw new Error(
+      'Supabase is not configured. ' +
+      'Please check your .env file and ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set. ' +
+      'Then restart your development server with: npm run dev'
+    );
   }
 
   const { data: { user } } = await supabase.auth.getUser();
