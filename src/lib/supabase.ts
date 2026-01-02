@@ -337,6 +337,7 @@ export async function signUp(email: string, password: string, name?: string) {
       data: {
         name: name || email.split('@')[0],
       },
+      emailRedirectTo: `${window.location.origin}/auth/callback`,
     },
   });
 
@@ -344,6 +345,8 @@ export async function signUp(email: string, password: string, name?: string) {
     throw new Error(error.message || 'Failed to sign up');
   }
 
+  // If no session is returned, it means email confirmation is required
+  // In that case, we should still return the data but the session will be null
   return data;
 }
 

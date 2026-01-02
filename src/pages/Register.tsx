@@ -34,10 +34,34 @@ export default function Register() {
     setLoading(true);
 
     try {
-      await signUp(email, password, name);
-      await refreshUser();
-      // Redirect to onboarding after signup
-      navigate('/onboarding', { replace: true });
+      const signUpData = await signUp(email, password, name);
+      
+      // Check if email confirmation is required (no session returned)
+      if (signUpData.user && !signUpData.session) {
+        // Email confirmation is required
+        // Show message and redirect to a confirmation page or show info
+        setError('');
+        navigate('/register/confirm-email', { 
+          replace: true,
+          state: { email } 
+        });
+        return;
+      }
+
+      // If session exists, wait a moment for it to be fully established
+      if (signUpData.session) {
+        // Wait a bit for the session to be fully established
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Refresh user data
+        await refreshUser();
+        
+        // Redirect to onboarding
+        navigate('/onboarding', { replace: true });
+      } else {
+        // No session and no user - something went wrong
+        throw new Error('Account created but session not established. Please try logging in.');
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to create account');
     } finally {

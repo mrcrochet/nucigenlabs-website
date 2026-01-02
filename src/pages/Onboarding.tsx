@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { updateUserProfile } from '../lib/supabase';
+import { updateUserProfile, getSession } from '../lib/supabase';
 import { Building2, Briefcase, Target, TrendingUp } from 'lucide-react';
 import SEO from '../components/SEO';
 
 export default function Onboarding() {
-  const { user, refreshUser } = useAuth();
+  const { user, loading: authLoading, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -17,6 +17,30 @@ export default function Onboarding() {
     intended_use: '',
     exposure: '',
   });
+
+  // Refresh user on mount to ensure we have the latest session
+  useEffect(() => {
+    const checkSession = async () => {
+      if (!authLoading && !user) {
+        // Try to get session directly
+        const session = await getSession();
+        if (session) {
+          // Session exists, refresh user
+          await refreshUser();
+        } else {
+          // No session, redirect to login after a short delay
+          setTimeout(() => {
+            navigate('/login', { 
+              replace: true,
+              state: { from: { pathname: '/onboarding' } }
+            });
+          }, 2000);
+        }
+      }
+    };
+    
+    checkSession();
+  }, [authLoading, user, refreshUser, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +79,28 @@ export default function Onboarding() {
           </p>
         </div>
 
+        {/* Show loading state while checking auth */}
+        {authLoading ? (
+          <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] rounded-2xl p-8 text-center">
+            <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-sm text-slate-500 font-light">Verifying authentication...</p>
+          </div>
+        ) : !user ? (
+          <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] rounded-2xl p-8 text-center">
+            <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <p className="text-sm text-red-400 mb-2">User not authenticated</p>
+              <p className="text-xs text-slate-500 mb-4">Please log in to continue.</p>
+              <button
+                onClick={() => navigate('/login', { 
+                  state: { from: { pathname: '/onboarding' } }
+                })}
+                className="px-4 py-2 bg-[#E1463E] text-white rounded-lg hover:bg-[#E1463E]/90 transition-colors text-sm font-light"
+              >
+                Go to Login
+              </button>
+            </div>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] rounded-2xl p-6 sm:p-8">
           {error && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
@@ -201,6 +247,7 @@ export default function Onboarding() {
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );
