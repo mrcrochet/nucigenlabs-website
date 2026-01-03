@@ -759,6 +759,75 @@ export async function getOfficialDocuments(nucigenEventId: string) {
 }
 
 /**
+ * Get user preferences for feed personalization
+ */
+export async function getUserPreferences() {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
+  const { data, error } = await supabase
+    .from('user_preferences')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || 'Failed to fetch user preferences');
+  }
+
+  return data;
+}
+
+/**
+ * Update user preferences
+ */
+export async function updateUserPreferences(preferences: {
+  preferred_sectors?: string[];
+  preferred_regions?: string[];
+  preferred_event_types?: string[];
+  focus_areas?: string[];
+  feed_priority?: 'relevance' | 'recency' | 'impact' | 'balanced';
+  min_impact_score?: number;
+  min_confidence_score?: number;
+  preferred_time_horizons?: string[];
+  notify_on_new_event?: boolean;
+  notify_frequency?: 'realtime' | 'hourly' | 'daily' | 'weekly';
+}) {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
+  const { data, error } = await supabase
+    .from('user_preferences')
+    .upsert({
+      user_id: user.id,
+      ...preferences,
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'user_id',
+    })
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(error.message || 'Failed to update user preferences');
+  }
+
+  return data;
+}
+
+/**
  * Check if user has completed onboarding
  */
 export async function hasCompletedOnboarding(): Promise<boolean> {

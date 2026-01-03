@@ -7,7 +7,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getEventsWithCausalChains } from '../lib/supabase';
+import { getEventsWithCausalChains, getUserPreferences } from '../lib/supabase';
+import { sortEventsByPreferences, filterEventsByPreferences, isEventHighlyRelevant } from '../lib/preferences-utils';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import AppSidebar from '../components/AppSidebar';
@@ -15,7 +16,7 @@ import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SectionHeader from '../components/ui/SectionHeader';
 import MetaRow from '../components/ui/MetaRow';
-import { Search, MapPin, Building2, TrendingUp, Clock } from 'lucide-react';
+import { Search, MapPin, Building2, TrendingUp, Clock, Sparkles } from 'lucide-react';
 
 interface CausalChain {
   id: string;
@@ -49,32 +50,46 @@ interface EventWithChain {
 function IntelligenceFeedContent() {
   const navigate = useNavigate();
   const [events, setEvents] = useState<EventWithChain[]>([]);
+  const [preferences, setPreferences] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'top' | 'recent' | 'critical'>('top');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Load preferences and events
   useEffect(() => {
-    async function fetchEvents() {
+    async function fetchData() {
       try {
         setLoading(true);
         setError('');
-        const data = await getEventsWithCausalChains();
-        setEvents(data || []);
+        
+        // Load preferences and events in parallel
+        const [eventsData, preferencesData] = await Promise.all([
+          getEventsWithCausalChains(),
+          getUserPreferences().catch(() => null), // Don't fail if preferences don't exist
+        ]);
+        
+        setEvents(eventsData || []);
+        setPreferences(preferencesData);
       } catch (err: any) {
-        console.error('Error loading events:', err);
-        setError(err.message || 'Failed to load events');
+        console.error('Error loading data:', err);
+        setError(err.message || 'Failed to load data');
       } finally {
         setLoading(false);
       }
     }
 
-    fetchEvents();
+    fetchData();
   }, []);
 
-  // Filter and sort events based on active tab
+  // Filter and sort events based on active tab and preferences
   const filteredEvents = useMemo(() => {
     let filtered = [...events];
+
+    // Apply preference-based filtering first (thresholds)
+    if (preferences) {
+      filtered = filterEventsByPreferences(filtered, preferences);
+    }
 
     // Search filter
     if (searchQuery) {
@@ -92,31 +107,46 @@ function IntelligenceFeedContent() {
       });
     }
 
-    // Tab-based sorting
+    // Tab-based sorting (with preference integration)
     switch (activeTab) {
       case 'top':
-        // Sort by impact_score * confidence (highest first)
-        filtered.sort((a, b) => {
-          const scoreA = (a.impact_score || 0) * (a.confidence || 0);
-          const scoreB = (b.impact_score || 0) * (b.confidence || 0);
-          return scoreB - scoreA;
-        });
+        // If preferences exist and priority is set, use preference-based sorting
+        if (preferences && preferences.feed_priority) {
+          filtered = sortEventsByPreferences(filtered, preferences);
+        } else {
+          // Default: Sort by impact_score * confidence (highest first)
+          filtered.sort((a, b) => {
+            const scoreA = (a.impact_score || 0) * (a.confidence || 0);
+            const scoreB = (b.impact_score || 0) * (b.confidence || 0);
+            return scoreB - scoreA;
+          });
+        }
         break;
       case 'recent':
-        // Sort by created_at (newest first)
-        filtered.sort((a, b) => {
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
+        // If preferences exist and priority is 'recency', use preference-based sorting
+        if (preferences && preferences.feed_priority === 'recency') {
+          filtered = sortEventsByPreferences(filtered, preferences);
+        } else {
+          // Default: Sort by created_at (newest first)
+          filtered.sort((a, b) => {
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+          });
+        }
         break;
       case 'critical':
         // Filter by high impact (>= 0.7) and sort by impact
         filtered = filtered.filter(e => (e.impact_score || 0) >= 0.7);
-        filtered.sort((a, b) => (b.impact_score || 0) - (a.impact_score || 0));
+        // If preferences exist, also consider relevance
+        if (preferences) {
+          filtered = sortEventsByPreferences(filtered, preferences);
+        } else {
+          filtered.sort((a, b) => (b.impact_score || 0) - (a.impact_score || 0));
+        }
         break;
     }
 
     return filtered;
-  }, [events, activeTab, searchQuery]);
+  }, [events, activeTab, searchQuery, preferences]);
 
   const getTimeHorizonLabel = (horizon: string) => {
     switch (horizon) {
@@ -266,6 +296,13 @@ function IntelligenceFeedContent() {
                       </h3>
                       
                       <div className="flex flex-wrap items-center gap-3 mb-3">
+                        {/* Relevance badge - show if highly relevant */}
+                        {preferences && isEventHighlyRelevant(event, preferences) && (
+                          <Badge variant="critical">
+                            <Sparkles className="w-3 h-3 mr-1.5" />
+                            Relevant to you
+                          </Badge>
+                        )}
                         {event.sector && (
                           <Badge variant="sector">
                             <Building2 className="w-3 h-3 mr-1.5" />
