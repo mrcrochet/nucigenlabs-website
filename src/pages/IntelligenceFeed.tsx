@@ -296,8 +296,15 @@ function IntelligenceFeedContent() {
                       </h3>
                       
                       <div className="flex flex-wrap items-center gap-3 mb-3">
-                        {/* Relevance badge - show if highly relevant */}
-                        {preferences && isEventHighlyRelevant(event, preferences) && (
+                        {/* Personalized badge - highest priority (from Tavily personalized queries) */}
+                        {(event as any).isPersonalized && (
+                          <Badge variant="critical">
+                            <Sparkles className="w-3 h-3 mr-1.5" />
+                            For you
+                          </Badge>
+                        )}
+                        {/* Relevance badge - show if highly relevant (but not already personalized) */}
+                        {preferences && isEventHighlyRelevant(event, preferences) && !(event as any).isPersonalized && (
                           <Badge variant="critical">
                             <Sparkles className="w-3 h-3 mr-1.5" />
                             Relevant to you

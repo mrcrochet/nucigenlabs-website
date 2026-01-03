@@ -8,9 +8,10 @@
  * Runs in a loop with configurable intervals
  */
 
-import { collectNewsEvents } from './data-collector';
+import { collectNewsEvents, runDataCollector } from './data-collector';
 import { processPendingEvents } from './event-processor';
 import { runAlertsGenerator } from './alerts-generator';
+import { collectPersonalizedEventsForAllUsers } from './tavily-personalized-collector';
 
 interface OrchestratorConfig {
   collectionInterval: number; // milliseconds
@@ -35,10 +36,20 @@ async function runCycle(config: OrchestratorConfig) {
   console.log('='.repeat(60));
 
   try {
-    // Step 1: Collect new events
-    console.log('\n[Orchestrator] Step 1: Collecting new events...');
-    const collectionResult = await collectNewsEvents();
+    // Step 1: Collect new events (Tavily + RSS, NewsAPI disabled by default)
+    console.log('\n[Orchestrator] Step 1: Collecting new events (Tavily + RSS)...');
+    const collectionResult = await runDataCollector(); // Tavily (primary) + RSS (complementary)
     console.log(`[Orchestrator] Collection: ${collectionResult.inserted} inserted, ${collectionResult.skipped} skipped`);
+    
+    // Step 1B: Collect personalized events for all users (based on preferences)
+    console.log('\n[Orchestrator] Step 1B: Collecting personalized events for users...');
+    try {
+      const personalizedResult = await collectPersonalizedEventsForAllUsers();
+      console.log(`[Orchestrator] Personalized: ${personalizedResult.totalInserted} inserted for ${personalizedResult.usersProcessed} users`);
+    } catch (error: any) {
+      console.warn('[Orchestrator] Personalized collection failed:', error.message);
+      // Don't fail the whole cycle if personalized collection fails
+    }
 
     // Step 2: Process pending events
     console.log('\n[Orchestrator] Step 2: Processing pending events...');
@@ -88,10 +99,11 @@ export async function startOrchestrator(config: Partial<OrchestratorConfig> = {}
     return;
   }
 
-  // Schedule collection
+  // Schedule collection (NewsAPI + RSS)
   const collectionInterval = setInterval(async () => {
     try {
-      await collectNewsEvents();
+      const { runDataCollector } = await import('./data-collector');
+      await runDataCollector();
     } catch (error) {
       console.error('[Orchestrator] Collection error:', error);
     }

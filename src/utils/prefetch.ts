@@ -18,6 +18,10 @@ export function prefetchRoute(path: string) {
 export function prefetchCriticalRoutes() {
   // Prefetch most visited routes
   const criticalRoutes = [
+    '/login',
+    '/register',
+    '/confirm-email',
+    '/onboarding',
     '/intelligence',
     '/pricing',
     '/request-access',

@@ -567,6 +567,10 @@ export async function resetPassword(email: string) {
  * Get events with causal chains for the Events page
  * Returns only events that have a causal chain
  */
+/**
+ * Get events with causal chains, including personalized events for the current user
+ * Prioritizes personalized events (tavily:personalized:userId) over general events
+ */
 export async function getEventsWithCausalChains() {
   if (!isConfigured) {
     throw new Error(
@@ -586,7 +590,10 @@ export async function getEventsWithCausalChains() {
     throw new Error('User not authenticated. Please log in to view events.');
   }
 
-  // First, get all events with their causal chains
+  const userId = session.user.id;
+  const personalizedSource = `tavily:personalized:${userId}`;
+
+  // Get events with their causal chains
   const { data, error } = await supabase
     .from('nucigen_events')
     .select(`
@@ -614,18 +621,50 @@ export async function getEventsWithCausalChains() {
     return [];
   }
 
-  // Filter out events without causal chains (only show events that have been processed)
-  const filtered = data.filter((event: any) => {
-    const hasChains = event.nucigen_causal_chains && 
-                     Array.isArray(event.nucigen_causal_chains) && 
-                     event.nucigen_causal_chains.length > 0;
-    if (!hasChains) {
-      console.log(`Event ${event.id} filtered out: no causal chains`);
+  // Get source information from events table for personalized check
+  const eventIds = data.map((e: any) => e.source_event_id).filter(Boolean);
+  let sourceMap: Record<string, string> = {};
+  
+  if (eventIds.length > 0) {
+    const { data: sourceData } = await supabase
+      .from('events')
+      .select('id, source')
+      .in('id', eventIds);
+    
+    if (sourceData) {
+      sourceMap = sourceData.reduce((acc: Record<string, string>, e: any) => {
+        acc[e.id] = e.source;
+        return acc;
+      }, {});
     }
-    return hasChains;
-  });
+  }
 
-  console.log(`Filtered ${filtered.length} events with causal chains from ${data.length} total`);
+  // Filter out events without causal chains and add personalized flag
+  const filtered = data
+    .filter((event: any) => {
+      const hasChains = event.nucigen_causal_chains && 
+                       Array.isArray(event.nucigen_causal_chains) && 
+                       event.nucigen_causal_chains.length > 0;
+      return hasChains;
+    })
+    .map((event: any) => {
+      // Check if this is a personalized event for this user
+      const eventSource = event.source_event_id ? sourceMap[event.source_event_id] : null;
+      const isPersonalized = eventSource === personalizedSource;
+      return {
+        ...event,
+        isPersonalized, // Add flag for frontend prioritization
+      };
+    })
+    // Sort: personalized events first, then by created_at
+    .sort((a: any, b: any) => {
+      if (a.isPersonalized && !b.isPersonalized) return -1;
+      if (!a.isPersonalized && b.isPersonalized) return 1;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+  const personalizedCount = filtered.filter((e: any) => e.isPersonalized).length;
+  console.log(`Fetched ${filtered.length} events (${personalizedCount} personalized) with causal chains`);
   return filtered;
 }
 

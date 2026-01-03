@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { signIn, signInWithOAuth } from '../lib/supabase';
+import { signIn, signInWithOAuth, hasCompletedOnboarding } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import SEO from '../components/SEO';
@@ -16,7 +16,7 @@ export default function Login() {
   const location = useLocation();
   const { refreshUser } = useAuth();
 
-  const from = (location.state as any)?.from?.pathname || '/app';
+  const from = (location.state as any)?.from?.pathname || '/dashboard';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +26,15 @@ export default function Login() {
     try {
       await signIn(email, password);
       await refreshUser();
-      navigate(from, { replace: true });
+      
+      // Check if user has completed onboarding
+      const completed = await hasCompletedOnboarding();
+      
+      if (completed) {
+        navigate(from, { replace: true });
+      } else {
+        navigate('/onboarding', { replace: true });
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to sign in');
     } finally {

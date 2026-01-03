@@ -17,9 +17,10 @@ import Home from './pages/Home';
 // Public marketing routes
 const Pricing = lazy(() => import('./pages/Pricing'));
 const PartnerProgram = lazy(() => import('./pages/PartnerProgram'));
-// Auth routes
+// Auth routes - Preload critical auth routes for smooth transitions
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
+const ConfirmEmail = lazy(() => import('./pages/ConfirmEmail'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 // Application core routes (PHASE 2D)
@@ -38,15 +39,24 @@ const QualityDashboard = lazy(() => import('./pages/QualityDashboard'));
 // Alerts (PHASE 3C)
 const AlertSettings = lazy(() => import('./pages/AlertSettings'));
 
-// Loading component for Suspense fallback
+// Loading component for Suspense fallback - smoother transition
 const PageLoader = () => (
-  <div className="fixed inset-0 flex items-center justify-center bg-[#0A0A0A]">
+  <div className="fixed inset-0 flex items-center justify-center bg-[#0A0A0A] z-50 transition-opacity duration-200">
     <div className="text-center">
       <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
       <p className="text-sm text-slate-500 font-light">Loading...</p>
     </div>
   </div>
 );
+
+// Smooth page transition wrapper
+const PageTransition = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <div className="animate-in fade-in duration-200">
+      {children}
+    </div>
+  );
+};
 
 function App() {
   const { toast, showToast, hideToast } = useToast();
@@ -102,6 +112,7 @@ function App() {
         {/* Auth Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/confirm-email" element={<ConfirmEmail />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         
         {/* Protected App Routes - PHASE 2D SITEMAP */}

@@ -39,9 +39,9 @@ export default function Register() {
       // Check if email confirmation is required (no session returned)
       if (signUpData.user && !signUpData.session) {
         // Email confirmation is required
-        // Show message and redirect to a confirmation page or show info
+        // Show message and redirect to confirmation page
         setError('');
-        navigate('/register/confirm-email', { 
+        navigate('/confirm-email', { 
           replace: true,
           state: { email } 
         });
