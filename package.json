@@ -26,7 +26,10 @@
     "alerts:generate:debug": "DEBUG=true npx tsx src/server/workers/alerts-generator.ts",
     "alerts:init": "npx tsx src/server/phase3c/init-alert-preferences.ts",
     "enrich:context": "npx tsx src/server/workers/context-enricher.ts",
-    "enrich:official": "npx tsx src/server/workers/official-document-enricher.ts"
+    "enrich:official": "npx tsx src/server/workers/official-document-enricher.ts",
+    "test:pipeline": "npx tsx src/server/tests/validate-pipeline.ts",
+    "test:quality": "npx tsx src/server/tests/validate-data-quality.ts",
+    "test:all": "npm run test:pipeline && npm run test:quality"
   },
   "dependencies": {
     "@mendable/firecrawl-js": "^1.29.3",

@@ -4,9 +4,14 @@
  * Displays nucigen_events with their causal chains in a clean, analyst-grade interface
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getEventsWithCausalChains } from '../lib/supabase';
+import { 
+  getEventsWithCausalChainsSearch, 
+  countSearchResults,
+  type EventWithChain,
+  type CausalChain 
+} from '../lib/supabase';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import AppSidebar from '../components/AppSidebar';
@@ -16,40 +21,12 @@ import SectionHeader from '../components/ui/SectionHeader';
 import MetaRow from '../components/ui/MetaRow';
 import { MapPin, Building2, TrendingUp, Clock, Search, Filter, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
-interface CausalChain {
-  id: string;
-  cause: string;
-  first_order_effect: string;
-  second_order_effect: string | null;
-  affected_sectors: string[];
-  affected_regions: string[];
-  time_horizon: 'hours' | 'days' | 'weeks';
-  confidence: number;
-}
-
-interface EventWithChain {
-  id: string;
-  event_type: string;
-  event_subtype: string | null;
-  summary: string;
-  country: string | null;
-  region: string | null;
-  sector: string | null;
-  actors: string[];
-  why_it_matters: string;
-  first_order_effect: string | null;
-  second_order_effect: string | null;
-  impact_score: number | null;
-  confidence: number | null;
-  created_at: string;
-  nucigen_causal_chains: CausalChain[];
-}
-
 function EventsContent() {
   const navigate = useNavigate();
   const [events, setEvents] = useState<EventWithChain[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [totalCount, setTotalCount] = useState(0);
   
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,24 +40,60 @@ function EventsContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const eventsPerPage = 5;
 
+  // Debounce search query to avoid too many requests
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   useEffect(() => {
-    async function fetchEvents() {
-      try {
-        setLoading(true);
-        setError('');
-        const data = await getEventsWithCausalChains();
-        console.log('Events loaded:', data?.length || 0);
-        setEvents(data || []);
-      } catch (err: any) {
-        console.error('Error loading events:', err);
-        setError(err.message || 'Failed to load events');
-      } finally {
-        setLoading(false);
-      }
-    }
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500); // 500ms debounce
 
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Fetch events with server-side search
+  const fetchEvents = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      
+      const offset = (currentPage - 1) * eventsPerPage;
+      
+      // Fetch events with search (using debounced query)
+      const [eventsData, count] = await Promise.all([
+        getEventsWithCausalChainsSearch({
+          searchQuery: debouncedSearchQuery || undefined,
+          sectorFilter: selectedSectors.length > 0 ? selectedSectors : undefined,
+          regionFilter: selectedRegions.length > 0 ? selectedRegions : undefined,
+          eventTypeFilter: selectedEventTypes.length > 0 ? selectedEventTypes : undefined,
+          timeHorizonFilter: selectedTimeHorizons.length > 0 ? selectedTimeHorizons : undefined,
+          limit: eventsPerPage,
+          offset: offset,
+        }),
+        countSearchResults({
+          searchQuery: debouncedSearchQuery || undefined,
+          sectorFilter: selectedSectors.length > 0 ? selectedSectors : undefined,
+          regionFilter: selectedRegions.length > 0 ? selectedRegions : undefined,
+          eventTypeFilter: selectedEventTypes.length > 0 ? selectedEventTypes : undefined,
+          timeHorizonFilter: selectedTimeHorizons.length > 0 ? selectedTimeHorizons : undefined,
+        }),
+      ]);
+      
+      console.log('Events loaded:', eventsData?.length || 0, 'Total:', count);
+      setEvents(eventsData || []);
+      setTotalCount(count);
+    } catch (err: any) {
+      console.error('Error loading events:', err);
+      setError(err.message || 'Failed to load events');
+      setEvents([]);
+      setTotalCount(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [debouncedSearchQuery, selectedSectors, selectedRegions, selectedEventTypes, selectedTimeHorizons, currentPage, eventsPerPage]);
+
+  useEffect(() => {
     fetchEvents();
-  }, []);
+  }, [fetchEvents]);
 
   const getTimeHorizonLabel = (horizon: string) => {
     switch (horizon) {
@@ -96,7 +109,9 @@ function EventsContent() {
   };
 
 
-  // Extract unique filter options
+  // Extract unique filter options from all available events (for filter dropdowns)
+  // Note: This is a simplified version. In production, you might want to fetch
+  // distinct values from the database for better performance
   const filterOptions = useMemo(() => {
     const sectors = new Set<string>();
     const regions = new Set<string>();
@@ -124,74 +139,16 @@ function EventsContent() {
     };
   }, [events]);
 
-  // Filter events
-  const filteredEvents = useMemo(() => {
-    return events.filter(event => {
-      const chain = event.nucigen_causal_chains?.[0];
-      
-      // Search query
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const matchesSummary = event.summary?.toLowerCase().includes(query);
-        const matchesWhyItMatters = event.why_it_matters?.toLowerCase().includes(query);
-        const matchesCause = chain?.cause?.toLowerCase().includes(query);
-        const matchesEffect = chain?.first_order_effect?.toLowerCase().includes(query) ||
-                            chain?.second_order_effect?.toLowerCase().includes(query);
-        
-        if (!matchesSummary && !matchesWhyItMatters && !matchesCause && !matchesEffect) {
-          return false;
-        }
-      }
+  // Pagination (server-side)
+  const totalPages = Math.ceil(totalCount / eventsPerPage);
+  const paginatedEvents = events; // Events are already paginated from server
 
-      // Sector filter
-      if (selectedSectors.length > 0) {
-        const eventSector = event.sector?.toLowerCase();
-        const chainSectors = chain?.affected_sectors?.map(s => s.toLowerCase()) || [];
-        const matches = selectedSectors.some(s => 
-          eventSector === s.toLowerCase() || chainSectors.includes(s.toLowerCase())
-        );
-        if (!matches) return false;
-      }
-
-      // Region filter
-      if (selectedRegions.length > 0) {
-        const eventRegion = event.region?.toLowerCase();
-        const chainRegions = chain?.affected_regions?.map(r => r.toLowerCase()) || [];
-        const matches = selectedRegions.some(r => 
-          eventRegion === r.toLowerCase() || chainRegions.includes(r.toLowerCase())
-        );
-        if (!matches) return false;
-      }
-
-      // Event type filter
-      if (selectedEventTypes.length > 0) {
-        if (!event.event_type || !selectedEventTypes.includes(event.event_type)) {
-          return false;
-        }
-      }
-
-      // Time horizon filter
-      if (selectedTimeHorizons.length > 0) {
-        if (!chain || !selectedTimeHorizons.includes(chain.time_horizon)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [events, searchQuery, selectedSectors, selectedRegions, selectedEventTypes, selectedTimeHorizons]);
-
-  // Pagination
-  const totalPages = Math.ceil(filteredEvents.length / eventsPerPage);
-  const paginatedEvents = useMemo(() => {
-    const startIndex = (currentPage - 1) * eventsPerPage;
-    return filteredEvents.slice(startIndex, startIndex + eventsPerPage);
-  }, [filteredEvents, currentPage, eventsPerPage]);
-
-  // Reset to page 1 when filters change
+  // Reset to page 1 when filters change (but not on debounced search)
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, selectedSectors, selectedRegions, selectedEventTypes, selectedTimeHorizons]);
+    if (debouncedSearchQuery === searchQuery) {
+      setCurrentPage(1);
+    }
+  }, [selectedSectors, selectedRegions, selectedEventTypes, selectedTimeHorizons]);
 
   const clearFilters = () => {
     setSearchQuery('');
@@ -257,7 +214,7 @@ function EventsContent() {
                   Events
                 </h1>
                 <p className="text-sm text-slate-600 font-light">
-                  {filteredEvents.length} of {events.length} event{events.length !== 1 ? 's' : ''} shown
+                  {events.length} of {totalCount} event{totalCount !== 1 ? 's' : ''} shown
                 </p>
               </div>
             </div>
@@ -429,7 +386,7 @@ function EventsContent() {
               Events will appear here once they have been processed and causal chains have been generated.
             </p>
           </div>
-        ) : filteredEvents.length === 0 ? (
+        ) : events.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-lg text-slate-500 font-light mb-4">No events match your filters.</p>
             <button

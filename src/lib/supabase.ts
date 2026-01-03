@@ -876,3 +876,278 @@ export async function hasCompletedOnboarding(): Promise<boolean> {
   // Check if user has filled required onboarding fields
   return !!(user.company && user.sector && user.intended_use);
 }
+
+// ============================================
+// PHASE 6: Full-Text Search Functions
+// ============================================
+
+export interface CausalChain {
+  id: string;
+  cause: string;
+  first_order_effect: string;
+  second_order_effect: string | null;
+  affected_sectors: string[];
+  affected_regions: string[];
+  time_horizon: 'hours' | 'days' | 'weeks';
+  confidence: number;
+}
+
+export interface EventWithChain {
+  id: string;
+  event_type: string;
+  event_subtype: string | null;
+  summary: string;
+  country: string | null;
+  region: string | null;
+  sector: string | null;
+  actors: string[];
+  why_it_matters: string;
+  first_order_effect: string | null;
+  second_order_effect: string | null;
+  impact_score: number | null;
+  confidence: number | null;
+  created_at: string;
+  nucigen_causal_chains: CausalChain[];
+  isPersonalized?: boolean;
+  relevanceScore?: number;
+}
+
+export interface SearchEventResult {
+  id: string;
+  event_type: string;
+  event_subtype: string | null;
+  summary: string;
+  country: string | null;
+  region: string | null;
+  sector: string | null;
+  actors: string[];
+  why_it_matters: string;
+  first_order_effect: string | null;
+  second_order_effect: string | null;
+  impact_score: number | null;
+  confidence: number | null;
+  created_at: string;
+  relevance_score: number;
+  has_causal_chain: boolean;
+}
+
+export interface SearchOptions {
+  searchQuery?: string;
+  sectorFilter?: string[];
+  regionFilter?: string[];
+  eventTypeFilter?: string[];
+  timeHorizonFilter?: string[];
+  minImpactScore?: number;
+  minConfidenceScore?: number;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Search nucigen_events using full-text search
+ */
+export async function searchEvents(options: SearchOptions = {}): Promise<SearchEventResult[]> {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('User not authenticated');
+  }
+
+  const {
+    searchQuery = '',
+    sectorFilter = null,
+    regionFilter = null,
+    eventTypeFilter = null,
+    timeHorizonFilter = null,
+    minImpactScore = null,
+    minConfidenceScore = null,
+    limit = 50,
+    offset = 0,
+  } = options;
+
+  const { data, error } = await supabase.rpc('search_nucigen_events', {
+    search_query: searchQuery || '',
+    sector_filter: sectorFilter,
+    region_filter: regionFilter,
+    event_type_filter: eventTypeFilter,
+    time_horizon_filter: timeHorizonFilter,
+    min_impact_score: minImpactScore,
+    min_confidence_score: minConfidenceScore,
+    limit_count: limit,
+    offset_count: offset,
+  });
+
+  if (error) {
+    console.error('Search error:', error);
+    throw new Error(error.message || 'Failed to search events');
+  }
+
+  return (data || []) as SearchEventResult[];
+}
+
+/**
+ * Count search results for pagination
+ */
+export async function countSearchResults(options: Omit<SearchOptions, 'limit' | 'offset'> = {}): Promise<number> {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('User not authenticated');
+  }
+
+  const {
+    searchQuery = '',
+    sectorFilter = null,
+    regionFilter = null,
+    eventTypeFilter = null,
+    timeHorizonFilter = null,
+    minImpactScore = null,
+    minConfidenceScore = null,
+  } = options;
+
+  const { data, error } = await supabase.rpc('count_nucigen_events_search', {
+    search_query: searchQuery || '',
+    sector_filter: sectorFilter,
+    region_filter: regionFilter,
+    event_type_filter: eventTypeFilter,
+    time_horizon_filter: timeHorizonFilter,
+    min_impact_score: minImpactScore,
+    min_confidence_score: minConfidenceScore,
+  });
+
+  if (error) {
+    console.error('Count error:', error);
+    throw new Error(error.message || 'Failed to count search results');
+  }
+
+  return (data as number) || 0;
+}
+
+/**
+ * Get events with causal chains using search (for Events page)
+ * This function combines search results with causal chain data
+ */
+export async function getEventsWithCausalChainsSearch(
+  options: SearchOptions = {}
+): Promise<EventWithChain[]> {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('User not authenticated');
+  }
+
+  // Get search results
+  const searchResults = await searchEvents(options);
+
+  if (searchResults.length === 0) {
+    return [];
+  }
+
+  // Get event IDs
+  const eventIds = searchResults.map(e => e.id);
+
+  // Fetch causal chains for these events
+  const { data: chainsData, error: chainsError } = await supabase
+    .from('nucigen_causal_chains')
+    .select('*')
+    .in('nucigen_event_id', eventIds);
+
+  if (chainsError) {
+    console.error('Error fetching causal chains:', chainsError);
+    // Continue without chains if there's an error
+  }
+
+  // Group chains by event ID
+  const chainsByEventId: Record<string, CausalChain[]> = {};
+  if (chainsData) {
+    chainsData.forEach((chain: any) => {
+      if (!chainsByEventId[chain.nucigen_event_id]) {
+        chainsByEventId[chain.nucigen_event_id] = [];
+      }
+      chainsByEventId[chain.nucigen_event_id].push({
+        id: chain.id,
+        cause: chain.cause,
+        first_order_effect: chain.first_order_effect,
+        second_order_effect: chain.second_order_effect,
+        affected_sectors: chain.affected_sectors || [],
+        affected_regions: chain.affected_regions || [],
+        time_horizon: chain.time_horizon,
+        confidence: chain.confidence,
+      });
+    });
+  }
+
+  // Get source information from events table for personalized check
+  const userId = session.user.id;
+  const personalizedSource = `tavily:personalized:${userId}`;
+  let sourceMap: Record<string, string> = {};
+  
+  // Fetch source information for personalized events
+  if (eventIds.length > 0) {
+    // Get source_event_id from nucigen_events
+    const { data: nucigenEventsData } = await supabase
+      .from('nucigen_events')
+      .select('id, source_event_id')
+      .in('id', eventIds);
+    
+    if (nucigenEventsData) {
+      const sourceEventIds = nucigenEventsData
+        .map((e: any) => e.source_event_id)
+        .filter(Boolean);
+      
+      if (sourceEventIds.length > 0) {
+        const { data: sourceData } = await supabase
+          .from('events')
+          .select('id, source')
+          .in('id', sourceEventIds);
+        
+        if (sourceData) {
+          // Map nucigen_event_id -> source
+          nucigenEventsData.forEach((ne: any) => {
+            const sourceEvent = sourceData.find((se: any) => se.id === ne.source_event_id);
+            if (sourceEvent) {
+              sourceMap[ne.id] = sourceEvent.source;
+            }
+          });
+        }
+      }
+    }
+  }
+
+  // Combine search results with causal chains and personalized flag
+  const eventsWithChains: EventWithChain[] = searchResults.map((event) => {
+    const eventSource = sourceMap[event.id];
+    const isPersonalized = eventSource === personalizedSource;
+    
+    return {
+      id: event.id,
+      event_type: event.event_type,
+      event_subtype: event.event_subtype,
+      summary: event.summary,
+      country: event.country,
+      region: event.region,
+      sector: event.sector,
+      actors: event.actors || [],
+      why_it_matters: event.why_it_matters,
+      first_order_effect: event.first_order_effect,
+      second_order_effect: event.second_order_effect,
+      impact_score: event.impact_score,
+      confidence: event.confidence,
+      created_at: event.created_at,
+      nucigen_causal_chains: chainsByEventId[event.id] || [],
+      isPersonalized, // Add flag for frontend prioritization
+      relevanceScore: (event as any).relevance_score || 0,
+    };
+  });
+
+  return eventsWithChains;
+}

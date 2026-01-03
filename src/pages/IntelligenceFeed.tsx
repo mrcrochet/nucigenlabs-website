@@ -5,9 +5,14 @@
  * Shows prioritized events with tabs: Top, Recent, Critical
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getEventsWithCausalChains, getUserPreferences } from '../lib/supabase';
+import { 
+  getEventsWithCausalChainsSearch, 
+  getUserPreferences,
+  type EventWithChain,
+  type CausalChain 
+} from '../lib/supabase';
 import { sortEventsByPreferences, filterEventsByPreferences, isEventHighlyRelevant } from '../lib/preferences-utils';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
@@ -18,35 +23,6 @@ import SectionHeader from '../components/ui/SectionHeader';
 import MetaRow from '../components/ui/MetaRow';
 import { Search, MapPin, Building2, TrendingUp, Clock, Sparkles } from 'lucide-react';
 
-interface CausalChain {
-  id: string;
-  cause: string;
-  first_order_effect: string;
-  second_order_effect: string | null;
-  affected_sectors: string[];
-  affected_regions: string[];
-  time_horizon: 'hours' | 'days' | 'weeks';
-  confidence: number;
-}
-
-interface EventWithChain {
-  id: string;
-  event_type: string;
-  event_subtype: string | null;
-  summary: string;
-  country: string | null;
-  region: string | null;
-  sector: string | null;
-  actors: string[];
-  why_it_matters: string;
-  first_order_effect: string | null;
-  second_order_effect: string | null;
-  impact_score: number | null;
-  confidence: number | null;
-  created_at: string;
-  nucigen_causal_chains: CausalChain[];
-}
-
 function IntelligenceFeedContent() {
   const navigate = useNavigate();
   const [events, setEvents] = useState<EventWithChain[]>([]);
@@ -55,67 +31,104 @@ function IntelligenceFeedContent() {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'top' | 'recent' | 'critical'>('top');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 
-  // Load preferences and events
+  // Debounce search query
   useEffect(() => {
-    async function fetchData() {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Load preferences
+  useEffect(() => {
+    async function fetchPreferences() {
       try {
-        setLoading(true);
-        setError('');
-        
-        // Load preferences and events in parallel
-        const [eventsData, preferencesData] = await Promise.all([
-          getEventsWithCausalChains(),
-          getUserPreferences().catch(() => null), // Don't fail if preferences don't exist
-        ]);
-        
-        setEvents(eventsData || []);
+        const preferencesData = await getUserPreferences().catch(() => null);
         setPreferences(preferencesData);
-      } catch (err: any) {
-        console.error('Error loading data:', err);
-        setError(err.message || 'Failed to load data');
-      } finally {
-        setLoading(false);
+      } catch (err) {
+        console.error('Error loading preferences:', err);
       }
     }
-
-    fetchData();
+    fetchPreferences();
   }, []);
 
-  // Filter and sort events based on active tab and preferences
-  const filteredEvents = useMemo(() => {
-    let filtered = [...events];
+  // Fetch events with server-side search based on active tab
+  const fetchEvents = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
 
-    // Apply preference-based filtering first (thresholds)
-    if (preferences) {
-      filtered = filterEventsByPreferences(filtered, preferences);
-    }
+      // Build search options based on active tab
+      let searchOptions: any = {
+        searchQuery: debouncedSearchQuery || undefined,
+        limit: 100, // Get more results for client-side sorting
+      };
 
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(event => {
-        const chain = event.nucigen_causal_chains?.[0];
-        return (
-          event.summary?.toLowerCase().includes(query) ||
-          event.why_it_matters?.toLowerCase().includes(query) ||
-          event.sector?.toLowerCase().includes(query) ||
-          event.region?.toLowerCase().includes(query) ||
-          chain?.cause?.toLowerCase().includes(query) ||
-          chain?.first_order_effect?.toLowerCase().includes(query)
-        );
-      });
+      // Apply tab-specific filters
+      switch (activeTab) {
+        case 'critical':
+          searchOptions.minImpactScore = 0.7;
+          break;
+        case 'top':
+        case 'recent':
+          // No additional filters for top/recent
+          break;
+      }
+
+      // Apply preference-based filters if available
+      if (preferences) {
+        if (preferences.preferred_sectors && preferences.preferred_sectors.length > 0) {
+          searchOptions.sectorFilter = preferences.preferred_sectors;
+        }
+        if (preferences.preferred_regions && preferences.preferred_regions.length > 0) {
+          searchOptions.regionFilter = preferences.preferred_regions;
+        }
+        if (preferences.preferred_event_types && preferences.preferred_event_types.length > 0) {
+          searchOptions.eventTypeFilter = preferences.preferred_event_types;
+        }
+        if (preferences.min_impact_score !== null && preferences.min_impact_score !== undefined) {
+          searchOptions.minImpactScore = Math.max(
+            searchOptions.minImpactScore || 0,
+            preferences.min_impact_score
+          );
+        }
+        if (preferences.min_confidence_score !== null && preferences.min_confidence_score !== undefined) {
+          searchOptions.minConfidenceScore = preferences.min_confidence_score;
+        }
+      }
+
+      const eventsData = await getEventsWithCausalChainsSearch(searchOptions);
+      console.log('Events loaded:', eventsData?.length || 0);
+      setEvents(eventsData || []);
+    } catch (err: any) {
+      console.error('Error loading events:', err);
+      setError(err.message || 'Failed to load events');
+      setEvents([]);
+    } finally {
+      setLoading(false);
     }
+  }, [debouncedSearchQuery, activeTab, preferences]);
+
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
+
+  // Sort events based on active tab and preferences (server already filtered)
+  const sortedEvents = useMemo(() => {
+    let sorted = [...events];
 
     // Tab-based sorting (with preference integration)
     switch (activeTab) {
       case 'top':
         // If preferences exist and priority is set, use preference-based sorting
         if (preferences && preferences.feed_priority) {
-          filtered = sortEventsByPreferences(filtered, preferences);
+          sorted = sortEventsByPreferences(sorted, preferences);
         } else {
           // Default: Sort by impact_score * confidence (highest first)
-          filtered.sort((a, b) => {
+          sorted.sort((a, b) => {
             const scoreA = (a.impact_score || 0) * (a.confidence || 0);
             const scoreB = (b.impact_score || 0) * (b.confidence || 0);
             return scoreB - scoreA;
@@ -125,28 +138,27 @@ function IntelligenceFeedContent() {
       case 'recent':
         // If preferences exist and priority is 'recency', use preference-based sorting
         if (preferences && preferences.feed_priority === 'recency') {
-          filtered = sortEventsByPreferences(filtered, preferences);
+          sorted = sortEventsByPreferences(sorted, preferences);
         } else {
           // Default: Sort by created_at (newest first)
-          filtered.sort((a, b) => {
+          sorted.sort((a, b) => {
             return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
           });
         }
         break;
       case 'critical':
-        // Filter by high impact (>= 0.7) and sort by impact
-        filtered = filtered.filter(e => (e.impact_score || 0) >= 0.7);
+        // Server already filtered by minImpactScore >= 0.7
         // If preferences exist, also consider relevance
         if (preferences) {
-          filtered = sortEventsByPreferences(filtered, preferences);
+          sorted = sortEventsByPreferences(sorted, preferences);
         } else {
-          filtered.sort((a, b) => (b.impact_score || 0) - (a.impact_score || 0));
+          sorted.sort((a, b) => (b.impact_score || 0) - (a.impact_score || 0));
         }
         break;
     }
 
-    return filtered;
-  }, [events, activeTab, searchQuery, preferences]);
+    return sorted;
+  }, [events, activeTab, preferences]);
 
   const getTimeHorizonLabel = (horizon: string) => {
     switch (horizon) {
@@ -262,12 +274,12 @@ function IntelligenceFeedContent() {
         </div>
 
         {/* Events List */}
-        {filteredEvents.length === 0 ? (
+        {sortedEvents.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-lg text-slate-500 font-light mb-4">
-              {searchQuery ? 'No events match your search.' : 'No events available.'}
+              {debouncedSearchQuery ? 'No events match your search.' : 'No events available.'}
             </p>
-            {searchQuery && (
+            {debouncedSearchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
                 className="text-sm text-slate-400 hover:text-white transition-colors font-light"
@@ -278,7 +290,7 @@ function IntelligenceFeedContent() {
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredEvents.map((event) => {
+            {sortedEvents.map((event) => {
               const chain = event.nucigen_causal_chains?.[0];
               if (!chain) return null;
 
