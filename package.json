@@ -21,14 +21,18 @@
     "quality:metrics-range": "npx tsx src/server/phase3b/quality-metrics-calculator.ts range",
     "alerts:generate": "npx tsx src/server/workers/alerts-generator.ts",
     "alerts:generate:debug": "DEBUG=true npx tsx src/server/workers/alerts-generator.ts",
-    "alerts:init": "npx tsx src/server/phase3c/init-alert-preferences.ts"
+    "alerts:init": "npx tsx src/server/phase3c/init-alert-preferences.ts",
+    "enrich:context": "npx tsx src/server/workers/context-enricher.ts",
+    "enrich:official": "npx tsx src/server/workers/official-document-enricher.ts"
   },
   "dependencies": {
+    "@mendable/firecrawl-js": "^1.29.3",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@supabase/supabase-js": "^2.57.4",
+    "@tavily/core": "^0.6.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.3",

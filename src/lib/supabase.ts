@@ -687,6 +687,78 @@ export async function getEventById(eventId: string) {
 }
 
 /**
+ * Get event context for a nucigen_event (Tavily)
+ */
+export async function getEventContext(nucigenEventId: string) {
+  if (!isConfigured) {
+    throw new Error(
+      'Supabase is not configured. ' +
+      'Please check your .env file and ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set. ' +
+      'Then restart your development server with: npm run dev'
+    );
+  }
+
+  // Check if user is authenticated
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error('Session error:', sessionError);
+    throw new Error('Failed to verify authentication');
+  }
+  if (!session) {
+    throw new Error('User not authenticated. Please log in to view context.');
+  }
+
+  const { data, error } = await supabase
+    .from('event_context')
+    .select('*')
+    .eq('nucigen_event_id', nucigenEventId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Supabase error:', error);
+    throw new Error(error.message || 'Failed to fetch event context');
+  }
+
+  return data;
+}
+
+/**
+ * Get official documents for a nucigen_event (Firecrawl)
+ */
+export async function getOfficialDocuments(nucigenEventId: string) {
+  if (!isConfigured) {
+    throw new Error(
+      'Supabase is not configured. ' +
+      'Please check your .env file and ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set. ' +
+      'Then restart your development server with: npm run dev'
+    );
+  }
+
+  // Check if user is authenticated
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error('Session error:', sessionError);
+    throw new Error('Failed to verify authentication');
+  }
+  if (!session) {
+    throw new Error('User not authenticated. Please log in to view documents.');
+  }
+
+  const { data, error } = await supabase
+    .from('official_documents')
+    .select('*')
+    .eq('nucigen_event_id', nucigenEventId)
+    .order('scraped_at', { ascending: false });
+
+  if (error) {
+    console.error('Supabase error:', error);
+    throw new Error(error.message || 'Failed to fetch official documents');
+  }
+
+  return data || [];
+}
+
+/**
  * Check if user has completed onboarding
  */
 export async function hasCompletedOnboarding(): Promise<boolean> {

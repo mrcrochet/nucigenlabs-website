@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getEventById } from '../lib/supabase';
+import { getEventById, getEventContext, getOfficialDocuments } from '../lib/supabase';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import AppSidebar from '../components/AppSidebar';
@@ -47,10 +47,30 @@ interface EventDetail {
   nucigen_causal_chains: CausalChain[];
 }
 
+interface EventContext {
+  id: string;
+  historical_context: string | null;
+  similar_events: Array<{title: string; date: string; relevance: number; url?: string}> | null;
+  background_explanation: string | null;
+  validation_notes: string | null;
+}
+
+interface OfficialDocument {
+  id: string;
+  url: string;
+  title: string | null;
+  content: string | null;
+  domain: string;
+  source_type: 'government' | 'regulator' | 'institution' | 'central_bank' | 'international_org';
+  scraped_at: string;
+}
+
 function EventDetailContent() {
   const { event_id } = useParams<{ event_id: string }>();
   const navigate = useNavigate();
   const [event, setEvent] = useState<EventDetail | null>(null);
+  const [context, setContext] = useState<EventContext | null>(null);
+  const [officialDocs, setOfficialDocs] = useState<OfficialDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [whyExpanded, setWhyExpanded] = useState(false);
@@ -66,8 +86,14 @@ function EventDetailContent() {
       try {
         setLoading(true);
         setError('');
-        const data = await getEventById(event_id);
-        setEvent(data);
+        const [eventData, contextData, documentsData] = await Promise.all([
+          getEventById(event_id),
+          getEventContext(event_id).catch(() => null), // Don't fail if context fails
+          getOfficialDocuments(event_id).catch(() => []), // Don't fail if documents fail
+        ]);
+        setEvent(eventData);
+        setContext(contextData);
+        setOfficialDocs(documentsData);
       } catch (err: any) {
         console.error('Error loading event:', err);
         setError(err.message || 'Failed to load event');
@@ -315,18 +341,104 @@ function EventDetailContent() {
             </div>
           </div>
 
-          {/* 5. Sources & Evidence */}
-          <div>
-            <SectionHeader title="Sources & Evidence" />
-            <div className="space-y-3">
-              <p className="text-sm text-slate-400 font-light leading-relaxed">
-                Source data is collected from verified news and intelligence feeds.
-              </p>
-              <p className="text-xs text-slate-600 font-light italic">
-                External source links and credibility scoring will be available in a future update.
-              </p>
+          {/* 5. Historical Context (Tavily) */}
+          {context && (
+            <div className="mb-10 pb-10 border-b border-white/[0.02]">
+              <SectionHeader title="Historical Context" />
+              <div className="space-y-4">
+                {context.historical_context && (
+                  <div>
+                    <p className="text-sm text-slate-300 font-light leading-relaxed">
+                      {context.historical_context}
+                    </p>
+                  </div>
+                )}
+                {context.similar_events && context.similar_events.length > 0 && (
+                  <div>
+                    <div className="text-xs text-slate-600 mb-3 font-light uppercase tracking-wide">Similar Past Events</div>
+                    <div className="space-y-2">
+                      {context.similar_events.map((similar, idx) => (
+                        <div key={idx} className="p-3 bg-white/[0.02] border border-white/[0.05] rounded-lg">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1">
+                              <p className="text-sm text-white font-light">{similar.title}</p>
+                              <p className="text-xs text-slate-500 font-light mt-1">{similar.date}</p>
+                            </div>
+                            {similar.url && (
+                              <a
+                                href={similar.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-slate-500 hover:text-white transition-colors"
+                              >
+                                →
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {context.background_explanation && (
+                  <div>
+                    <div className="text-xs text-slate-600 mb-2 font-light uppercase tracking-wide">Background</div>
+                    <p className="text-sm text-slate-400 font-light leading-relaxed">
+                      {context.background_explanation}
+                    </p>
+                  </div>
+                )}
+                {context.validation_notes && (
+                  <div>
+                    <div className="text-xs text-slate-600 mb-2 font-light uppercase tracking-wide">Validation Notes</div>
+                    <p className="text-sm text-slate-400 font-light leading-relaxed">
+                      {context.validation_notes}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* 6. Official Documents (Firecrawl) */}
+          {officialDocs.length > 0 && (
+            <div>
+              <SectionHeader title="Official Documents" />
+              <div className="space-y-3">
+                <p className="text-sm text-slate-400 font-light leading-relaxed mb-4">
+                  Official documents and statements from verified sources.
+                </p>
+                <div className="space-y-2">
+                  {officialDocs.map((doc) => (
+                    <a
+                      key={doc.id}
+                      href={doc.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block p-4 bg-white/[0.02] border border-white/[0.05] rounded-lg hover:bg-white/[0.03] hover:border-white/10 transition-all group"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <h4 className="text-sm font-light text-white group-hover:text-white/90 transition-colors line-clamp-1">
+                              {doc.title || doc.url}
+                            </h4>
+                            <Badge variant="level" className="text-xs capitalize">{doc.source_type}</Badge>
+                          </div>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="text-xs text-slate-600 font-light">
+                              {doc.domain}
+                            </span>
+                            <span className="text-xs text-slate-600 font-light">→</span>
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </Card>
         </main>
       </div>
