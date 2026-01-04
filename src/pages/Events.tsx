@@ -19,7 +19,7 @@ import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SectionHeader from '../components/ui/SectionHeader';
 import MetaRow from '../components/ui/MetaRow';
-import { MapPin, Building2, TrendingUp, Clock, Search, Filter, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MapPin, Building2, TrendingUp, Clock, Search, Filter, X, ChevronLeft, ChevronRight, Sparkles, Loader2 } from 'lucide-react';
 
 function EventsContent() {
   const navigate = useNavigate();
@@ -35,6 +35,9 @@ function EventsContent() {
   const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([]);
   const [selectedTimeHorizons, setSelectedTimeHorizons] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [liveSearchQuery, setLiveSearchQuery] = useState('');
+  const [isSearchingLive, setIsSearchingLive] = useState(false);
+  const [liveSearchError, setLiveSearchError] = useState('');
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -164,6 +167,83 @@ function EventsContent() {
     selectedEventTypes.length > 0 || 
     selectedTimeHorizons.length > 0;
 
+  // Handle live search - Search real-world events and create structured summaries
+  const handleLiveSearch = async () => {
+    if (!liveSearchQuery.trim() || isSearchingLive) return;
+
+    setIsSearchingLive(true);
+    setLiveSearchError('');
+
+    try {
+      // Call backend service to search and create event
+      // Use full URL in development, proxy in production
+      const apiUrl = import.meta.env.DEV 
+        ? 'http://localhost:3001/live-search'
+        : '/api/live-search';
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: liveSearchQuery.trim() }),
+      });
+
+      // Read response body ONCE (can only be read once)
+      const contentType = response.headers.get('content-type');
+      const text = await response.text();
+
+      // Check if response is ok
+      if (!response.ok) {
+        let errorMessage = `Server error: ${response.status} ${response.statusText}`;
+        if (text) {
+          try {
+            const errorData = JSON.parse(text);
+            errorMessage = errorData.error || errorData.message || errorMessage;
+          } catch {
+            // If not JSON, use text as error message
+            errorMessage = text || errorMessage;
+          }
+        }
+        throw new Error(errorMessage);
+      }
+
+      // Check if response has content
+      if (!text || text.trim().length === 0) {
+        throw new Error('Empty response from server. Make sure the API server is running.');
+      }
+
+      // Check Content-Type
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error(`Invalid response format. Server returned: ${text.substring(0, 100)}`);
+      }
+
+      // Parse JSON response
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        console.error('Response text:', text);
+        throw new Error(`Invalid JSON response: ${text.substring(0, 200)}`);
+      }
+
+      if (result.success && result.event) {
+        // Success! Refresh events list and navigate to the new event
+        await fetchEvents();
+        navigate(`/events/${result.event.id}`);
+        setLiveSearchQuery('');
+      } else {
+        throw new Error(result.error || 'No event created');
+      }
+    } catch (error: any) {
+      console.error('Live search error:', error);
+      setLiveSearchError(error.message || 'Failed to search live events. Please make sure the API server is running (npm run api:server).');
+    } finally {
+      setIsSearchingLive(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
@@ -226,22 +306,64 @@ function EventsContent() {
         {/* Search and Filters */}
         <div className="mb-8 space-y-4">
           {/* Search Bar */}
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-            <input
-              type="text"
-              placeholder="Search events, causes, effects..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-white/[0.02] border border-white/[0.05] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-white/10 focus:bg-white/[0.03] transition-all font-light"
-            />
-            {searchQuery && (
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Search events, causes, effects..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 bg-white/[0.02] border border-white/[0.05] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-white/10 focus:bg-white/[0.03] transition-all font-light"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Live Search - Search Real-World Events */}
+            <div className="relative">
+              <Sparkles className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-400" />
+              <input
+                type="text"
+                placeholder="Search real-world events (e.g., 'Fed interest rate cut', 'China trade policy')..."
+                value={liveSearchQuery}
+                onChange={(e) => setLiveSearchQuery(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && liveSearchQuery.trim() && !isSearchingLive) {
+                    handleLiveSearch();
+                  }
+                }}
+                disabled={isSearchingLive}
+                className="w-full pl-12 pr-32 py-3 bg-purple-500/5 border border-purple-500/20 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/40 focus:bg-purple-500/10 transition-all font-light disabled:opacity-50"
+              />
               <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-white transition-colors"
+                onClick={handleLiveSearch}
+                disabled={!liveSearchQuery.trim() || isSearchingLive}
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed border border-purple-500/30 rounded-lg text-purple-300 text-sm font-light transition-all flex items-center gap-2"
               >
-                <X className="w-4 h-4" />
+                {isSearchingLive ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Creating...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span>Search Live</span>
+                  </>
+                )}
               </button>
+            </div>
+            {liveSearchError && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+                {liveSearchError}
+              </div>
             )}
           </div>
 

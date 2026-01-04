@@ -38,6 +38,8 @@ const Settings = lazy(() => import('./pages/Settings'));
 const QualityDashboard = lazy(() => import('./pages/QualityDashboard'));
 // Alerts (PHASE 3C)
 const AlertSettings = lazy(() => import('./pages/AlertSettings'));
+// Recommendations (PHASE 7)
+const Recommendations = lazy(() => import('./pages/Recommendations'));
 
 // Loading component for Suspense fallback - smoother transition
 const PageLoader = () => (
@@ -126,6 +128,8 @@ function App() {
         {/* Level 2 - Modules (Beta / Locked) */}
         <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
         <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} />
+        {/* Recommendations (PHASE 7) */}
+        <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
         
         {/* Level 3 - User / System */}
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

@@ -18,7 +18,8 @@ import {
   LogOut,
   Menu,
   X,
-  BarChart3
+  BarChart3,
+  Target
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -37,6 +38,7 @@ export default function AppSidebar() {
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/intelligence', label: 'Intelligence', icon: Brain },
     { path: '/events', label: 'Events', icon: FileText },
+    { path: '/recommendations', label: 'Recommendations', icon: Target },
     { path: '/alerts', label: 'Alerts', icon: Bell },
     { path: '/research', label: 'Research', icon: BookOpen },
     { path: '/quality', label: 'Quality', icon: BarChart3 },

@@ -29,7 +29,18 @@
     "enrich:official": "npx tsx src/server/workers/official-document-enricher.ts",
     "test:pipeline": "npx tsx src/server/tests/validate-pipeline.ts",
     "test:quality": "npx tsx src/server/tests/validate-data-quality.ts",
-    "test:all": "npm run test:pipeline && npm run test:quality"
+    "test:all": "npm run test:pipeline && npm run test:quality",
+    "phase7:relationships": "npx tsx src/server/phase7/relationship-extractor.ts",
+    "phase7:relationships:event": "npx tsx src/server/phase7/relationship-extractor.ts",
+    "phase7:historical": "npx tsx src/server/phase7/historical-analyzer.ts",
+    "phase7:scenarios": "npx tsx src/server/phase7/scenario-predictor.ts",
+    "phase7:recommendations": "npx tsx src/server/phase7/recommendation-engine.ts",
+    "phase7:recommendations:user": "npx tsx src/server/phase7/recommendation-engine.ts",
+    "phase7:run": "npx tsx src/server/workers/phase7-orchestrator.ts",
+    "phase8:auto-learning": "npx tsx src/server/workers/phase8-auto-learning-orchestrator.ts",
+    "phase8:auto-learning:continuous": "npx tsx src/server/workers/phase8-auto-learning-orchestrator.ts continuous",
+    "api:server": "npx tsx src/server/api-server.ts",
+    "live:search": "npx tsx src/server/services/live-search-api.ts"
   },
   "dependencies": {
     "@mendable/firecrawl-js": "^1.29.3",
@@ -41,7 +52,9 @@
     "@tavily/core": "^0.6.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.3",
+    "express": "^5.2.1",
     "lucide-react": "^0.344.0",
     "openai": "^4.104.0",
     "react": "^19.2.3",
@@ -52,6 +65,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.7.0",

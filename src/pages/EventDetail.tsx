@@ -7,7 +7,17 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getEventById, getEventContext, getOfficialDocuments } from '../lib/supabase';
+import { 
+  getEventById, 
+  getEventContext, 
+  getOfficialDocuments,
+  getEventRelationships,
+  getHistoricalComparisons,
+  getScenarioPredictions,
+  type EventRelationship,
+  type HistoricalComparison,
+  type ScenarioPrediction
+} from '../lib/supabase';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import AppSidebar from '../components/AppSidebar';
@@ -16,7 +26,8 @@ import Badge from '../components/ui/Badge';
 import Timeline from '../components/ui/Timeline';
 import SectionHeader from '../components/ui/SectionHeader';
 import MetaRow from '../components/ui/MetaRow';
-import { ArrowLeft, MapPin, Building2, TrendingUp, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, MapPin, Building2, TrendingUp, Clock, ChevronDown, ChevronUp, Link2, History, TrendingDown, Target, MessageSquare } from 'lucide-react';
+import FeedbackModal from '../components/FeedbackModal';
 
 interface CausalChain {
   id: string;
@@ -71,9 +82,17 @@ function EventDetailContent() {
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [context, setContext] = useState<EventContext | null>(null);
   const [officialDocs, setOfficialDocs] = useState<OfficialDocument[]>([]);
+  const [relationships, setRelationships] = useState<EventRelationship[]>([]);
+  const [historicalComparisons, setHistoricalComparisons] = useState<HistoricalComparison[]>([]);
+  const [scenarios, setScenarios] = useState<ScenarioPrediction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [whyExpanded, setWhyExpanded] = useState(false);
+  const [showRelationships, setShowRelationships] = useState(true);
+  const [showHistorical, setShowHistorical] = useState(true);
+  const [showScenarios, setShowScenarios] = useState(true);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackComponentType, setFeedbackComponentType] = useState<'event_extraction' | 'causal_chain' | 'scenario' | 'relationship' | 'historical_comparison'>('event_extraction');
 
   useEffect(() => {
     async function fetchEvent() {
@@ -86,14 +105,27 @@ function EventDetailContent() {
       try {
         setLoading(true);
         setError('');
-        const [eventData, contextData, documentsData] = await Promise.all([
+        const [
+          eventData, 
+          contextData, 
+          documentsData,
+          relationshipsData,
+          historicalData,
+          scenariosData
+        ] = await Promise.all([
           getEventById(event_id),
-          getEventContext(event_id).catch(() => null), // Don't fail if context fails
-          getOfficialDocuments(event_id).catch(() => []), // Don't fail if documents fail
+          getEventContext(event_id).catch(() => null),
+          getOfficialDocuments(event_id).catch(() => []),
+          getEventRelationships(event_id).catch(() => []),
+          getHistoricalComparisons(event_id).catch(() => []),
+          getScenarioPredictions(event_id).catch(() => []),
         ]);
         setEvent(eventData);
         setContext(contextData);
         setOfficialDocs(documentsData);
+        setRelationships(relationshipsData);
+        setHistoricalComparisons(historicalData);
+        setScenarios(scenariosData);
       } catch (err: any) {
         console.error('Error loading event:', err);
         setError(err.message || 'Failed to load event');
@@ -202,6 +234,17 @@ function EventDetailContent() {
                   Published {formatDate(event.created_at)}
                 </p>
               </div>
+              <button
+                onClick={() => {
+                  setFeedbackComponentType('event_extraction');
+                  setShowFeedbackModal(true);
+                }}
+                className="px-4 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/[0.02] rounded-lg border border-white/[0.05] transition-all flex items-center gap-2"
+                title="Provide feedback to improve this event extraction"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span className="hidden sm:inline">Feedback</span>
+              </button>
             </div>
           </div>
         </header>
@@ -400,7 +443,238 @@ function EventDetailContent() {
             </div>
           )}
 
-          {/* 6. Official Documents (Firecrawl) */}
+          {/* 6. Related Events (Knowledge Graph) */}
+          {relationships.length > 0 && (
+            <div className="mb-10 pb-10 border-b border-white/[0.02]">
+              <SectionHeader 
+                title="Related Events" 
+                action={
+                  <button
+                    onClick={() => setShowRelationships(!showRelationships)}
+                    className="text-xs text-slate-500 hover:text-white transition-colors"
+                  >
+                    {showRelationships ? 'Hide' : 'Show'}
+                  </button>
+                }
+              />
+              {showRelationships && (
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-400 font-light leading-relaxed mb-4">
+                    Events connected to this one through causal, temporal, or logical relationships.
+                  </p>
+                  <div className="space-y-3">
+                    {relationships.map((rel) => (
+                      <Card
+                        key={rel.id}
+                        hover
+                        onClick={() => navigate(`/events/${rel.related_event_id}`)}
+                        className="p-4"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge variant={rel.direction === 'outgoing' ? 'level' : 'neutral'}>
+                                <Link2 className="w-3 h-3 mr-1" />
+                                {rel.relationship_type.replace('_', ' ')}
+                              </Badge>
+                              <span className="text-xs text-slate-500">
+                                Strength: {(rel.strength * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                            <p className="text-sm text-white font-light mb-2">
+                              {rel.related_event_summary}
+                            </p>
+                            {rel.evidence && (
+                              <p className="text-xs text-slate-400 font-light italic">
+                                {rel.evidence}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            {rel.related_event_impact_score !== null && (
+                              <Badge variant="impact">
+                                {(rel.related_event_impact_score * 100).toFixed(0)}% impact
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 7. Historical Comparisons */}
+          {historicalComparisons.length > 0 && (
+            <div className="mb-10 pb-10 border-b border-white/[0.02]">
+              <SectionHeader 
+                title="Historical Comparisons" 
+                action={
+                  <button
+                    onClick={() => setShowHistorical(!showHistorical)}
+                    className="text-xs text-slate-500 hover:text-white transition-colors"
+                  >
+                    {showHistorical ? 'Hide' : 'Show'}
+                  </button>
+                }
+              />
+              {showHistorical && (
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-400 font-light leading-relaxed mb-4">
+                    Similar past events and lessons learned.
+                  </p>
+                  <div className="space-y-4">
+                    {historicalComparisons.map((comp) => (
+                      <Card key={comp.id} className="p-5">
+                        <div className="flex items-start justify-between gap-4 mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge variant="neutral">
+                                <History className="w-3 h-3 mr-1" />
+                                {(comp.similarity_score * 100).toFixed(0)}% similar
+                              </Badge>
+                              {comp.predictive_value !== null && (
+                                <Badge variant="level">
+                                  {(comp.predictive_value * 100).toFixed(0)}% predictive value
+                                </Badge>
+                              )}
+                            </div>
+                            <h4 className="text-sm font-light text-white mb-2">
+                              {comp.historical_event_summary}
+                            </h4>
+                            <p className="text-xs text-slate-500 font-light">
+                              {formatDate(comp.historical_event_created_at)}
+                            </p>
+                          </div>
+                        </div>
+                        {comp.comparison_insights && (
+                          <div className="mb-3">
+                            <div className="text-xs text-slate-600 mb-1 font-light uppercase tracking-wide">Insights</div>
+                            <p className="text-sm text-slate-300 font-light leading-relaxed">
+                              {comp.comparison_insights}
+                            </p>
+                          </div>
+                        )}
+                        {comp.lessons_learned && (
+                          <div className="mb-3">
+                            <div className="text-xs text-slate-600 mb-1 font-light uppercase tracking-wide">Lessons Learned</div>
+                            <p className="text-sm text-slate-300 font-light leading-relaxed">
+                              {comp.lessons_learned}
+                            </p>
+                          </div>
+                        )}
+                        {comp.outcome_differences && (
+                          <div>
+                            <div className="text-xs text-slate-600 mb-1 font-light uppercase tracking-wide">Outcome Differences</div>
+                            <p className="text-sm text-slate-400 font-light leading-relaxed">
+                              {comp.outcome_differences}
+                            </p>
+                          </div>
+                        )}
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 8. Scenario Predictions */}
+          {scenarios.length > 0 && (
+            <div className="mb-10 pb-10 border-b border-white/[0.02]">
+              <SectionHeader 
+                title="Scenario Predictions" 
+                action={
+                  <button
+                    onClick={() => setShowScenarios(!showScenarios)}
+                    className="text-xs text-slate-500 hover:text-white transition-colors"
+                  >
+                    {showScenarios ? 'Hide' : 'Show'}
+                  </button>
+                }
+              />
+              {showScenarios && (
+                <div className="space-y-4">
+                  <p className="text-sm text-slate-400 font-light leading-relaxed mb-4">
+                    Multi-scenario analysis with probabilities for different time horizons.
+                  </p>
+                  {/* Group scenarios by time horizon */}
+                  {['1week', '1month', '3months', '6months', '1year'].map((horizon) => {
+                    const horizonScenarios = scenarios.filter(s => s.time_horizon === horizon);
+                    if (horizonScenarios.length === 0) return null;
+
+                    const getHorizonLabel = (h: string) => {
+                      const labels: Record<string, string> = {
+                        '1week': '1 Week',
+                        '1month': '1 Month',
+                        '3months': '3 Months',
+                        '6months': '6 Months',
+                        '1year': '1 Year',
+                      };
+                      return labels[h] || h;
+                    };
+
+                    return (
+                      <div key={horizon} className="mb-6">
+                        <h4 className="text-sm font-light text-white mb-4">
+                          {getHorizonLabel(horizon)}
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {horizonScenarios.map((scenario) => {
+                            const getScenarioColor = (type: string) => {
+                              if (type === 'optimistic') return 'border-green-500/20 bg-green-500/5';
+                              if (type === 'pessimistic') return 'border-red-500/20 bg-red-500/5';
+                              return 'border-blue-500/20 bg-blue-500/5';
+                            };
+
+                            return (
+                              <Card key={scenario.id} className={`p-4 border-2 ${getScenarioColor(scenario.scenario_type)}`}>
+                                <div className="flex items-center justify-between mb-3">
+                                  <Badge variant={scenario.scenario_type === 'pessimistic' ? 'critical' : scenario.scenario_type === 'optimistic' ? 'level' : 'neutral'}>
+                                    {scenario.scenario_type.charAt(0).toUpperCase() + scenario.scenario_type.slice(1)}
+                                  </Badge>
+                                  <span className="text-xs text-slate-500">
+                                    {(scenario.probability * 100).toFixed(0)}%
+                                  </span>
+                                </div>
+                                <p className="text-sm text-slate-300 font-light leading-relaxed mb-3">
+                                  {scenario.predicted_outcome}
+                                </p>
+                                {scenario.key_indicators && scenario.key_indicators.length > 0 && (
+                                  <div className="mb-2">
+                                    <div className="text-xs text-slate-600 mb-1 font-light">Key Indicators</div>
+                                    <ul className="text-xs text-slate-400 space-y-1">
+                                      {scenario.key_indicators.slice(0, 3).map((indicator, idx) => (
+                                        <li key={idx}>• {indicator}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                                {scenario.risk_factors && scenario.risk_factors.length > 0 && (
+                                  <div className="mb-2">
+                                    <div className="text-xs text-slate-600 mb-1 font-light">Risk Factors</div>
+                                    <ul className="text-xs text-slate-400 space-y-1">
+                                      {scenario.risk_factors.slice(0, 2).map((risk, idx) => (
+                                        <li key={idx}>• {risk}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 9. Official Documents (Firecrawl) */}
           {officialDocs.length > 0 && (
             <div>
               <SectionHeader title="Official Documents" />
@@ -442,6 +716,24 @@ function EventDetailContent() {
         </Card>
         </main>
       </div>
+
+      {/* Feedback Modal */}
+      {event && (
+        <FeedbackModal
+          isOpen={showFeedbackModal}
+          onClose={() => setShowFeedbackModal(false)}
+          componentType={feedbackComponentType}
+          eventId={event.id}
+          causalChainId={event.nucigen_causal_chains?.[0]?.id}
+          originalContent={{
+            event_type: event.event_type,
+            summary: event.summary,
+            why_it_matters: event.why_it_matters,
+            impact_score: event.impact_score,
+            confidence: event.confidence,
+          }}
+        />
+      )}
     </div>
   );
 }

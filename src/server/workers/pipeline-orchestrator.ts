@@ -21,9 +21,9 @@ interface OrchestratorConfig {
 }
 
 const DEFAULT_CONFIG: OrchestratorConfig = {
-  collectionInterval: 60 * 60 * 1000, // 1 hour
-  processingInterval: 15 * 60 * 1000, // 15 minutes
-  processingBatchSize: 10,
+  collectionInterval: 5 * 60 * 1000, // 5 minutes (optimized: was 1 hour)
+  processingInterval: 2 * 60 * 1000, // 2 minutes (optimized: was 15 minutes)
+  processingBatchSize: 100, // 100 (optimized: was 10)
 };
 
 /**

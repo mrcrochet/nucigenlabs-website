@@ -120,7 +120,7 @@ export async function collectTavilyEvents(): Promise<{ inserted: number; skipped
         
         const response = await tavilyClient.search(queryConfig.query, {
           searchDepth: 'advanced',
-          maxResults: 10, // Top 10 most relevant results
+          maxResults: 50, // Optimized: 50 results (was 10) - maximize API usage
           includeAnswer: false, // We only need articles, not AI answers
           includeRawContent: true, // Get full article content
           includeImages: false,

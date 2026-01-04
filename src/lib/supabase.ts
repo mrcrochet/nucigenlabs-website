@@ -1151,3 +1151,346 @@ export async function getEventsWithCausalChainsSearch(
 
   return eventsWithChains;
 }
+
+// ============================================
+// PHASE 7: Knowledge Graph & Advanced Features
+// ============================================
+
+export interface EventRelationship {
+  id: string;
+  source_event_id: string;
+  target_event_id: string;
+  relationship_type: 'causes' | 'precedes' | 'related_to' | 'contradicts' | 'amplifies' | 'mitigates' | 'triggers' | 'follows_from';
+  strength: number;
+  confidence: number;
+  evidence: string;
+  reasoning: string;
+  related_event_summary: string;
+  related_event_id: string;
+  related_event_impact_score: number | null;
+  related_event_confidence: number | null;
+  direction: 'outgoing' | 'incoming';
+}
+
+/**
+ * Get relationships for an event
+ */
+export async function getEventRelationships(eventId: string): Promise<EventRelationship[]> {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('User not authenticated');
+  }
+
+  const { data, error } = await supabase.rpc('get_event_relationships', {
+    event_id: eventId,
+  });
+
+  if (error) {
+    console.error('Error fetching relationships:', error);
+    throw new Error(error.message || 'Failed to fetch relationships');
+  }
+
+  return (data || []) as EventRelationship[];
+}
+
+export interface HistoricalComparison {
+  id: string;
+  historical_event_id: string;
+  historical_event_summary: string;
+  historical_event_created_at: string;
+  similarity_score: number;
+  similarity_factors: string[];
+  comparison_insights: string;
+  outcome_differences: string;
+  lessons_learned: string;
+  predictive_value: number | null;
+  confidence: number;
+}
+
+/**
+ * Get historical comparisons for an event
+ */
+export async function getHistoricalComparisons(eventId: string, minSimilarity: number = 0.6): Promise<HistoricalComparison[]> {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('User not authenticated');
+  }
+
+  const { data, error } = await supabase.rpc('get_historical_comparisons', {
+    event_id: eventId,
+    min_similarity: minSimilarity,
+  });
+
+  if (error) {
+    console.error('Error fetching historical comparisons:', error);
+    throw new Error(error.message || 'Failed to fetch historical comparisons');
+  }
+
+  return (data || []) as HistoricalComparison[];
+}
+
+export interface ScenarioPrediction {
+  id: string;
+  scenario_type: 'optimistic' | 'realistic' | 'pessimistic';
+  predicted_outcome: string;
+  probability: number;
+  time_horizon: '1week' | '1month' | '3months' | '6months' | '1year';
+  confidence: number;
+  reasoning: string;
+  key_indicators: string[];
+  risk_factors: string[];
+  opportunities: string[];
+}
+
+/**
+ * Get scenario predictions for an event
+ */
+export async function getScenarioPredictions(eventId: string, horizonFilter?: string): Promise<ScenarioPrediction[]> {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('User not authenticated');
+  }
+
+  const { data, error } = await supabase.rpc('get_scenario_predictions', {
+    event_id: eventId,
+    horizon_filter: horizonFilter || null,
+  });
+
+  if (error) {
+    console.error('Error fetching scenarios:', error);
+    throw new Error(error.message || 'Failed to fetch scenarios');
+  }
+
+  return (data || []) as ScenarioPrediction[];
+}
+
+export interface UserRecommendation {
+  id: string;
+  event_id: string;
+  event_summary: string;
+  event_impact_score: number | null;
+  recommendation_type: 'monitor' | 'prepare' | 'act' | 'investigate' | 'mitigate' | 'capitalize';
+  action: string;
+  priority: 'high' | 'medium' | 'low';
+  reasoning: string;
+  deadline: string | null;
+  urgency_score: number | null;
+  impact_potential: number | null;
+  status: 'pending' | 'acknowledged' | 'completed' | 'dismissed';
+  created_at: string;
+}
+
+/**
+ * Get recommendations for current user
+ */
+export async function getUserRecommendations(
+  statusFilter?: string,
+  priorityFilter?: string,
+  limit: number = 50
+): Promise<UserRecommendation[]> {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('User not authenticated');
+  }
+
+  const { data, error } = await supabase.rpc('get_user_recommendations', {
+    target_user_id: session.user.id,
+    status_filter: statusFilter || null,
+    priority_filter: priorityFilter || null,
+    limit_count: limit,
+  });
+
+  if (error) {
+    console.error('Error fetching recommendations:', error);
+    throw new Error(error.message || 'Failed to fetch recommendations');
+  }
+
+  return (data || []) as UserRecommendation[];
+}
+
+/**
+ * Get unread recommendations count
+ */
+export async function getUnreadRecommendationsCount(): Promise<number> {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('User not authenticated');
+  }
+
+  const { data, error } = await supabase.rpc('count_unread_recommendations', {
+    target_user_id: session.user.id,
+  });
+
+  if (error) {
+    console.error('Error counting recommendations:', error);
+    return 0;
+  }
+
+  return (data as number) || 0;
+}
+
+/**
+ * Update recommendation status
+ */
+export async function updateRecommendationStatus(
+  recommendationId: string,
+  status: 'pending' | 'acknowledged' | 'completed' | 'dismissed'
+): Promise<void> {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('User not authenticated');
+  }
+
+  const updateData: any = {
+    status,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (status === 'acknowledged') {
+    updateData.acknowledged_at = new Date().toISOString();
+  } else if (status === 'completed') {
+    updateData.completed_at = new Date().toISOString();
+  }
+
+  const { error } = await supabase
+    .from('recommendations')
+    .update(updateData)
+    .eq('id', recommendationId)
+    .eq('user_id', session.user.id);
+
+  if (error) {
+    throw new Error(error.message || 'Failed to update recommendation');
+  }
+}
+
+// =====================================================
+// PHASE 8: Auto-Learning - Feedback Functions
+// =====================================================
+
+export interface ModelFeedback {
+  id?: string;
+  event_id?: string | null;
+  causal_chain_id?: string | null;
+  scenario_id?: string | null;
+  recommendation_id?: string | null;
+  user_id?: string;
+  feedback_type: 'correction' | 'improvement' | 'validation' | 'rejection';
+  component_type: 'event_extraction' | 'causal_chain' | 'scenario' | 'recommendation' | 'relationship' | 'historical_comparison';
+  original_content?: any;
+  corrected_content?: any;
+  reasoning?: string | null;
+  severity?: 'low' | 'medium' | 'high' | 'critical' | null;
+  impact_score?: number | null;
+  status?: 'pending' | 'processed' | 'applied' | 'rejected';
+  created_at?: string;
+}
+
+/**
+ * Submit feedback on a model prediction/extraction
+ */
+export async function submitModelFeedback(feedback: Omit<ModelFeedback, 'id' | 'user_id' | 'status' | 'created_at'>): Promise<ModelFeedback> {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('User not authenticated');
+  }
+
+  const feedbackData: any = {
+    ...feedback,
+    user_id: session.user.id,
+    status: 'pending',
+  };
+
+  const { data, error } = await supabase
+    .from('model_feedback')
+    .insert(feedbackData)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(error.message || 'Failed to submit feedback');
+  }
+
+  return data;
+}
+
+/**
+ * Get user's feedback history
+ */
+export async function getUserFeedback(limit: number = 50): Promise<ModelFeedback[]> {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('User not authenticated');
+  }
+
+  const { data, error } = await supabase
+    .from('model_feedback')
+    .select('*')
+    .eq('user_id', session.user.id)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw new Error(error.message || 'Failed to fetch feedback');
+  }
+
+  return data || [];
+}
+
+/**
+ * Update feedback (user can edit their own feedback)
+ */
+export async function updateModelFeedback(
+  feedbackId: string,
+  updates: Partial<Pick<ModelFeedback, 'reasoning' | 'corrected_content' | 'severity' | 'impact_score'>>
+): Promise<void> {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('User not authenticated');
+  }
+
+  const { error } = await supabase
+    .from('model_feedback')
+    .update(updates)
+    .eq('id', feedbackId)
+    .eq('user_id', session.user.id);
+
+  if (error) {
+    throw new Error(error.message || 'Failed to update feedback');
+  }
+}

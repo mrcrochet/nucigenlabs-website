@@ -12,6 +12,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { extractNucigenEvent } from '../phase1/event-extractor';
 import { extractCausalChain } from '../phase2b/causal-extractor';
+import { maximizeApiUsage } from '../utils/api-optimizer';
 
 // Load environment variables
 const __filename = fileURLToPath(import.meta.url);
@@ -144,7 +145,7 @@ export async function processPendingEvents(limit: number = 10): Promise<Processi
       };
     }
 
-    console.log(`[Processor] Processing ${events.length} events...`);
+    console.log(`[Processor] Processing ${events.length} events with parallel optimization...`);
 
     const result: ProcessingResult = {
       processed: events.length,
@@ -155,10 +156,22 @@ export async function processPendingEvents(limit: number = 10): Promise<Processi
       skipped: 0,
     };
 
-    // Process each event sequentially to avoid rate limits
-    for (const event of events) {
-      const processResult = await processEvent(event.id);
+    // Process events in parallel with intelligent rate limiting
+    const { results: processResults, errors } = await maximizeApiUsage(
+      events,
+      async (event) => {
+        return await processEvent(event.id);
+      },
+      'openai',
+      (completed, total) => {
+        if (completed % 10 === 0 || completed === total) {
+          console.log(`[Processor] Progress: ${completed}/${total} events processed`);
+        }
+      }
+    );
 
+    // Count successes and errors
+    for (const processResult of processResults) {
       if (processResult.phase1Success) {
         result.phase1Success++;
       } else {
@@ -171,9 +184,12 @@ export async function processPendingEvents(limit: number = 10): Promise<Processi
         // Phase 2B failed but Phase 1 succeeded
         result.phase2bErrors++;
       }
+    }
 
-      // Small delay between events to avoid rate limits
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    // Log errors if any
+    if (errors.length > 0) {
+      console.warn(`[Processor] ${errors.length} events failed after retries`);
+      result.phase1Errors += errors.length;
     }
 
     console.log(`[Processor] Processing complete:`);

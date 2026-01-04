@@ -129,19 +129,14 @@ export async function collectPersonalizedEventsForUser(
     
     let allArticles: TavilyArticle[] = [];
     
-    // Search all queries in parallel (with rate limiting)
-    const searchPromises = queries.map(async (query, index) => {
+    // Search all queries in parallel (optimized - no delays, maximize usage)
+    const searchPromises = queries.map(async (query) => {
       try {
-        // Add small delay to avoid rate limiting
-        if (index > 0) {
-          await new Promise(resolve => setTimeout(resolve, index * 200)); // 200ms delay between queries
-        }
-        
         console.log(`[Personalized Collector] Searching: "${query.substring(0, 60)}..."`);
         
         const response = await tavilyClient.search(query, {
           searchDepth: 'advanced',
-          maxResults: 8, // Top 8 most relevant results per query
+          maxResults: 50, // Optimized: 50 results (was 8) - maximize API usage
           includeAnswer: false,
           includeRawContent: true,
           includeImages: false,

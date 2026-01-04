@@ -22,6 +22,7 @@ import Badge from '../components/ui/Badge';
 import SectionHeader from '../components/ui/SectionHeader';
 import MetaRow from '../components/ui/MetaRow';
 import { Search, MapPin, Building2, TrendingUp, Clock, Sparkles } from 'lucide-react';
+import PerformanceMetrics from '../components/PerformanceMetrics';
 
 function IntelligenceFeedContent() {
   const navigate = useNavigate();
@@ -242,6 +243,11 @@ function IntelligenceFeedContent() {
 
         {/* Main Content */}
         <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-12 w-full">
+        {/* Performance Metrics - Optimizations Visible */}
+        <div className="mb-8">
+          <PerformanceMetrics />
+        </div>
+
         {/* Search Bar */}
         <div className="mb-6">
           <div className="relative">
