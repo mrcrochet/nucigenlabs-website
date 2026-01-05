@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { 
   getUserRecommendations, 
   updateRecommendationStatus,
@@ -21,6 +22,11 @@ import SectionHeader from '../components/ui/SectionHeader';
 import { Target, CheckCircle2, XCircle, Clock, AlertCircle, TrendingUp, TrendingDown, Eye } from 'lucide-react';
 
 function RecommendationsContent() {
+  const { user, isLoaded: userLoaded } = useUser();
+  const { isLoaded: authLoaded } = useClerkAuth();
+  
+  // Force user to load by accessing auth state
+  const isFullyLoaded = userLoaded && authLoaded;
   const navigate = useNavigate();
   const [recommendations, setRecommendations] = useState<UserRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,6 +36,18 @@ function RecommendationsContent() {
 
   useEffect(() => {
     async function fetchRecommendations() {
+      // Wait for user and auth to be fully loaded
+      if (!isFullyLoaded) {
+        return;
+      }
+
+      // If user is not authenticated, show error
+      if (!user?.id) {
+        setError('User not authenticated');
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         setError('');
@@ -38,9 +56,10 @@ function RecommendationsContent() {
           getUserRecommendations(
             activeTab === 'pending' ? 'pending' : undefined,
             undefined,
-            100
+            100,
+            user.id
           ),
-          getUnreadRecommendationsCount(),
+          getUnreadRecommendationsCount(user.id),
         ]);
         
         setRecommendations(recsData || []);
@@ -54,19 +73,21 @@ function RecommendationsContent() {
     }
 
     fetchRecommendations();
-  }, [activeTab]);
+  }, [activeTab, user?.id, isFullyLoaded]);
 
   const handleStatusUpdate = async (recId: string, newStatus: 'acknowledged' | 'completed' | 'dismissed') => {
+    if (!user?.id) return;
     try {
-      await updateRecommendationStatus(recId, newStatus);
+      await updateRecommendationStatus(recId, newStatus, user.id);
       // Refresh recommendations
       const [recsData, count] = await Promise.all([
         getUserRecommendations(
           activeTab === 'pending' ? 'pending' : undefined,
           undefined,
-          100
+          100,
+          user.id
         ),
-        getUnreadRecommendationsCount(),
+        getUnreadRecommendationsCount(user.id),
       ]);
       setRecommendations(recsData || []);
       setUnreadCount(count);

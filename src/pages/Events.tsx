@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { 
   getEventsWithCausalChainsSearch, 
   countSearchResults,
@@ -22,6 +23,11 @@ import MetaRow from '../components/ui/MetaRow';
 import { MapPin, Building2, TrendingUp, Clock, Search, Filter, X, ChevronLeft, ChevronRight, Sparkles, Loader2 } from 'lucide-react';
 
 function EventsContent() {
+  const { user, isLoaded: userLoaded } = useUser();
+  const { isLoaded: authLoaded } = useClerkAuth();
+  
+  // Force user to load by accessing auth state
+  const isFullyLoaded = userLoaded && authLoaded;
   const navigate = useNavigate();
   const [events, setEvents] = useState<EventWithChain[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +67,10 @@ function EventsContent() {
       
       const offset = (currentPage - 1) * eventsPerPage;
       
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
       // Fetch events with search (using debounced query)
       const [eventsData, count] = await Promise.all([
         getEventsWithCausalChainsSearch({
@@ -71,28 +81,26 @@ function EventsContent() {
           timeHorizonFilter: selectedTimeHorizons.length > 0 ? selectedTimeHorizons : undefined,
           limit: eventsPerPage,
           offset: offset,
-        }),
+        }, user.id),
         countSearchResults({
           searchQuery: debouncedSearchQuery || undefined,
           sectorFilter: selectedSectors.length > 0 ? selectedSectors : undefined,
           regionFilter: selectedRegions.length > 0 ? selectedRegions : undefined,
           eventTypeFilter: selectedEventTypes.length > 0 ? selectedEventTypes : undefined,
           timeHorizonFilter: selectedTimeHorizons.length > 0 ? selectedTimeHorizons : undefined,
-        }),
+        }, user.id),
       ]);
       
-      console.log('Events loaded:', eventsData?.length || 0, 'Total:', count);
       setEvents(eventsData || []);
       setTotalCount(count);
     } catch (err: any) {
-      console.error('Error loading events:', err);
       setError(err.message || 'Failed to load events');
       setEvents([]);
       setTotalCount(0);
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearchQuery, selectedSectors, selectedRegions, selectedEventTypes, selectedTimeHorizons, currentPage, eventsPerPage]);
+  }, [debouncedSearchQuery, selectedSectors, selectedRegions, selectedEventTypes, selectedTimeHorizons, currentPage, eventsPerPage, user?.id, isFullyLoaded]);
 
   useEffect(() => {
     fetchEvents();
@@ -223,9 +231,7 @@ function EventsContent() {
       try {
         result = JSON.parse(text);
       } catch (parseError) {
-        console.error('JSON parse error:', parseError);
-        console.error('Response text:', text);
-        throw new Error(`Invalid JSON response: ${text.substring(0, 200)}`);
+        throw new Error(`Invalid response from server. Please try again.`);
       }
 
       if (result.success && result.event) {
@@ -237,8 +243,10 @@ function EventsContent() {
         throw new Error(result.error || 'No event created');
       }
     } catch (error: any) {
-      console.error('Live search error:', error);
-      setLiveSearchError(error.message || 'Failed to search live events. Please make sure the API server is running (npm run api:server).');
+      const errorMessage = error.message || 'Failed to search live events.';
+      setLiveSearchError(errorMessage.includes('API server') 
+        ? errorMessage 
+        : 'Failed to search live events. Please make sure the API server is running.');
     } finally {
       setIsSearchingLive(false);
     }

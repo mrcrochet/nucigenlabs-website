@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { 
   getEventsWithCausalChainsSearch, 
   getUserPreferences,
@@ -24,6 +25,11 @@ import MetaRow from '../components/ui/MetaRow';
 import { Search, MapPin, Building2, TrendingUp, Clock, Sparkles } from 'lucide-react';
 
 function IntelligenceFeedContent() {
+  const { user, isLoaded: userLoaded } = useUser();
+  const { isLoaded: authLoaded } = useClerkAuth();
+  
+  // Force user to load by accessing auth state
+  const isFullyLoaded = userLoaded && authLoaded;
   const navigate = useNavigate();
   const [events, setEvents] = useState<EventWithChain[]>([]);
   const [preferences, setPreferences] = useState<any>(null);
@@ -45,18 +51,32 @@ function IntelligenceFeedContent() {
   // Load preferences
   useEffect(() => {
     async function fetchPreferences() {
+      if (!user?.id) return;
       try {
-        const preferencesData = await getUserPreferences().catch(() => null);
+        const preferencesData = await getUserPreferences(user.id).catch(() => null);
         setPreferences(preferencesData);
       } catch (err) {
         console.error('Error loading preferences:', err);
       }
     }
     fetchPreferences();
-  }, []);
+  }, [user?.id]);
 
   // Fetch events with server-side search based on active tab
   const fetchEvents = useCallback(async () => {
+    // Wait for user and auth to be fully loaded
+    if (!isFullyLoaded) {
+      return;
+    }
+
+    // If user is not authenticated, show error
+    if (!user?.id) {
+      setError('User not authenticated');
+      setLoading(false);
+      setEvents([]);
+      return;
+    }
+
     try {
       setLoading(true);
       setError('');
@@ -100,17 +120,15 @@ function IntelligenceFeedContent() {
         }
       }
 
-      const eventsData = await getEventsWithCausalChainsSearch(searchOptions);
-      console.log('Events loaded:', eventsData?.length || 0);
+      const eventsData = await getEventsWithCausalChainsSearch(searchOptions, user.id);
       setEvents(eventsData || []);
     } catch (err: any) {
-      console.error('Error loading events:', err);
       setError(err.message || 'Failed to load events');
       setEvents([]);
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearchQuery, activeTab, preferences]);
+  }, [debouncedSearchQuery, activeTab, preferences, user?.id, isFullyLoaded]);
 
   useEffect(() => {
     fetchEvents();

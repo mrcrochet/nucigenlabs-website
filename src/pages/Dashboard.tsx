@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUser, useAuth } from '@clerk/clerk-react';
 import { getEventsWithCausalChains } from '../lib/supabase';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
@@ -32,15 +33,33 @@ interface EventWithChain {
 
 function DashboardContent() {
   const navigate = useNavigate();
+  const { user, isLoaded: userLoaded } = useUser();
+  const { isLoaded: authLoaded } = useAuth();
+  
+  // Force user to load by accessing auth state
+  const isFullyLoaded = userLoaded && authLoaded;
+  
   const [events, setEvents] = useState<EventWithChain[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     async function fetchEvents() {
+      // Wait for user and auth to be fully loaded
+      if (!isFullyLoaded) {
+        return;
+      }
+
+      // If user is not authenticated, show error
+      if (!user?.id) {
+        setError('User not authenticated');
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
-        const data = await getEventsWithCausalChains();
+        const data = await getEventsWithCausalChains(user.id);
         setEvents(data || []);
       } catch (err: any) {
         console.error('Error loading events:', err);
@@ -51,7 +70,7 @@ function DashboardContent() {
     }
 
     fetchEvents();
-  }, []);
+  }, [user?.id, isFullyLoaded]);
 
   // Get top 3-5 events (prioritized by impact * confidence)
   const topEvents = events

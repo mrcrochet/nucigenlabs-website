@@ -1,4 +1,4 @@
-import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
+import { useUser, useAuth as useClerkAuthHook } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 
 /**
@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
  */
 export function useClerkAuth() {
   const { user, isLoaded: userLoaded } = useUser();
-  const { signOut } = useClerkAuth();
+  const { signOut } = useClerkAuthHook();
   const navigate = useNavigate();
 
   const loading = !userLoaded;

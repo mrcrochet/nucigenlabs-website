@@ -427,6 +427,41 @@ export async function signInWithOAuth(provider: 'google' | 'linkedin') {
 }
 
 /**
+ * Get or create Supabase UUID for a Clerk user ID
+ * This function maps Clerk user IDs (e.g., "user_37qEOHmXa9h5K2xQLb37cVf2JMp")
+ * to Supabase UUIDs for compatibility with existing tables
+ */
+export async function getOrCreateSupabaseUserId(clerkUserId: string, email?: string): Promise<string> {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:getOrCreateSupabaseUserId',message:'Getting or creating Supabase UUID',data:{clerkUserId:clerkUserId?.substring(0,15)+'...',hasEmail:!!email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'UUID_MAPPING'})}).catch(()=>{});
+  // #endregion
+
+  // Call the Supabase function to get or create the mapping
+  const { data, error } = await supabase.rpc('get_or_create_supabase_user_id', {
+    clerk_id: clerkUserId,
+    user_email: email || null,
+  });
+
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:getOrCreateSupabaseUserId',message:'RPC result',data:{hasData:!!data,hasError:!!error,error:error?.message,uuid:data?.substring(0,10)+'...'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'UUID_MAPPING'})}).catch(()=>{});
+  // #endregion
+
+  if (error) {
+    throw new Error(error.message || 'Failed to get or create user mapping');
+  }
+
+  if (!data) {
+    throw new Error('Failed to get user mapping');
+  }
+
+  return data as string;
+}
+
+/**
  * Get current user
  */
 export async function getCurrentUser(): Promise<User | null> {
@@ -500,8 +535,10 @@ export async function getUserProfile(userId: string) {
 
 /**
  * Update user profile
+ * @param updates - Profile updates
+ * @param userId - Optional Clerk user ID. If not provided, tries to get from Supabase Auth (legacy)
  */
-export async function updateUserProfile(updates: Partial<User>) {
+export async function updateUserProfile(updates: Partial<User>, userId?: string) {
   if (!isConfigured) {
     throw new Error(
       'Supabase is not configured. ' +
@@ -510,8 +547,21 @@ export async function updateUserProfile(updates: Partial<User>) {
     );
   }
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  let targetUserId: string | null = null;
+
+  if (userId) {
+    // Convert Clerk user ID to Supabase UUID
+    targetUserId = await getOrCreateSupabaseUserId(userId, updates.email);
+  } else {
+    // Legacy: Try to get from Supabase Auth (for backward compatibility)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+    targetUserId = user.id;
+  }
+
+  if (!targetUserId) {
     throw new Error('User not authenticated');
   }
 
@@ -535,7 +585,7 @@ export async function updateUserProfile(updates: Partial<User>) {
   const { data, error } = await supabase
     .from('users')
     .update(cleanUpdates)
-    .eq('id', user.id)
+    .eq('id', targetUserId)
     .select()
     .maybeSingle();
 
@@ -570,8 +620,9 @@ export async function resetPassword(email: string) {
 /**
  * Get events with causal chains, including personalized events for the current user
  * Prioritizes personalized events (tavily:personalized:userId) over general events
+ * @param userId - Optional Clerk user ID. If not provided, tries to get from Supabase Auth (legacy)
  */
-export async function getEventsWithCausalChains() {
+export async function getEventsWithCausalChains(userId?: string) {
   if (!isConfigured) {
     throw new Error(
       'Supabase is not configured. ' +
@@ -580,18 +631,29 @@ export async function getEventsWithCausalChains() {
     );
   }
 
-  // Check if user is authenticated
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) {
-    console.error('Session error:', sessionError);
-    throw new Error('Failed to verify authentication');
+  let targetUserId: string | null = null;
+
+  if (userId) {
+    // Convert Clerk user ID to Supabase UUID
+    targetUserId = await getOrCreateSupabaseUserId(userId);
+  } else {
+    // Legacy: Try to get from Supabase Auth (for backward compatibility)
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      console.error('Session error:', sessionError);
+      throw new Error('Failed to verify authentication');
+    }
+    if (!session) {
+      throw new Error('User not authenticated. Please log in to view events.');
+    }
+    targetUserId = session.user.id;
   }
-  if (!session) {
+
+  if (!targetUserId) {
     throw new Error('User not authenticated. Please log in to view events.');
   }
 
-  const userId = session.user.id;
-  const personalizedSource = `tavily:personalized:${userId}`;
+  const personalizedSource = `tavily:personalized:${targetUserId}`;
 
   // Get events with their causal chains
   const { data, error } = await supabase
@@ -799,21 +861,35 @@ export async function getOfficialDocuments(nucigenEventId: string) {
 
 /**
  * Get user preferences for feed personalization
+ * @param userId - Optional Clerk user ID. If not provided, tries to get from Supabase Auth (legacy)
  */
-export async function getUserPreferences() {
+export async function getUserPreferences(userId?: string) {
   if (!isConfigured) {
     throw new Error('Supabase is not configured');
   }
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  let targetUserId: string | null = null;
+
+  if (userId) {
+    // Convert Clerk user ID to Supabase UUID
+    targetUserId = await getOrCreateSupabaseUserId(userId);
+  } else {
+    // Legacy: Try to get from Supabase Auth (for backward compatibility)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+    targetUserId = user.id;
+  }
+
+  if (!targetUserId) {
     throw new Error('User not authenticated');
   }
 
   const { data, error } = await supabase
     .from('user_preferences')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', targetUserId)
     .maybeSingle();
 
   if (error) {
@@ -825,6 +901,8 @@ export async function getUserPreferences() {
 
 /**
  * Update user preferences
+ * @param preferences - User preferences
+ * @param userId - Optional Clerk user ID. If not provided, tries to get from Supabase Auth (legacy)
  */
 export async function updateUserPreferences(preferences: {
   preferred_sectors?: string[];
@@ -837,20 +915,33 @@ export async function updateUserPreferences(preferences: {
   preferred_time_horizons?: string[];
   notify_on_new_event?: boolean;
   notify_frequency?: 'realtime' | 'hourly' | 'daily' | 'weekly';
-}) {
+}, userId?: string) {
   if (!isConfigured) {
     throw new Error('Supabase is not configured');
   }
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  let targetUserId: string | null = null;
+
+  if (userId) {
+    // Convert Clerk user ID to Supabase UUID
+    targetUserId = await getOrCreateSupabaseUserId(userId);
+  } else {
+    // Legacy: Try to get from Supabase Auth (for backward compatibility)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+    targetUserId = user.id;
+  }
+
+  if (!targetUserId) {
     throw new Error('User not authenticated');
   }
 
   const { data, error } = await supabase
     .from('user_preferences')
     .upsert({
-      user_id: user.id,
+      user_id: targetUserId,
       ...preferences,
       updated_at: new Date().toISOString(),
     }, {
@@ -1021,13 +1112,41 @@ export async function searchEvents(options: SearchOptions = {}): Promise<SearchE
 /**
  * Count search results for pagination
  */
-export async function countSearchResults(options: Omit<SearchOptions, 'limit' | 'offset'> = {}): Promise<number> {
+export async function countSearchResults(
+  options: Omit<SearchOptions, 'limit' | 'offset'> = {},
+  userId?: string
+): Promise<number> {
   if (!isConfigured) {
     throw new Error('Supabase is not configured');
   }
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1068',message:'countSearchResults entry',data:{hasUserId:!!userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
+
+  let targetUserId: string | null = null;
+
+  if (userId) {
+    // Convert Clerk user ID to Supabase UUID
+    targetUserId = await getOrCreateSupabaseUserId(userId);
+  } else {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1078',message:'Attempting supabase.auth.getSession',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1081',message:'getSession result',data:{hasSession:!!session,hasError:!!sessionError},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    if (sessionError || !session) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1084',message:'No session - throwing',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
+      throw new Error('User not authenticated');
+    }
+    targetUserId = session.user.id;
+  }
+
+  if (!targetUserId) {
     throw new Error('User not authenticated');
   }
 
@@ -1064,14 +1183,53 @@ export async function countSearchResults(options: Omit<SearchOptions, 'limit' | 
  * This function combines search results with causal chain data
  */
 export async function getEventsWithCausalChainsSearch(
-  options: SearchOptions = {}
+  options: SearchOptions = {},
+  userId?: string
 ): Promise<EventWithChain[]> {
   if (!isConfigured) {
     throw new Error('Supabase is not configured');
   }
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1110',message:'getEventsWithCausalChainsSearch entry',data:{hasUserId:!!userId,userId:userId?.substring(0,10)+'...'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+
+  let targetUserId: string | null = null;
+
+  if (userId) {
+    // Use provided Clerk user ID
+    targetUserId = userId;
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1118',message:'Using provided userId',data:{userId:userId?.substring(0,10)+'...'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+  } else {
+    // Legacy: Try to get from Supabase Auth (for backward compatibility)
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1122',message:'Attempting supabase.auth.getSession',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1125',message:'getSession result',data:{hasSession:!!session,hasError:!!sessionError,error:sessionError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    if (sessionError) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1128',message:'Session error - throwing',data:{error:sessionError.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      throw new Error('User not authenticated');
+    }
+    if (!session) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1132',message:'No session - throwing',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      throw new Error('User not authenticated');
+    }
+    targetUserId = session.user.id;
+  }
+
+  if (!targetUserId) {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1138',message:'No targetUserId - throwing',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     throw new Error('User not authenticated');
   }
 
@@ -1117,8 +1275,7 @@ export async function getEventsWithCausalChainsSearch(
   }
 
   // Get source information from events table for personalized check
-  const userId = session.user.id;
-  const personalizedSource = `tavily:personalized:${userId}`;
+  const personalizedSource = `tavily:personalized:${targetUserId}`;
   let sourceMap: Record<string, string> = {};
   
   // Fetch source information for personalized events
@@ -1328,19 +1485,45 @@ export interface UserRecommendation {
 export async function getUserRecommendations(
   statusFilter?: string,
   priorityFilter?: string,
-  limit: number = 50
+  limit: number = 50,
+  userId?: string
 ): Promise<UserRecommendation[]> {
   if (!isConfigured) {
     throw new Error('Supabase is not configured');
   }
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1372',message:'getUserRecommendations entry',data:{hasUserId:!!userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+  // #endregion
+
+  let targetUserId: string | null = null;
+
+  if (userId) {
+    // Convert Clerk user ID to Supabase UUID
+    targetUserId = await getOrCreateSupabaseUserId(userId);
+  } else {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1385',message:'Attempting supabase.auth.getSession',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1388',message:'getSession result',data:{hasSession:!!session,hasError:!!sessionError},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    if (sessionError || !session) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1391',message:'No session - throwing',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      throw new Error('User not authenticated');
+    }
+    targetUserId = session.user.id;
+  }
+
+  if (!targetUserId) {
     throw new Error('User not authenticated');
   }
 
   const { data, error } = await supabase.rpc('get_user_recommendations', {
-    target_user_id: session.user.id,
+    target_user_id: targetUserId,
     status_filter: statusFilter || null,
     priority_filter: priorityFilter || null,
     limit_count: limit,
@@ -1357,18 +1540,43 @@ export async function getUserRecommendations(
 /**
  * Get unread recommendations count
  */
-export async function getUnreadRecommendationsCount(): Promise<number> {
+export async function getUnreadRecommendationsCount(userId?: string): Promise<number> {
   if (!isConfigured) {
     throw new Error('Supabase is not configured');
   }
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1404',message:'getUnreadRecommendationsCount entry',data:{hasUserId:!!userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+  // #endregion
+
+  let targetUserId: string | null = null;
+
+  if (userId) {
+    // Convert Clerk user ID to Supabase UUID
+    targetUserId = await getOrCreateSupabaseUserId(userId);
+  } else {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1415',message:'Attempting supabase.auth.getSession',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1418',message:'getSession result',data:{hasSession:!!session,hasError:!!sessionError},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+    // #endregion
+    if (sessionError || !session) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1421',message:'No session - throwing',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+      // #endregion
+      throw new Error('User not authenticated');
+    }
+    targetUserId = session.user.id;
+  }
+
+  if (!targetUserId) {
     throw new Error('User not authenticated');
   }
 
   const { data, error } = await supabase.rpc('count_unread_recommendations', {
-    target_user_id: session.user.id,
+    target_user_id: targetUserId,
   });
 
   if (error) {
@@ -1384,14 +1592,27 @@ export async function getUnreadRecommendationsCount(): Promise<number> {
  */
 export async function updateRecommendationStatus(
   recommendationId: string,
-  status: 'pending' | 'acknowledged' | 'completed' | 'dismissed'
+  status: 'pending' | 'acknowledged' | 'completed' | 'dismissed',
+  userId?: string
 ): Promise<void> {
   if (!isConfigured) {
     throw new Error('Supabase is not configured');
   }
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  let targetUserId: string | null = null;
+
+  if (userId) {
+    // Convert Clerk user ID to Supabase UUID
+    targetUserId = await getOrCreateSupabaseUserId(userId);
+  } else {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+      throw new Error('User not authenticated');
+    }
+    targetUserId = session.user.id;
+  }
+
+  if (!targetUserId) {
     throw new Error('User not authenticated');
   }
 
@@ -1410,7 +1631,7 @@ export async function updateRecommendationStatus(
     .from('recommendations')
     .update(updateData)
     .eq('id', recommendationId)
-    .eq('user_id', session.user.id);
+    .eq('user_id', targetUserId);
 
   if (error) {
     throw new Error(error.message || 'Failed to update recommendation');

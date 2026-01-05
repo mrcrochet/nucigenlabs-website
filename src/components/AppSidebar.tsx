@@ -6,7 +6,7 @@
  */
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth, useUser } from '@clerk/clerk-react';
 import { 
   LayoutDashboard, 
   Brain, 
@@ -26,11 +26,13 @@ import { useState } from 'react';
 export default function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { signOut } = useAuth();
+  // Access useUser to force Clerk to load user profile
+  useUser();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = async () => {
-    await logout();
+    await signOut();
     navigate('/');
   };
 

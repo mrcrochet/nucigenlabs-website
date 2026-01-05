@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import AppSidebar from '../components/AppSidebar';
@@ -39,7 +39,12 @@ interface QualityMetrics {
 }
 
 function QualityDashboardContent() {
-  const { user } = useAuth();
+  const { isLoaded: userLoaded } = useUser();
+  const { isLoaded: authLoaded } = useClerkAuth();
+  
+  // Force user to load by accessing auth state
+  // Note: QualityDashboard doesn't need user data, but we ensure Clerk is loaded
+  const isFullyLoaded = userLoaded && authLoaded;
   const [metrics, setMetrics] = useState<QualityMetrics[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d'>('7d');
@@ -81,7 +86,7 @@ function QualityDashboardContent() {
     }
 
     fetchMetrics();
-  }, [selectedPeriod]);
+  }, [selectedPeriod, isFullyLoaded]);
 
   const latestMetrics = metrics[metrics.length - 1];
   const previousMetrics = metrics[metrics.length - 2];

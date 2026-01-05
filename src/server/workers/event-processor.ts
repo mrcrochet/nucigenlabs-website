@@ -157,7 +157,7 @@ export async function processPendingEvents(limit: number = 10): Promise<Processi
     };
 
     // Process events in parallel with intelligent rate limiting
-    const { results: processResults, errors } = await maximizeApiUsage(
+    const { results: processResults, errors: apiErrors } = await maximizeApiUsage(
       events,
       async (event) => {
         return await processEvent(event.id);
@@ -187,9 +187,11 @@ export async function processPendingEvents(limit: number = 10): Promise<Processi
     }
 
     // Log errors if any
-    if (errors.length > 0) {
-      console.warn(`[Processor] ${errors.length} events failed after retries`);
-      result.phase1Errors += errors.length;
+    if (apiErrors.length > 0) {
+      console.warn(`[Processor] ${apiErrors.length} events failed after retries`);
+      // Count API errors as Phase 1 errors
+      result.phase1Errors += apiErrors.length;
+      result.processed -= apiErrors.length; // Adjust processed count
     }
 
     console.log(`[Processor] Processing complete:`);

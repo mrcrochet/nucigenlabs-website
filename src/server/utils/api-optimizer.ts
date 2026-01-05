@@ -43,13 +43,14 @@ export const API_CONFIGS: Record<string, ApiConfig> = {
 
 /**
  * Exécute des tâches en parallèle avec contrôle de concurrence
+ * Retourne les résultats et les erreurs séparément
  */
 export async function parallelExecute<T, R>(
   items: T[],
   processor: (item: T) => Promise<R>,
   config: ApiConfig,
   onProgress?: (completed: number, total: number) => void
-): Promise<R[]> {
+): Promise<{ results: R[]; errors: Array<{ item: T; error: any }> }> {
   const results: R[] = [];
   const errors: Array<{ item: T; error: any }> = [];
   let completed = 0;
@@ -122,7 +123,7 @@ export async function parallelExecute<T, R>(
     console.warn(`[API Optimizer] ${errors.length} items failed after retries`);
   }
 
-  return results;
+  return { results, errors };
 }
 
 /**
@@ -247,7 +248,7 @@ export async function maximizeApiUsage<T, R>(
     }
   };
 
-  const processedResults = await parallelExecute(
+  const { results: processedResults, errors: processedErrors } = await parallelExecute(
     items,
     safeProcessor,
     config,
@@ -257,9 +258,12 @@ export async function maximizeApiUsage<T, R>(
   // Filter out undefined results (from errors)
   const validResults = processedResults.filter((r): r is R => r !== undefined);
 
+  // Combine errors from parallelExecute with our own error tracking
+  const allErrors = [...errors, ...processedErrors];
+
   return {
     results: validResults,
-    errors,
+    errors: allErrors,
   };
 }
 

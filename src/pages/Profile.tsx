@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useClerkAuth } from '../hooks/useClerkAuth';
+import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { getUserProfile } from '../lib/supabase';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
@@ -16,14 +16,26 @@ import Card from '../components/ui/Card';
 import SectionHeader from '../components/ui/SectionHeader';
 
 function ProfileContent() {
-  const { user } = useClerkAuth();
+  const { user, isLoaded: userLoaded } = useUser();
+  const { isLoaded: authLoaded } = useClerkAuth();
+  
+  // Force user to load by accessing auth state
+  const isFullyLoaded = userLoaded && authLoaded;
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadProfile() {
-      if (!user) return;
+      // Wait for user and auth to be fully loaded
+      if (!isFullyLoaded || !user?.id) {
+        if (isFullyLoaded && !user?.id) {
+          setLoading(false);
+        }
+        return;
+      }
+      
       try {
+        setLoading(true);
         const data = await getUserProfile(user.id);
         setProfile(data);
       } catch (err) {
@@ -33,7 +45,7 @@ function ProfileContent() {
       }
     }
     loadProfile();
-  }, [user]);
+  }, [user?.id, isFullyLoaded]);
 
   if (loading) {
     return (
@@ -74,7 +86,7 @@ function ProfileContent() {
           <div className="space-y-6">
             <div>
               <label className="block text-sm font-light text-slate-400 mb-2">Email</label>
-              <p className="text-base text-white font-light">{user?.email}</p>
+              <p className="text-base text-white font-light">{user?.primaryEmailAddress?.emailAddress || profile?.email || 'N/A'}</p>
             </div>
             {profile && (
               <>

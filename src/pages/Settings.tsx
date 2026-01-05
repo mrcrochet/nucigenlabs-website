@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useUser } from '@clerk/clerk-react';
 import { getUserPreferences, updateUserPreferences } from '../lib/supabase';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
@@ -77,6 +78,7 @@ const TIME_HORIZON_OPTIONS = [
 ];
 
 function SettingsContent() {
+  const { user } = useUser();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -100,9 +102,14 @@ function SettingsContent() {
   // Load existing preferences
   useEffect(() => {
     async function loadPreferences() {
+      if (!user?.id) {
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
-        const data = await getUserPreferences();
+        const data = await getUserPreferences(user.id);
         if (data) {
           setPreferences({
             preferred_sectors: data.preferred_sectors || [],
@@ -133,6 +140,10 @@ function SettingsContent() {
       setError('');
       setSuccess(false);
 
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
       await updateUserPreferences({
         preferred_sectors: preferences.preferred_sectors,
         preferred_regions: preferences.preferred_regions,
@@ -144,7 +155,7 @@ function SettingsContent() {
         preferred_time_horizons: preferences.preferred_time_horizons,
         notify_on_new_event: preferences.notify_on_new_event,
         notify_frequency: preferences.notify_frequency,
-      });
+      }, user.id);
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, CheckCircle, AlertCircle, RotateCcw } from 'lucide-react';
 import { useSignUp } from '@clerk/clerk-react';
+import { useToast } from '../hooks/useToast';
 import SEO from '../components/SEO';
 
 export default function ConfirmEmail() {
@@ -14,7 +15,9 @@ export default function ConfirmEmail() {
   const [resending, setResending] = useState(false);
   const [error, setError] = useState('');
   const [verified, setVerified] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const { showToast } = useToast();
 
   useEffect(() => {
     // Get email from location state
@@ -69,8 +72,8 @@ export default function ConfirmEmail() {
   };
 
   const handleVerify = async (codeToVerify?: string) => {
-    if (!isLoaded || !signUp) {
-      return;
+    if (!isLoaded || !signUp || verifying) {
+      return; // Prevent multiple simultaneous verifications
     }
 
     const codeString = codeToVerify || code.join('');
@@ -82,6 +85,7 @@ export default function ConfirmEmail() {
 
     setVerifying(true);
     setError('');
+    setResendSuccess(false);
 
     try {
       const result = await signUp.attemptEmailAddressVerification({
@@ -91,6 +95,7 @@ export default function ConfirmEmail() {
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
         setVerified(true);
+        showToast('Email verified successfully!', 'success');
         setTimeout(() => {
           navigate('/onboarding', { replace: true });
         }, 2000);
@@ -100,7 +105,15 @@ export default function ConfirmEmail() {
         inputRefs.current[0]?.focus();
       }
     } catch (err: any) {
-      setError(err.errors?.[0]?.message || err.message || 'Failed to verify code');
+      const errorMessage = err.errors?.[0]?.message || err.message || 'Failed to verify code';
+      // Provide more specific error messages
+      if (errorMessage.toLowerCase().includes('expired')) {
+        setError('This code has expired. Please request a new one.');
+      } else if (errorMessage.toLowerCase().includes('invalid')) {
+        setError('Invalid code. Please check and try again.');
+      } else {
+        setError(errorMessage);
+      }
       setCode(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } finally {
@@ -119,10 +132,15 @@ export default function ConfirmEmail() {
     try {
       await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
       setCode(['', '', '', '', '', '']);
+      setError(''); // Clear any previous errors
+      setResendSuccess(true);
+      showToast('Verification code sent! Check your email.', 'success');
       inputRefs.current[0]?.focus();
-      // Show success message (you can add a toast here)
+      // Clear success message after 5 seconds
+      setTimeout(() => setResendSuccess(false), 5000);
     } catch (err: any) {
       setError(err.errors?.[0]?.message || err.message || 'Failed to resend code');
+      setResendSuccess(false);
     } finally {
       setResending(false);
     }
@@ -175,11 +193,21 @@ export default function ConfirmEmail() {
                 </div>
               )}
 
+              {/* Success Message */}
+              {resendSuccess && (
+                <div className="mb-6 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                  <p className="text-sm text-green-400 text-center">Verification code sent! Please check your email.</p>
+                </div>
+              )}
+
               {/* Code Input Fields */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-300 mb-3 text-center">
+                <label htmlFor="code-input-0" className="block text-sm font-medium text-slate-300 mb-3 text-center">
                   Verification Code
                 </label>
+                <div id="code-description" className="sr-only">
+                  Enter the 6-digit verification code sent to your email
+                </div>
                 <div className="flex gap-2 justify-center">
                   {code.map((digit, index) => (
                     <input
@@ -193,6 +221,8 @@ export default function ConfirmEmail() {
                       onKeyDown={(e) => handleKeyDown(index, e)}
                       onPaste={index === 0 ? handlePaste : undefined}
                       disabled={verifying || !isLoaded}
+                      aria-label={`Verification code digit ${index + 1} of 6`}
+                      aria-describedby="code-description"
                       className="w-12 h-14 text-center text-2xl font-bold bg-white/5 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-[#E1463E] focus:border-[#E1463E] outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   ))}

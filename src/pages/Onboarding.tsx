@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
-import { updateUserProfile, getSession, updateUserPreferences } from '../lib/supabase';
+import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
+import { updateUserProfile, updateUserPreferences } from '../lib/supabase';
 import { Building2, Briefcase, Target, TrendingUp, Zap, X } from 'lucide-react';
 import SEO from '../components/SEO';
 import MultiSelect from '../components/ui/MultiSelect';
@@ -56,12 +56,15 @@ const TIME_HORIZON_OPTIONS = [
 ];
 
 export default function Onboarding() {
-  const { user, loading: authLoading, refreshUser } = useAuth();
+  const { user, isLoaded: userLoaded } = useUser();
+  const { isLoaded: authLoaded, isSignedIn } = useClerkAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
+  
+  const authLoading = !userLoaded || !authLoaded;
 
   // Basic profile data
   const [formData, setFormData] = useState({
@@ -86,26 +89,15 @@ export default function Onboarding() {
 
   const [focusAreaInput, setFocusAreaInput] = useState('');
 
-  // Refresh user on mount to ensure we have the latest session
+  // Redirect if not authenticated
   useEffect(() => {
-    const checkSession = async () => {
-      if (!authLoading && !user) {
-        const session = await getSession();
-        if (session) {
-          await refreshUser();
-        } else {
-          setTimeout(() => {
-            navigate('/login', { 
-              replace: true,
-              state: { from: { pathname: '/onboarding' } }
-            });
-          }, 2000);
-        }
-      }
-    };
-    
-    checkSession();
-  }, [authLoading, user, refreshUser, navigate]);
+    if (authLoaded && !isSignedIn) {
+      navigate('/login', { 
+        replace: true,
+        state: { from: { pathname: '/onboarding' } }
+      });
+    }
+  }, [authLoaded, isSignedIn, navigate]);
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -133,13 +125,22 @@ export default function Onboarding() {
     setError('');
     setLoading(true);
 
+    if (!user?.id) {
+      setError('User not authenticated');
+      setLoading(false);
+      return;
+    }
+
     try {
       // Step 1: Update basic profile (backward compatibility)
+      // Map role to professional_role (not system role)
+      const { role, ...otherFormData } = formData;
       await updateUserProfile({
-        ...formData,
+        ...otherFormData,
+        professional_role: role, // Map to professional_role
         // Use first selected sector for backward compatibility
         sector: preferences.preferred_sectors[0] || formData.sector,
-      });
+      }, user.id); // Pass Clerk user ID
 
       // Step 2: Save preferences (Phase 5)
       await updateUserPreferences({
@@ -151,10 +152,9 @@ export default function Onboarding() {
         min_impact_score: preferences.min_impact_score,
         min_confidence_score: preferences.min_confidence_score,
         preferred_time_horizons: preferences.preferred_time_horizons,
-      });
+      }, user.id); // Pass Clerk user ID
 
-      await refreshUser();
-      navigate('/app', { replace: true });
+      navigate('/dashboard', { replace: true });
     } catch (err: any) {
       setError(err.message || 'Failed to save profile');
     } finally {
@@ -546,7 +546,7 @@ export default function Onboarding() {
             ) : (
               <button
                 type="button"
-                onClick={() => navigate('/app')}
+                onClick={() => navigate('/dashboard')}
                 className="flex-1 px-6 py-3 border border-white/10 rounded-lg text-white hover:bg-white/5 transition-colors font-light"
               >
                 I'll complete this later
