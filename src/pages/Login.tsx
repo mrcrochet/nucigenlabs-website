@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSignIn, useUser } from '@clerk/clerk-react';
 import { hasCompletedOnboarding } from '../lib/supabase';
@@ -18,6 +18,13 @@ export default function Login() {
   const { user } = useUser();
 
   const from = (location.state as any)?.from?.pathname || '/dashboard';
+  
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isLoaded && user) {
+      navigate(from, { replace: true });
+    }
+  }, [isLoaded, user, navigate, from]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,11 +45,17 @@ export default function Login() {
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
         
-        // Wait a moment for user data to be available
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Get user ID from the result or wait for user data to be available
+        const userId = result.createdUserId || user?.id;
+        
+        // Wait a moment for user data to be available if needed
+        if (!userId) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
         
         // Check if user has completed onboarding (using Clerk user ID)
-        const completed = await hasCompletedOnboarding(user?.id);
+        const finalUserId = userId || user?.id;
+        const completed = finalUserId ? await hasCompletedOnboarding(finalUserId) : false;
         
         if (completed) {
           navigate(from, { replace: true });

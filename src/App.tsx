@@ -11,6 +11,7 @@ import StructuredData from './components/StructuredData';
 import Breadcrumbs from './components/Breadcrumbs';
 import { prefetchCriticalRoutes } from './utils/prefetch';
 import ProtectedRoute from './components/ProtectedRoute';
+import PublicRoute from './components/PublicRoute';
 import Home from './pages/Home';
 
 // Lazy load routes for better performance
@@ -21,6 +22,8 @@ const PartnerProgram = lazy(() => import('./pages/PartnerProgram'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const ConfirmEmail = lazy(() => import('./pages/ConfirmEmail'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 // Application core routes (PHASE 2D)
@@ -112,9 +115,11 @@ function App() {
         <Route path="/partners" element={<PartnerProgram />} />
         
         {/* Auth Routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/confirm-email" element={<ConfirmEmail />} />
+        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+        <Route path="/confirm-email" element={<PublicRoute><ConfirmEmail /></PublicRoute>} />
+        <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+        <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         
         {/* Protected App Routes - PHASE 2D SITEMAP */}

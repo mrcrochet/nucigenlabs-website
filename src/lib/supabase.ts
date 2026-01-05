@@ -1524,3 +1524,90 @@ export async function updateModelFeedback(
     throw new Error(error.message || 'Failed to update feedback');
   }
 }
+
+/**
+ * Get user block preferences for a specific page type
+ * @param userId - User ID (Clerk user ID)
+ * @param pageType - Page type ('event_detail', 'dashboard', 'intelligence', etc.)
+ * @returns Block preferences or null if not found
+ */
+export async function getUserBlockPreferences(
+  userId: string,
+  pageType: 'event_detail' | 'dashboard' | 'intelligence' | 'events' | 'alerts'
+) {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data, error } = await supabase
+    .from('user_block_preferences')
+    .select('blocks')
+    .eq('user_id', userId)
+    .eq('page_type', pageType)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || 'Failed to fetch block preferences');
+  }
+
+  return data?.blocks || null;
+}
+
+/**
+ * Save user block preferences for a specific page type
+ * @param userId - User ID (Clerk user ID)
+ * @param pageType - Page type ('event_detail', 'dashboard', 'intelligence', etc.)
+ * @param blocks - Array of block configurations
+ */
+export async function saveUserBlockPreferences(
+  userId: string,
+  pageType: 'event_detail' | 'dashboard' | 'intelligence' | 'events' | 'alerts',
+  blocks: any[]
+) {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { data, error } = await supabase
+    .from('user_block_preferences')
+    .upsert({
+      user_id: userId,
+      page_type: pageType,
+      blocks: blocks,
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'user_id,page_type',
+    })
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(error.message || 'Failed to save block preferences');
+  }
+
+  return data;
+}
+
+/**
+ * Reset user block preferences to defaults for a specific page type
+ * @param userId - User ID (Clerk user ID)
+ * @param pageType - Page type ('event_detail', 'dashboard', 'intelligence', etc.)
+ */
+export async function resetUserBlockPreferences(
+  userId: string,
+  pageType: 'event_detail' | 'dashboard' | 'intelligence' | 'events' | 'alerts'
+) {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  const { error } = await supabase
+    .from('user_block_preferences')
+    .delete()
+    .eq('user_id', userId)
+    .eq('page_type', pageType);
+
+  if (error) {
+    throw new Error(error.message || 'Failed to reset block preferences');
+  }
+}

@@ -12,12 +12,22 @@ import AdvancedFeatures from '../components/AdvancedFeatures';
 import HowPeopleUseNucigen from '../components/HowPeopleUseNucigen';
 import TypewriterText from '../components/TypewriterText';
 import SocialProof from '../components/SocialProof';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '@clerk/clerk-react';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Home() {
   const [openStep, setOpenStep] = useState<number | null>(0); // First step open by default
   const [isNotOpen, setIsNotOpen] = useState(false);
-  const { isAuthenticated } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isLoaded, isSignedIn, navigate]);
 
   return (
     <main className="min-h-screen">
@@ -88,7 +98,7 @@ export default function Home() {
           </div>
 
           <div className="mb-12 max-w-2xl mx-auto">
-            {isAuthenticated ? (
+            {isLoaded && isSignedIn ? (
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link
                   to="/app"

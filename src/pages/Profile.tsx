@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import { useClerkAuth } from '../hooks/useClerkAuth';
 import { getUserProfile } from '../lib/supabase';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
@@ -16,7 +16,7 @@ import Card from '../components/ui/Card';
 import SectionHeader from '../components/ui/SectionHeader';
 
 function ProfileContent() {
-  const { user } = useAuth();
+  const { user } = useClerkAuth();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 

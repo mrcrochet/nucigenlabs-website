@@ -23,7 +23,8 @@ import {
   CheckCircle,
   AlertCircle,
   Info,
-  X
+  X,
+  Lock
 } from 'lucide-react';
 
 // Available options (same as onboarding)
@@ -398,6 +399,31 @@ function SettingsContent() {
                     onChange={(e) => setPreferences({ ...preferences, min_confidence_score: parseFloat(e.target.value) })}
                     className="w-full"
                   />
+                </div>
+              </div>
+            </Card>
+
+            {/* Account Security */}
+            <Card className="p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <Lock className="w-5 h-5 text-[#E1463E]" />
+                <h3 className="text-lg font-light text-white">Account Security</h3>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-light text-slate-300 mb-2">
+                    Change Password
+                  </label>
+                  <p className="text-xs text-slate-500 font-light mb-3">
+                    Update your password to keep your account secure.
+                  </p>
+                  <Link
+                    to="/forgot-password"
+                    className="inline-block px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
+                  >
+                    Change Password
+                  </Link>
                 </div>
               </div>
             </Card>

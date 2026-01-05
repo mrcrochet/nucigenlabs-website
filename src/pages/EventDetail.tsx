@@ -23,11 +23,11 @@ import SEO from '../components/SEO';
 import AppSidebar from '../components/AppSidebar';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import Timeline from '../components/ui/Timeline';
 import SectionHeader from '../components/ui/SectionHeader';
-import MetaRow from '../components/ui/MetaRow';
-import { ArrowLeft, MapPin, Building2, TrendingUp, Clock, ChevronDown, ChevronUp, Link2, History, TrendingDown, Target, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Link2, History, MessageSquare } from 'lucide-react';
 import FeedbackModal from '../components/FeedbackModal';
+import BlockRenderer from '../components/blocks/BlockRenderer';
+import { useBlockPreferences } from '../hooks/useBlockPreferences';
 
 interface CausalChain {
   id: string;
@@ -87,12 +87,14 @@ function EventDetailContent() {
   const [scenarios, setScenarios] = useState<ScenarioPrediction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [whyExpanded, setWhyExpanded] = useState(false);
   const [showRelationships, setShowRelationships] = useState(true);
   const [showHistorical, setShowHistorical] = useState(true);
   const [showScenarios, setShowScenarios] = useState(true);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackComponentType, setFeedbackComponentType] = useState<'event_extraction' | 'causal_chain' | 'scenario' | 'relationship' | 'historical_comparison'>('event_extraction');
+  
+  // Use block preferences hook
+  const { blocks, loading: blocksLoading } = useBlockPreferences('event_detail');
 
   useEffect(() => {
     async function fetchEvent() {
@@ -188,21 +190,9 @@ function EventDetailContent() {
   }
 
   const chain = event.nucigen_causal_chains[0];
-  const whyItMattersText = event.why_it_matters || '';
-  const shouldTruncate = whyItMattersText.length > 200;
-  const displayText = whyExpanded || !shouldTruncate 
-    ? whyItMattersText 
-    : whyItMattersText.substring(0, 200) + '...';
-
-  // Build timeline items
-  const timelineItems = [
-    { label: 'Cause', content: chain.cause },
-    { label: 'First-Order Effect', content: chain.first_order_effect },
-  ];
-
-  if (chain.second_order_effect) {
-    timelineItems.push({ label: 'Second-Order Effect', content: chain.second_order_effect });
-  }
+  
+  // Sort blocks by order
+  const sortedBlocks = [...blocks].sort((a, b) => a.order - b.order);
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] flex">
@@ -252,196 +242,24 @@ function EventDetailContent() {
         {/* Main Content */}
         <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-10 py-12 w-full">
         <Card className="p-8">
-          {/* 1. Event Header */}
-          <div className="mb-10 pb-10 border-b border-white/[0.02]">
-            <h2 className="text-2xl font-light text-white mb-6 leading-snug">
-              {event.summary}
-            </h2>
-
-            {/* Tags */}
-            <div className="flex flex-wrap items-center gap-3 mb-6">
-              {event.sector && (
-                <Badge variant="sector">
-                  <Building2 className="w-3 h-3 mr-1.5" />
-                  {event.sector}
-                </Badge>
-              )}
-              {event.region && (
-                <Badge variant="region">
-                  <MapPin className="w-3 h-3 mr-1.5" />
-                  {event.region}
-                </Badge>
-              )}
-              {event.event_type && (
-                <Badge variant="level">
-                  <TrendingUp className="w-3 h-3 mr-1.5" />
-                  {event.event_type}
-                </Badge>
-              )}
-            </div>
-
-            {/* Confidence & Impact */}
-            <MetaRow
-              items={[
-                ...(event.confidence !== null ? [{
-                  label: 'Confidence',
-                  value: event.confidence,
-                  variant: 'confidence' as const,
-                }] : []),
-                ...(event.impact_score !== null ? [{
-                  label: 'Impact',
-                  value: event.impact_score,
-                  variant: 'impact' as const,
-                }] : []),
-                {
-                  label: 'Published',
-                  value: formatDate(event.created_at),
-                },
-              ]}
+          {/* Render blocks using BlockRenderer */}
+          {!blocksLoading && sortedBlocks.map((block) => (
+            <BlockRenderer
+              key={block.id}
+              block={block}
+              data={{
+                event,
+                chain,
+                whyItMatters: event.why_it_matters,
+                context,
+                documents: officialDocs,
+              }}
+              onFeedbackClick={() => {
+                setFeedbackComponentType('event_extraction');
+                setShowFeedbackModal(true);
+              }}
             />
-          </div>
-
-          {/* 2. Why It Matters */}
-          <div className="mb-10 pb-10 border-b border-white/[0.02]">
-            <SectionHeader
-              title="Why It Matters"
-              action={shouldTruncate ? (
-                <button
-                  onClick={() => setWhyExpanded(!whyExpanded)}
-                  className="text-xs text-slate-500 hover:text-white transition-colors flex items-center gap-1"
-                >
-                  {whyExpanded ? (
-                    <>
-                      <ChevronUp className="w-3 h-3" />
-                      Show less
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="w-3 h-3" />
-                      Show more
-                    </>
-                  )}
-                </button>
-              ) : undefined}
-            />
-            <p className="text-base text-slate-300 font-light leading-relaxed">
-              {displayText}
-            </p>
-          </div>
-
-          {/* 3. Causal Chain */}
-          <div className="mb-10 pb-10 border-b border-white/[0.02]">
-            <SectionHeader title="Causal Chain" />
-            <Timeline items={timelineItems} />
-
-            {/* Chain Metadata */}
-            <div className="pt-6 mt-6 border-t border-white/[0.02]">
-              <MetaRow
-                items={[
-                  {
-                    label: 'Time horizon',
-                    value: getTimeHorizonLabel(chain.time_horizon),
-                    icon: Clock,
-                  },
-                  ...(chain.affected_sectors.length > 0 ? [{
-                    label: 'Affected sectors',
-                    value: chain.affected_sectors.join(', '),
-                  }] : []),
-                  ...(chain.affected_regions.length > 0 ? [{
-                    label: 'Affected regions',
-                    value: chain.affected_regions.join(', '),
-                  }] : []),
-                  {
-                    label: 'Chain confidence',
-                    value: chain.confidence,
-                    variant: 'confidence' as const,
-                  },
-                ]}
-              />
-            </div>
-          </div>
-
-          {/* 4. Exposure */}
-          <div className="mb-10 pb-10 border-b border-white/[0.02]">
-            <SectionHeader title="Exposure" />
-            <div className="space-y-6">
-              <div>
-                <div className="text-xs text-slate-600 mb-3 font-light uppercase tracking-wide">Most exposed sectors</div>
-                <div className="flex flex-wrap gap-2">
-                  {chain.affected_sectors.map(sector => (
-                    <Badge key={sector} variant="sector">{sector}</Badge>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-slate-600 mb-3 font-light uppercase tracking-wide">Potentially affected regions</div>
-                <div className="flex flex-wrap gap-2">
-                  {chain.affected_regions.map(region => (
-                    <Badge key={region} variant="region">{region}</Badge>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 5. Historical Context (Tavily) */}
-          {context && (
-            <div className="mb-10 pb-10 border-b border-white/[0.02]">
-              <SectionHeader title="Historical Context" />
-              <div className="space-y-4">
-                {context.historical_context && (
-                  <div>
-                    <p className="text-sm text-slate-300 font-light leading-relaxed">
-                      {context.historical_context}
-                    </p>
-                  </div>
-                )}
-                {context.similar_events && context.similar_events.length > 0 && (
-                  <div>
-                    <div className="text-xs text-slate-600 mb-3 font-light uppercase tracking-wide">Similar Past Events</div>
-                    <div className="space-y-2">
-                      {context.similar_events.map((similar, idx) => (
-                        <div key={idx} className="p-3 bg-white/[0.02] border border-white/[0.05] rounded-lg">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1">
-                              <p className="text-sm text-white font-light">{similar.title}</p>
-                              <p className="text-xs text-slate-500 font-light mt-1">{similar.date}</p>
-                            </div>
-                            {similar.url && (
-                              <a
-                                href={similar.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-slate-500 hover:text-white transition-colors"
-                              >
-                                →
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {context.background_explanation && (
-                  <div>
-                    <div className="text-xs text-slate-600 mb-2 font-light uppercase tracking-wide">Background</div>
-                    <p className="text-sm text-slate-400 font-light leading-relaxed">
-                      {context.background_explanation}
-                    </p>
-                  </div>
-                )}
-                {context.validation_notes && (
-                  <div>
-                    <div className="text-xs text-slate-600 mb-2 font-light uppercase tracking-wide">Validation Notes</div>
-                    <p className="text-sm text-slate-400 font-light leading-relaxed">
-                      {context.validation_notes}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          ))}
 
           {/* 6. Related Events (Knowledge Graph) */}
           {relationships.length > 0 && (

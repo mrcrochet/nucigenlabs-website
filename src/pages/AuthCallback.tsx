@@ -20,7 +20,7 @@ export default function AuthCallback() {
           const completed = await hasCompletedOnboarding(user.id);
           
           if (completed) {
-            navigate('/app', { replace: true });
+            navigate('/dashboard', { replace: true });
           } else {
             navigate('/onboarding', { replace: true });
           }
