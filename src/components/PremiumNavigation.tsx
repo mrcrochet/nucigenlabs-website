@@ -1,15 +1,23 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Terminal, TrendingUp, FileText, DollarSign, Layers, Users, Menu, X, LogOut } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth, useUser, UserButton } from '@clerk/clerk-react';
 
 export default function PremiumNavigation() {
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { isSignedIn, signOut } = useAuth();
+  const { user } = useUser();
   const navigate = useNavigate();
+  
+  const isAuthenticated = isSignedIn;
+  
+  const logout = async () => {
+    await signOut();
+    navigate('/');
+  };
 
   // Hide navigation on auth and app pages
   const hideNavPaths = ['/login', '/register', '/auth', '/app', '/onboarding'];
@@ -118,16 +126,14 @@ export default function PremiumNavigation() {
                 >
                   Dashboard
                 </Link>
-                <button
-                  onClick={async () => {
-                    await logout();
-                    navigate('/');
+                <UserButton 
+                  afterSignOutUrl="/"
+                  appearance={{
+                    elements: {
+                      avatarBox: "w-10 h-10",
+                    },
                   }}
-                  className="px-4 py-2 text-slate-300 hover:text-white text-sm font-light transition-colors min-h-[44px] flex items-center gap-2"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Logout
-                </button>
+                />
               </>
             ) : (
               <>
@@ -195,17 +201,16 @@ export default function PremiumNavigation() {
                   >
                     Dashboard
                   </Link>
-                  <button
-                    onClick={async () => {
-                      await logout();
-                      setMobileMenuOpen(false);
-                      navigate('/');
-                    }}
-                    className="mt-2 px-4 py-3 text-slate-300 hover:text-white hover:bg-white/[0.05] rounded-lg text-sm font-light transition-all min-h-[44px] flex items-center gap-2 w-full"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Logout
-                  </button>
+                  <div className="mt-2 px-4 py-3 flex items-center justify-center">
+                    <UserButton 
+                      afterSignOutUrl="/"
+                      appearance={{
+                        elements: {
+                          avatarBox: "w-10 h-10",
+                        },
+                      }}
+                    />
+                  </div>
                 </>
               ) : (
                 <>

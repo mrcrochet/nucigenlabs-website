@@ -60,3 +60,4 @@ export async function searchLiveEvents(query: string): Promise<LiveSearchResult>
   }
 }
 
+

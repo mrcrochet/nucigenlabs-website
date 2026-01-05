@@ -17,7 +17,6 @@ import Badge from '../components/ui/Badge';
 import Metric from '../components/ui/Metric';
 import SectionHeader from '../components/ui/SectionHeader';
 import { Activity, Globe, Clock, ArrowRight, Building2, MapPin, TrendingUp } from 'lucide-react';
-import PerformanceMetrics from '../components/PerformanceMetrics';
 
 interface EventWithChain {
   id: string;
@@ -116,11 +115,6 @@ function DashboardContent() {
 
         {/* Main Content */}
         <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-12 w-full">
-        {/* Performance Metrics - Optimizations Visible */}
-        <div className="mb-8">
-          <PerformanceMetrics />
-        </div>
-
         {/* Real Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
           <Metric

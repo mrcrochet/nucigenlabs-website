@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { signIn, signInWithOAuth, hasCompletedOnboarding } from '../lib/supabase';
-import { useAuth } from '../hooks/useAuth';
+import { useSignIn, useUser } from '@clerk/clerk-react';
+import { hasCompletedOnboarding } from '../lib/supabase';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import SEO from '../components/SEO';
 
@@ -14,39 +14,64 @@ export default function Login() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
-  const { refreshUser } = useAuth();
+  const { isLoaded, signIn, setActive } = useSignIn();
+  const { user } = useUser();
 
   const from = (location.state as any)?.from?.pathname || '/dashboard';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    
+    if (!isLoaded) {
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await signIn(email, password);
-      await refreshUser();
-      
-      // Check if user has completed onboarding
-      const completed = await hasCompletedOnboarding();
-      
-      if (completed) {
-        navigate(from, { replace: true });
+      const result = await signIn.create({
+        identifier: email,
+        password,
+      });
+
+      if (result.status === 'complete') {
+        await setActive({ session: result.createdSessionId });
+        
+        // Wait a moment for user data to be available
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Check if user has completed onboarding (using Clerk user ID)
+        const completed = await hasCompletedOnboarding(user?.id);
+        
+        if (completed) {
+          navigate(from, { replace: true });
+        } else {
+          navigate('/onboarding', { replace: true });
+        }
       } else {
-        navigate('/onboarding', { replace: true });
+        setError('Sign in incomplete. Please try again.');
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in');
+      setError(err.errors?.[0]?.message || err.message || 'Failed to sign in');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOAuth = async (provider: 'google' | 'linkedin') => {
+  const handleOAuth = async (provider: 'google' | 'oauth_google' | 'oauth_linkedin') => {
+    if (!isLoaded) {
+      return;
+    }
+
     try {
-      await signInWithOAuth(provider);
+      await signIn.authenticateWithRedirect({
+        strategy: provider === 'google' ? 'oauth_google' : provider,
+        redirectUrl: `${window.location.origin}/auth/callback`,
+        redirectUrlComplete: `${window.location.origin}/auth/callback`,
+      });
     } catch (err: any) {
-      setError(err.message || `Failed to sign in with ${provider}`);
+      setError(err.errors?.[0]?.message || err.message || `Failed to sign in with ${provider}`);
     }
   };
 
@@ -95,9 +120,10 @@ export default function Login() {
             {/* Social Login Buttons */}
             <div className="grid grid-cols-2 gap-3 mb-6">
               <button
-                onClick={() => handleOAuth('google')}
+                onClick={() => handleOAuth('oauth_google')}
                 className="flex items-center justify-center p-3 border border-white/20 rounded-lg hover:bg-white/5 transition-colors bg-white/5"
                 type="button"
+                disabled={!isLoaded || loading}
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -107,9 +133,10 @@ export default function Login() {
                 </svg>
               </button>
               <button
-                onClick={() => handleOAuth('linkedin')}
+                onClick={() => handleOAuth('oauth_linkedin')}
                 className="flex items-center justify-center p-3 border border-white/20 rounded-lg hover:bg-white/5 transition-colors bg-white/5"
                 type="button"
+                disabled={!isLoaded || loading}
               >
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#0077B5">
                   <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.065 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>

@@ -868,13 +868,43 @@ export async function updateUserPreferences(preferences: {
 
 /**
  * Check if user has completed onboarding
+ * @param userId - Optional Clerk user ID. If not provided, tries to get from Supabase Auth (legacy)
  */
-export async function hasCompletedOnboarding(): Promise<boolean> {
-  const user = await getCurrentUser();
-  if (!user) return false;
+export async function hasCompletedOnboarding(userId?: string): Promise<boolean> {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return false;
+  }
+
+  let targetUserId: string | null = null;
+
+  if (userId) {
+    // Use provided Clerk user ID
+    targetUserId = userId;
+  } else {
+    // Legacy: Try to get from Supabase Auth (for backward compatibility)
+    const user = await getCurrentUser();
+    if (!user) return false;
+    targetUserId = user.id;
+  }
+
+  if (!targetUserId) {
+    return false;
+  }
+
+  // Get user profile from Supabase using the user ID
+  const { data: profile, error } = await supabase
+    .from('users')
+    .select('company, sector, intended_use')
+    .eq('id', targetUserId)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error checking onboarding status:', error);
+    return false;
+  }
 
   // Check if user has filled required onboarding fields
-  return !!(user.company && user.sector && user.intended_use);
+  return !!(profile?.company && profile?.sector && profile?.intended_use);
 }
 
 // ============================================

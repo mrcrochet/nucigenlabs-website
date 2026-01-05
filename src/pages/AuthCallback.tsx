@@ -1,29 +1,23 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase, hasCompletedOnboarding } from '../lib/supabase';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth, useUser } from '@clerk/clerk-react';
+import { hasCompletedOnboarding } from '../lib/supabase';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
-  const { refreshUser } = useAuth();
+  const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
 
   useEffect(() => {
     const handleAuthCallback = async () => {
-      try {
-        // Get the session from the URL hash
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Error getting session:', error);
-          navigate('/login?error=auth_failed');
-          return;
-        }
+      if (!isLoaded) {
+        return;
+      }
 
-        if (session) {
-          await refreshUser();
-          
-          // Check if user has completed onboarding
-          const completed = await hasCompletedOnboarding();
+      try {
+        if (isSignedIn && user) {
+          // Check if user has completed onboarding (using Clerk user ID)
+          const completed = await hasCompletedOnboarding(user.id);
           
           if (completed) {
             navigate('/app', { replace: true });
@@ -40,7 +34,7 @@ export default function AuthCallback() {
     };
 
     handleAuthCallback();
-  }, [navigate, refreshUser]);
+  }, [navigate, isLoaded, isSignedIn, user]);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-[#0A0A0A]">
