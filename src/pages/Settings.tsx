@@ -13,6 +13,7 @@ import { getUserPreferences, updateUserPreferences } from '../lib/supabase';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import AppSidebar from '../components/AppSidebar';
+import OnboardingBanner from '../components/OnboardingBanner';
 import Card from '../components/ui/Card';
 import SectionHeader from '../components/ui/SectionHeader';
 import MultiSelect from '../components/ui/MultiSelect';
@@ -219,6 +220,7 @@ function SettingsContent() {
 
         {/* Main Content */}
         <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-12 w-full">
+          <OnboardingBanner />
           {/* Success/Error Messages */}
           {success && (
             <Card className="p-4 mb-6 bg-green-500/10 border-green-500/20">

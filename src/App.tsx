@@ -12,6 +12,7 @@ import Breadcrumbs from './components/Breadcrumbs';
 import { prefetchCriticalRoutes } from './utils/prefetch';
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
+import OnboardingGuard from './components/OnboardingGuard';
 import Home from './pages/Home';
 
 // Lazy load routes for better performance
@@ -124,24 +125,26 @@ function App() {
         
         {/* Protected App Routes - PHASE 2D SITEMAP */}
         {/* Level 1 - Application Core */}
-        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path="/app" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} /> {/* Legacy redirect */}
-        <Route path="/intelligence" element={<ProtectedRoute><IntelligenceFeed /></ProtectedRoute>} />
-        <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
-        <Route path="/events/:event_id" element={<ProtectedRoute><EventDetail /></ProtectedRoute>} />
+        {/* Note: OnboardingGuard ensures users complete onboarding before accessing app features */}
+        <Route path="/dashboard" element={<ProtectedRoute><OnboardingGuard><Dashboard /></OnboardingGuard></ProtectedRoute>} />
+        <Route path="/app" element={<ProtectedRoute><OnboardingGuard><Dashboard /></OnboardingGuard></ProtectedRoute>} /> {/* Legacy redirect */}
+        <Route path="/intelligence" element={<ProtectedRoute><OnboardingGuard><IntelligenceFeed /></OnboardingGuard></ProtectedRoute>} />
+        <Route path="/events" element={<ProtectedRoute><OnboardingGuard><Events /></OnboardingGuard></ProtectedRoute>} />
+        <Route path="/events/:event_id" element={<ProtectedRoute><OnboardingGuard><EventDetail /></OnboardingGuard></ProtectedRoute>} />
         
         {/* Level 2 - Modules (Beta / Locked) */}
-        <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
-        <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} />
+        <Route path="/alerts" element={<ProtectedRoute><OnboardingGuard><Alerts /></OnboardingGuard></ProtectedRoute>} />
+        <Route path="/research" element={<ProtectedRoute><OnboardingGuard><Research /></OnboardingGuard></ProtectedRoute>} />
         {/* Recommendations (PHASE 7) */}
-        <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
+        <Route path="/recommendations" element={<ProtectedRoute><OnboardingGuard><Recommendations /></OnboardingGuard></ProtectedRoute>} />
         
         {/* Level 3 - User / System */}
+        {/* Profile and Settings don't require onboarding (user can update profile there) */}
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/settings/alerts" element={<ProtectedRoute><AlertSettings /></ProtectedRoute>} />
         {/* Quality (PHASE 3B) */}
-        <Route path="/quality" element={<ProtectedRoute><QualityDashboard /></ProtectedRoute>} />
+        <Route path="/quality" element={<ProtectedRoute><OnboardingGuard><QualityDashboard /></OnboardingGuard></ProtectedRoute>} />
         
         {/* Onboarding */}
         <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />

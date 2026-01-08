@@ -12,6 +12,7 @@ import { getUserProfile } from '../lib/supabase';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import AppSidebar from '../components/AppSidebar';
+import OnboardingBanner from '../components/OnboardingBanner';
 import Card from '../components/ui/Card';
 import SectionHeader from '../components/ui/SectionHeader';
 
@@ -82,6 +83,7 @@ function ProfileContent() {
 
         {/* Main Content */}
         <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-12 w-full">
+          <OnboardingBanner />
         <Card className="p-8">
           <div className="space-y-6">
             <div>

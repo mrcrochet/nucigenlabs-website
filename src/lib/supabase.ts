@@ -551,7 +551,10 @@ export async function updateUserProfile(updates: Partial<User>, userId?: string)
 
   if (userId) {
     // Convert Clerk user ID to Supabase UUID
-    targetUserId = await getOrCreateSupabaseUserId(userId, updates.email);
+    // IMPORTANT: Ne pas passer updates.email car cela peut causer des conflits
+    // L'email ne devrait jamais changer via updateUserProfile pour les utilisateurs Clerk
+    // On utilise seulement l'ID Clerk pour trouver/créer le mapping
+    targetUserId = await getOrCreateSupabaseUserId(userId);
   } else {
     // Legacy: Try to get from Supabase Auth (for backward compatibility)
     const { data: { user } } = await supabase.auth.getUser();
@@ -567,7 +570,8 @@ export async function updateUserProfile(updates: Partial<User>, userId?: string)
 
   // Separate system role from professional role
   // The 'role' field in updates might be a professional role from onboarding form
-  const { role, ...otherUpdates } = updates;
+  // Exclure email des updates pour éviter les conflits
+  const { role, email, ...otherUpdates } = updates;
   
   // Map role to professional_role if it's not a system role
   const systemRoles = ['user', 'early', 'admin'];
@@ -580,7 +584,8 @@ export async function updateUserProfile(updates: Partial<User>, userId?: string)
     // This is a valid system role, keep it
     cleanUpdates.role = role;
   }
-  // If role is not provided or is undefined, don't update it
+  // Ne jamais mettre à jour l'email via updateUserProfile pour les utilisateurs Clerk
+  // L'email est géré par Clerk et ne devrait pas être modifié dans Supabase
 
   const { data, error } = await supabase
     .from('users')
@@ -982,11 +987,14 @@ export async function hasCompletedOnboarding(userId?: string): Promise<boolean> 
     return false;
   }
 
-  // Get user profile from Supabase using the user ID
+  // Convert Clerk user ID to Supabase UUID
+  const supabaseUserId = await getOrCreateSupabaseUserId(targetUserId);
+
+  // Get user profile from Supabase using the Supabase UUID
   const { data: profile, error } = await supabase
     .from('users')
     .select('company, sector, intended_use')
-    .eq('id', targetUserId)
+    .eq('id', supabaseUserId)
     .maybeSingle();
 
   if (error && error.code !== 'PGRST116') {
@@ -995,7 +1003,35 @@ export async function hasCompletedOnboarding(userId?: string): Promise<boolean> 
   }
 
   // Check if user has filled required onboarding fields
-  return !!(profile?.company && profile?.sector && profile?.intended_use);
+  const hasBasicProfile = !!(profile?.company && profile?.sector && profile?.intended_use);
+  
+  if (!hasBasicProfile) {
+    return false;
+  }
+
+  // Also check if user has preferences (at least sectors or regions)
+  // This ensures the user can benefit from personalized scraping
+  const { data: userPrefs, error: prefsError } = await supabase
+    .from('user_preferences')
+    .select('preferred_sectors, preferred_regions')
+    .eq('user_id', supabaseUserId)
+    .maybeSingle();
+
+  if (prefsError && prefsError.code !== 'PGRST116') {
+    console.error('Error checking user preferences:', prefsError);
+    // If we can't check preferences, still return true if basic profile is complete
+    return hasBasicProfile;
+  }
+
+  // User has completed onboarding if they have:
+  // 1. Basic profile (company, sector, intended_use)
+  // 2. At least some preferences (sectors OR regions)
+  const hasPreferences = !!(
+    (userPrefs?.preferred_sectors && userPrefs.preferred_sectors.length > 0) ||
+    (userPrefs?.preferred_regions && userPrefs.preferred_regions.length > 0)
+  );
+
+  return hasBasicProfile && hasPreferences;
 }
 
 // ============================================

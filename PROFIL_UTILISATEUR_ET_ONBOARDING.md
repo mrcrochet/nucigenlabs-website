@@ -184,3 +184,4 @@ Pour s'assurer qu'un utilisateur peut bénéficier du scraping personnalisé :
 3. **Ajouter des notifications pour encourager l'onboarding**
 4. **Créer un dashboard admin pour voir les utilisateurs sans préférences**
 
+

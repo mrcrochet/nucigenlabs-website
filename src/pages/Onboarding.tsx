@@ -273,7 +273,7 @@ export default function Onboarding() {
                   value={formData.role}
                   onChange={(e) => handleChange('role', e.target.value)}
                   required
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-[#E1463E] focus:border-[#E1463E] outline-none"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-[#E1463E] focus:border-[#E1463E] outline-none [&>option]:bg-[#1a1a1a] [&>option]:text-white"
                 >
                   <option value="">Choose your primary function</option>
                   <option value="analyst">Analyst</option>
@@ -320,7 +320,7 @@ export default function Onboarding() {
                   id="exposure"
                   value={formData.exposure}
                   onChange={(e) => handleChange('exposure', e.target.value)}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-[#E1463E] focus:border-[#E1463E] outline-none"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-[#E1463E] focus:border-[#E1463E] outline-none [&>option]:bg-[#1a1a1a] [&>option]:text-white"
                 >
                   <option value="">Choose if applicable</option>
                   <option value="retail">Retail / Individual</option>
@@ -453,7 +453,7 @@ export default function Onboarding() {
                 <select
                   value={preferences.feed_priority}
                     onChange={(e) => setPreferences((prev: typeof preferences) => ({ ...prev, feed_priority: e.target.value as 'relevance' | 'recency' | 'impact' | 'balanced' }))}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-[#E1463E] focus:border-[#E1463E] outline-none"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:ring-2 focus:ring-[#E1463E] focus:border-[#E1463E] outline-none [&>option]:bg-[#1a1a1a] [&>option]:text-white"
                 >
                   <option value="balanced">Balanced (relevance + recency + impact)</option>
                   <option value="relevance">Relevance (match your interests)</option>
