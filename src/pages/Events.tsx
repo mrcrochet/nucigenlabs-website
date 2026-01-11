@@ -1,18 +1,20 @@
 /**
- * PHASE 2C: Events Page
+ * Events Page
  * 
- * Displays nucigen_events with their causal chains in a clean, analyst-grade interface
+ * UI CONTRACT: Consumes ONLY events (source of truth)
+ * Events are normalized, factual events without interpretation
  */
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { 
   getEventsWithCausalChainsSearch, 
   countSearchResults,
   type EventWithChain,
-  type CausalChain 
 } from '../lib/supabase';
+import { eventWithChainToEvent } from '../lib/adapters/intelligence-adapters';
+import type { Event } from '../types/intelligence';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import AppSidebar from '../components/AppSidebar';
@@ -29,7 +31,8 @@ function EventsContent() {
   // Force user to load by accessing auth state
   const isFullyLoaded = userLoaded && authLoaded;
   const navigate = useNavigate();
-  const [events, setEvents] = useState<EventWithChain[]>([]);
+  const [searchParams] = useSearchParams();
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [totalCount, setTotalCount] = useState(0);
@@ -71,6 +74,10 @@ function EventsContent() {
         throw new Error('User not authenticated');
       }
 
+      // Check if filtering by specific event IDs (from signal click)
+      const eventIdsParam = searchParams.get('event_ids');
+      const eventIds = eventIdsParam ? eventIdsParam.split(',') : undefined;
+
       // Fetch events with search (using debounced query)
       const [eventsData, count] = await Promise.all([
         getEventsWithCausalChainsSearch({
@@ -91,7 +98,15 @@ function EventsContent() {
         }, user.id),
       ]);
       
-      setEvents(eventsData || []);
+      // Convert EventWithChain to Event (UI contract)
+      let normalizedEvents = (eventsData || []).map(eventWithChainToEvent);
+      
+      // Filter by event IDs if provided
+      if (eventIds && eventIds.length > 0) {
+        normalizedEvents = normalizedEvents.filter(e => eventIds.includes(e.id));
+      }
+      
+      setEvents(normalizedEvents);
       setTotalCount(count);
     } catch (err: any) {
       setError(err.message || 'Failed to load events');
@@ -108,12 +123,17 @@ function EventsContent() {
 
   const getTimeHorizonLabel = (horizon: string) => {
     switch (horizon) {
+      case 'immediate':
       case 'hours':
-        return 'Hours';
+        return 'Immediate';
+      case 'short':
       case 'days':
-        return 'Days';
+        return 'Short-term';
+      case 'medium':
       case 'weeks':
-        return 'Weeks';
+        return 'Medium-term';
+      case 'long':
+        return 'Long-term';
       default:
         return horizon;
     }
@@ -121,8 +141,6 @@ function EventsContent() {
 
 
   // Extract unique filter options from all available events (for filter dropdowns)
-  // Note: This is a simplified version. In production, you might want to fetch
-  // distinct values from the database for better performance
   const filterOptions = useMemo(() => {
     const sectors = new Set<string>();
     const regions = new Set<string>();
@@ -130,15 +148,15 @@ function EventsContent() {
     const timeHorizons = new Set<string>();
 
     events.forEach(event => {
-      if (event.sector) sectors.add(event.sector);
+      if (event.sectors && event.sectors.length > 0) {
+        event.sectors.forEach(s => sectors.add(s));
+      }
       if (event.region) regions.add(event.region);
       if (event.event_type) eventTypes.add(event.event_type);
       
-      const chain = event.nucigen_causal_chains?.[0];
-      if (chain) {
-        chain.affected_sectors?.forEach(s => sectors.add(s));
-        chain.affected_regions?.forEach(r => regions.add(r));
-        timeHorizons.add(chain.time_horizon);
+      // Time horizon from event
+      if (event.horizon) {
+        timeHorizons.add(event.horizon);
       }
     });
 
@@ -184,10 +202,8 @@ function EventsContent() {
 
     try {
       // Call backend service to search and create event
-      // Use full URL in development, proxy in production
-      const apiUrl = import.meta.env.DEV 
-        ? 'http://localhost:3001/live-search'
-        : '/api/live-search';
+      // Use Vite proxy in both dev and production
+      const apiUrl = '/api/live-search';
       
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -243,10 +259,21 @@ function EventsContent() {
         throw new Error(result.error || 'No event created');
       }
     } catch (error: any) {
-      const errorMessage = error.message || 'Failed to search live events.';
-      setLiveSearchError(errorMessage.includes('API server') 
-        ? errorMessage 
-        : 'Failed to search live events. Please make sure the API server is running.');
+      // Detect network errors (server not running)
+      const isNetworkError = 
+        error.message?.includes('Failed to fetch') ||
+        error.message?.includes('NetworkError') ||
+        error.message?.includes('Network request failed') ||
+        error.name === 'TypeError' ||
+        error.code === 'ECONNREFUSED';
+      
+      let errorMessage = error.message || 'Failed to search live events.';
+      
+      if (isNetworkError || errorMessage.includes('API server') || errorMessage.includes('Empty response')) {
+        errorMessage = 'Failed to search live events. Please make sure the API server is running. Start it with: npm run api:server';
+      }
+      
+      setLiveSearchError(errorMessage);
     } finally {
       setIsSearchingLive(false);
     }
@@ -369,8 +396,13 @@ function EventsContent() {
               </button>
             </div>
             {liveSearchError && (
-              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
-                {liveSearchError}
+              <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <p className="text-red-400 text-sm font-light mb-2">{liveSearchError}</p>
+                {liveSearchError.includes('API server is running') && (
+                  <p className="text-red-300/70 text-xs font-light">
+                    The API server should run on port 3001. Check the terminal for errors.
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -530,17 +562,8 @@ function EventsContent() {
           <>
             <div className="space-y-8">
               {paginatedEvents.map((event) => {
-              // Get first causal chain (should always exist due to filter)
-              const chain = event.nucigen_causal_chains && 
-                           Array.isArray(event.nucigen_causal_chains) && 
-                           event.nucigen_causal_chains.length > 0
-                           ? event.nucigen_causal_chains[0]
-                           : null;
-
-              // Skip if no chain (shouldn't happen, but safety check)
-              if (!chain) {
-                return null;
-              }
+              // Get causal chain from extended Event properties
+              const chain = (event as any).causal_chain;
 
               return (
                 <Card
@@ -554,15 +577,15 @@ function EventsContent() {
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
                         <h2 className="text-2xl font-light text-white mb-3 leading-snug">
-                          {event.summary}
+                          {event.headline}
                         </h2>
                         <div className="flex flex-wrap items-center gap-3 mb-4">
-                          {event.sector && (
-                            <Badge variant="sector">
+                          {event.sectors && event.sectors.length > 0 && event.sectors.map((sector, idx) => (
+                            <Badge key={idx} variant="sector">
                               <Building2 className="w-3 h-3 mr-1.5" />
-                              {event.sector}
+                              {sector}
                             </Badge>
-                          )}
+                          ))}
                           {event.region && (
                             <Badge variant="region">
                               <MapPin className="w-3 h-3 mr-1.5" />
@@ -580,14 +603,14 @@ function EventsContent() {
                     </div>
                     <MetaRow
                       items={[
-                        ...(event.confidence !== null ? [{
+                        ...(event.confidence !== null && event.confidence !== undefined ? [{
                           label: 'Confidence',
-                          value: event.confidence,
+                          value: typeof event.confidence === 'number' ? event.confidence : (event.confidence * 100),
                           variant: 'confidence' as const,
                         }] : []),
-                        ...(event.impact_score !== null ? [{
+                        ...(event.impact_score !== null && event.impact_score !== undefined ? [{
                           label: 'Impact',
-                          value: event.impact_score,
+                          value: typeof event.impact_score === 'number' ? event.impact_score : (event.impact_score * 100),
                           variant: 'impact' as const,
                         }] : []),
                       ]}

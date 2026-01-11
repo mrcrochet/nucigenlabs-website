@@ -554,7 +554,9 @@ export async function updateUserProfile(updates: Partial<User>, userId?: string)
     // IMPORTANT: Ne pas passer updates.email car cela peut causer des conflits
     // L'email ne devrait jamais changer via updateUserProfile pour les utilisateurs Clerk
     // On utilise seulement l'ID Clerk pour trouver/créer le mapping
-    targetUserId = await getOrCreateSupabaseUserId(userId);
+    // Try to get email from updates if available (for initial user creation)
+    const userEmail = (updates as any).email || null;
+    targetUserId = await getOrCreateSupabaseUserId(userId, userEmail);
   } else {
     // Legacy: Try to get from Supabase Auth (for backward compatibility)
     const { data: { user } } = await supabase.auth.getUser();
@@ -567,6 +569,25 @@ export async function updateUserProfile(updates: Partial<User>, userId?: string)
   if (!targetUserId) {
     throw new Error('User not authenticated');
   }
+
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'Before upsert - checking if user exists',data:{targetUserId:targetUserId?.substring(0,10)+'...',hasUserId:!!userId,updatesKeys:Object.keys(updates)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'USER_EXISTS_CHECK'})}).catch(()=>{});
+  // #endregion
+
+  // Check if user exists in users table before upsert
+  const { data: existingUser, error: checkError } = await supabase
+    .from('users')
+    .select('id')
+    .eq('id', targetUserId)
+    .maybeSingle();
+
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'User existence check result',data:{userExists:!!existingUser,checkError:checkError?.message,checkErrorCode:checkError?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'USER_EXISTS_CHECK'})}).catch(()=>{});
+  // #endregion
+
+  // If user doesn't exist, the upsert will try to INSERT
+  // The RLS policy should allow this if the user exists in clerk_user_mapping
+  // If it still fails, we'll catch the error and provide a helpful message
 
   // Separate system role from professional role
   // The 'role' field in updates might be a professional role from onboarding form
@@ -587,18 +608,84 @@ export async function updateUserProfile(updates: Partial<User>, userId?: string)
   // Ne jamais mettre à jour l'email via updateUserProfile pour les utilisateurs Clerk
   // L'email est géré par Clerk et ne devrait pas être modifié dans Supabase
 
-  const { data, error } = await supabase
-    .from('users')
-    .update(cleanUpdates)
-    .eq('id', targetUserId)
-    .select()
-    .maybeSingle();
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'Before upsert - prepared data',data:{targetUserId:targetUserId?.substring(0,10)+'...',cleanUpdatesKeys:Object.keys(cleanUpdates),userExists:!!existingUser,willInsert:!existingUser},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'UPSERT_ATTEMPT'})}).catch(()=>{});
+  // #endregion
 
-  if (error) {
-    throw new Error(error.message || 'Failed to update profile');
+  // Try using RPC function first (bypasses RLS with SECURITY DEFINER)
+  // If RPC function doesn't exist, fall back to direct upsert
+  let data: any = null;
+  let error: any = null;
+
+  try {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'Attempting RPC upsert_user_profile',data:{targetUserId:targetUserId?.substring(0,10)+'...',hasEmail:!!email,hasCompany:!!cleanUpdates.company},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'RPC_UPSERT'})}).catch(()=>{});
+    // #endregion
+
+    const { data: rpcData, error: rpcError } = await supabase.rpc('upsert_user_profile', {
+      p_user_id: targetUserId,
+      p_email: email || null,
+      p_company: cleanUpdates.company || null,
+      p_professional_role: cleanUpdates.professional_role || null,
+      p_intended_use: cleanUpdates.intended_use || null,
+      p_exposure: cleanUpdates.exposure || null,
+      p_sector: cleanUpdates.sector || null,
+      p_name: cleanUpdates.name || null,
+      p_role: cleanUpdates.role || 'user',
+    });
+
+    if (!rpcError && rpcData) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'RPC upsert successful',data:{hasData:!!rpcData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'RPC_UPSERT'})}).catch(()=>{});
+      // #endregion
+      return rpcData;
+    } else if (rpcError && rpcError.message?.includes('function') && rpcError.message?.includes('does not exist')) {
+      // RPC function doesn't exist, fall back to direct upsert
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'RPC function not found, falling back to direct upsert',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'RPC_UPSERT'})}).catch(()=>{});
+      // #endregion
+    } else {
+      // RPC error, throw it
+      throw rpcError;
+    }
+  } catch (rpcErr: any) {
+    // If RPC fails for other reasons, fall back to direct upsert
+    if (!rpcErr?.message?.includes('does not exist')) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'RPC error, falling back to direct upsert',data:{error:rpcErr?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'RPC_UPSERT'})}).catch(()=>{});
+      // #endregion
+    }
   }
 
-  return data;
+  // Fallback: Use direct upsert (may fail due to RLS)
+  const upsertData = {
+    id: targetUserId,
+    ...cleanUpdates,
+    updated_at: new Date().toISOString(),
+  };
+
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'Direct upsert attempt',data:{id:targetUserId?.substring(0,10)+'...',hasCompany:!!upsertData.company,hasProfessionalRole:!!upsertData.professional_role,hasIntendedUse:!!upsertData.intended_use,hasSector:!!upsertData.sector},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'DIRECT_UPSERT'})}).catch(()=>{});
+  // #endregion
+
+  const { data: upsertResult, error: upsertError } = await supabase
+    .from('users')
+    .upsert(upsertData, {
+      onConflict: 'id',
+    })
+    .select()
+    .single();
+
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'Direct upsert result',data:{hasData:!!upsertResult,hasError:!!upsertError,errorMessage:upsertError?.message,errorCode:upsertError?.code,errorDetails:upsertError?.details,errorHint:upsertError?.hint},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'RLS_POLICY_VIOLATION'})}).catch(()=>{});
+  // #endregion
+
+  if (upsertError) {
+    console.error('Error updating user profile:', upsertError);
+    throw new Error(upsertError.message || 'Failed to update profile');
+  }
+
+  return upsertResult;
 }
 
 /**
@@ -747,17 +834,11 @@ export async function getEventById(eventId: string) {
     );
   }
 
-  // Check if user is authenticated
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) {
-    console.error('Session error:', sessionError);
-    throw new Error('Failed to verify authentication');
-  }
-  if (!session) {
-    throw new Error('User not authenticated. Please log in to view events.');
-  }
+  // Note: Events are public, no authentication required
+  // RLS policies control access if needed
 
-  const { data, error } = await supabase
+  // First, try to find in nucigen_events by ID
+  let { data, error } = await supabase
     .from('nucigen_events')
     .select(`
       *,
@@ -773,20 +854,53 @@ export async function getEventById(eventId: string) {
       )
     `)
     .eq('id', eventId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Supabase error:', error);
     throw new Error(error.message || 'Failed to fetch event');
   }
 
+  // If not found by ID, try to find by source_event_id (in case the provided ID is from events table)
+  if (!data) {
+    const { data: dataBySourceId, error: errorBySourceId } = await supabase
+      .from('nucigen_events')
+      .select(`
+        *,
+        nucigen_causal_chains (
+          id,
+          cause,
+          first_order_effect,
+          second_order_effect,
+          affected_sectors,
+          affected_regions,
+          time_horizon,
+          confidence
+        )
+      `)
+      .eq('source_event_id', eventId)
+      .maybeSingle();
+
+    if (errorBySourceId) {
+      console.error('Supabase error (by source_event_id):', errorBySourceId);
+      throw new Error(errorBySourceId.message || 'Failed to fetch event');
+    }
+
+    if (dataBySourceId) {
+      data = dataBySourceId;
+    }
+  }
+
   if (!data) {
     throw new Error('Event not found');
   }
 
-  // Ensure event has at least one causal chain
+  // Ensure event has at least one causal chain (but don't throw, handle gracefully)
+  // Make causal chains optional for display
   if (!data.nucigen_causal_chains || data.nucigen_causal_chains.length === 0) {
-    throw new Error('Event has no causal chain');
+    console.warn(`Event ${eventId} has no causal chain yet`);
+    // Return event with empty causal chains array instead of throwing
+    data.nucigen_causal_chains = [];
   }
 
   return data;
@@ -804,15 +918,8 @@ export async function getEventContext(nucigenEventId: string) {
     );
   }
 
-  // Check if user is authenticated
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) {
-    console.error('Session error:', sessionError);
-    throw new Error('Failed to verify authentication');
-  }
-  if (!session) {
-    throw new Error('User not authenticated. Please log in to view context.');
-  }
+  // Note: Event context is public, no authentication required
+  // RLS policies control access if needed
 
   const { data, error } = await supabase
     .from('event_context')
@@ -840,15 +947,8 @@ export async function getOfficialDocuments(nucigenEventId: string) {
     );
   }
 
-  // Check if user is authenticated
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) {
-    console.error('Session error:', sessionError);
-    throw new Error('Failed to verify authentication');
-  }
-  if (!session) {
-    throw new Error('User not authenticated. Please log in to view documents.');
-  }
+  // Note: Official documents are public, no authentication required
+  // RLS policies control access if needed
 
   const { data, error } = await supabase
     .from('official_documents')
@@ -1002,13 +1102,6 @@ export async function hasCompletedOnboarding(userId?: string): Promise<boolean> 
     return false;
   }
 
-  // Check if user has filled required onboarding fields
-  const hasBasicProfile = !!(profile?.company && profile?.sector && profile?.intended_use);
-  
-  if (!hasBasicProfile) {
-    return false;
-  }
-
   // Also check if user has preferences (at least sectors or regions)
   // This ensures the user can benefit from personalized scraping
   const { data: userPrefs, error: prefsError } = await supabase
@@ -1019,12 +1112,20 @@ export async function hasCompletedOnboarding(userId?: string): Promise<boolean> 
 
   if (prefsError && prefsError.code !== 'PGRST116') {
     console.error('Error checking user preferences:', prefsError);
-    // If we can't check preferences, still return true if basic profile is complete
-    return hasBasicProfile;
+    // Continue with check even if preferences query fails
+  }
+
+  // Check if user has filled required onboarding fields
+  // Accept either sector from profile OR preferred_sectors[0] from preferences
+  const effectiveSector = profile?.sector || userPrefs?.preferred_sectors?.[0];
+  const hasBasicProfile = !!(profile?.company && effectiveSector && profile?.intended_use);
+  
+  if (!hasBasicProfile) {
+    return false;
   }
 
   // User has completed onboarding if they have:
-  // 1. Basic profile (company, sector, intended_use)
+  // 1. Basic profile (company, sector OR preferred_sectors[0], intended_use)
   // 2. At least some preferences (sectors OR regions)
   const hasPreferences = !!(
     (userPrefs?.preferred_sectors && userPrefs.preferred_sectors.length > 0) ||
@@ -1102,14 +1203,29 @@ export interface SearchOptions {
 
 /**
  * Search nucigen_events using full-text search
+ * @param options - Search options
+ * @param userId - Optional Clerk user ID. If not provided, tries to get from Supabase Auth (legacy)
  */
-export async function searchEvents(options: SearchOptions = {}): Promise<SearchEventResult[]> {
+export async function searchEvents(options: SearchOptions = {}, userId?: string): Promise<SearchEventResult[]> {
   if (!isConfigured) {
     throw new Error('Supabase is not configured');
   }
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  let targetUserId: string | null = null;
+
+  if (userId) {
+    // Convert Clerk user ID to Supabase UUID
+    targetUserId = await getOrCreateSupabaseUserId(userId);
+  } else {
+    // Fallback for legacy Supabase Auth users (should not happen with Clerk)
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+      throw new Error('User not authenticated');
+    }
+    targetUserId = session.user.id;
+  }
+
+  if (!targetUserId) {
     throw new Error('User not authenticated');
   }
 
@@ -1233,8 +1349,8 @@ export async function getEventsWithCausalChainsSearch(
   let targetUserId: string | null = null;
 
   if (userId) {
-    // Use provided Clerk user ID
-    targetUserId = userId;
+    // Convert Clerk user ID to Supabase UUID
+    targetUserId = await getOrCreateSupabaseUserId(userId);
     // #region agent log
     fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1118',message:'Using provided userId',data:{userId:userId?.substring(0,10)+'...'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
@@ -1269,8 +1385,8 @@ export async function getEventsWithCausalChainsSearch(
     throw new Error('User not authenticated');
   }
 
-  // Get search results
-  const searchResults = await searchEvents(options);
+  // Get search results - pass userId to avoid Supabase Auth check
+  const searchResults = await searchEvents(options, userId);
 
   if (searchResults.length === 0) {
     return [];
@@ -1403,10 +1519,8 @@ export async function getEventRelationships(eventId: string): Promise<EventRelat
     throw new Error('Supabase is not configured');
   }
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    throw new Error('User not authenticated');
-  }
+  // Note: Event relationships are public, no authentication required
+  // RLS policies control access if needed
 
   const { data, error } = await supabase.rpc('get_event_relationships', {
     event_id: eventId,
@@ -1442,10 +1556,8 @@ export async function getHistoricalComparisons(eventId: string, minSimilarity: n
     throw new Error('Supabase is not configured');
   }
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    throw new Error('User not authenticated');
-  }
+  // Note: Historical comparisons are public, no authentication required
+  // RLS policies control access if needed
 
   const { data, error } = await supabase.rpc('get_historical_comparisons', {
     event_id: eventId,
@@ -1481,10 +1593,8 @@ export async function getScenarioPredictions(eventId: string, horizonFilter?: st
     throw new Error('Supabase is not configured');
   }
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    throw new Error('User not authenticated');
-  }
+  // Note: Scenario predictions are public, no authentication required
+  // RLS policies control access if needed
 
   const { data, error } = await supabase.rpc('get_scenario_predictions', {
     event_id: eventId,
@@ -1867,4 +1977,103 @@ export async function resetUserBlockPreferences(
   if (error) {
     throw new Error(error.message || 'Failed to reset block preferences');
   }
+}
+
+/**
+ * Get audit trail for a specific user (using Clerk user ID)
+ * Uses the RPC function get_user_audit_trail which handles the Clerk→Supabase UUID mapping
+ * 
+ * @param clerkUserId - Clerk user ID (e.g., "user_xxx")
+ * @param limit - Maximum number of records to return (default: 100)
+ * @param offset - Number of records to skip (default: 0)
+ * @returns Array of audit trail records
+ */
+export async function getUserAuditTrail(
+  clerkUserId: string,
+  limit: number = 100,
+  offset: number = 0
+): Promise<any[]> {
+  if (!isConfigured) {
+    throw new Error('Supabase is not configured');
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('get_user_audit_trail', {
+      clerk_user_id_param: clerkUserId,
+      limit_param: limit,
+      offset_param: offset,
+    });
+
+    if (error) {
+      throw new Error(error.message || 'Failed to get user audit trail');
+    }
+
+    return data || [];
+  } catch (error: any) {
+    console.error('[Supabase] Error getting user audit trail:', error);
+    throw error;
+  }
+}
+
+// ============================================
+// UI CONTRACT HELPERS
+// Functions that return UI contract-compliant types
+// ============================================
+
+/**
+ * Get normalized Events (UI contract: Event type)
+ * This is the source of truth format
+ */
+export async function getNormalizedEvents(
+  options: SearchOptions = {},
+  userId?: string
+): Promise<import('../types/intelligence').Event[]> {
+  const events = await getEventsWithCausalChainsSearch(options, userId);
+  
+  // Import adapter dynamically to avoid circular dependencies
+  const { eventWithChainToEvent } = await import('./adapters/intelligence-adapters');
+  
+  return events.map(eventWithChainToEvent);
+}
+
+/**
+ * Get Signals (UI contract: Signal type)
+ * Signals are synthesized from multiple events
+ */
+export async function getSignalsFromEvents(
+  options: SearchOptions = {},
+  userId?: string
+): Promise<import('../types/intelligence').Signal[]> {
+  const events = await getEventsWithCausalChainsSearch(options, userId);
+  
+  // Import adapter dynamically to avoid circular dependencies
+  const { eventsToSignals, filterSignalsByPreferences } = await import('./adapters/intelligence-adapters');
+  
+  const allSignals = eventsToSignals(events);
+  
+  // Get user preferences for filtering
+  let preferences = null;
+  if (userId) {
+    try {
+      preferences = await getUserPreferences(userId);
+    } catch (err) {
+      // Ignore errors, use all signals
+    }
+  }
+  
+  return filterSignalsByPreferences(allSignals, preferences);
+}
+
+/**
+ * Get normalized Event by ID (UI contract: Event type)
+ */
+export async function getNormalizedEventById(
+  eventId: string
+): Promise<import('../types/intelligence').Event> {
+  const event = await getEventById(eventId);
+  
+  // Import adapter dynamically to avoid circular dependencies
+  const { eventWithChainToEvent } = await import('./adapters/intelligence-adapters');
+  
+  return eventWithChainToEvent(event);
 }

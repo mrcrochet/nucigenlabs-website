@@ -6,7 +6,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { tavily } from '@tavily/core';
+import { apiGateway } from '../services/api-gateway';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -18,18 +18,12 @@ dotenv.config({ path: join(__dirname, '../../../.env') });
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const tavilyApiKey = process.env.TAVILY_API_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   throw new Error('Missing required environment variables: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY');
 }
 
-if (!tavilyApiKey) {
-  throw new Error('Missing TAVILY_API_KEY. Tavily is required for quality news collection.');
-}
-
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
-const tavilyClient = tavily({ apiKey: tavilyApiKey });
 
 /**
  * Tavily Search Queries
@@ -113,62 +107,35 @@ export async function collectTavilyEvents(): Promise<{ inserted: number; skipped
     
     let allArticles: TavilyArticle[] = [];
     
-    // Search all queries in parallel
-    const searchPromises = TAVILY_QUERIES.map(async (queryConfig) => {
-      try {
-        console.log(`[Tavily Collector] Searching: "${queryConfig.query}"`);
-        
-        const response = await tavilyClient.search(queryConfig.query, {
-          searchDepth: 'advanced',
-          maxResults: 50, // Optimized: 50 results (was 10) - maximize API usage
-          includeAnswer: false, // We only need articles, not AI answers
-          includeRawContent: true, // Get full article content
-          includeImages: false,
-        });
-        
-        const articles: TavilyArticle[] = (response.results || [])
-          .filter((result: any) => {
-            // Filter by relevance score (if available)
-            const score = result.score || 0;
-            return score >= 0.5; // Only highly relevant articles
-          })
-          .filter((result: any) => {
-            // Filter by date (only recent articles, last 7 days)
-            if (result.publishedDate) {
-              const publishedDate = new Date(result.publishedDate);
-              const daysAgo = (Date.now() - publishedDate.getTime()) / (1000 * 60 * 60 * 24);
-              return daysAgo <= 7; // Only articles from last 7 days
-            }
-            return true; // If no date, include it (but prefer dated articles)
-          })
-          .map((result: any) => ({
-            title: result.title || '',
-            url: result.url || '',
-            content: result.content || result.rawContent || '',
-            publishedDate: result.publishedDate || new Date().toISOString(),
-            score: result.score || 0.5,
-            author: result.author || null,
-          }))
-          .filter((article: TavilyArticle) => article.title && article.url);
-        
-        console.log(`[Tavily Collector] Found ${articles.length} relevant articles for "${queryConfig.query}"`);
-        
-        return articles.map(article => ({
+    // Search all queries using unified Tavily service (with deduplication and caching)
+    const queries = TAVILY_QUERIES.map(q => ({
+      query: q.query,
+      type: 'news' as const,
+      options: {
+        maxResults: 50,
+        days: 7,
+        minScore: 0.5,
+      },
+    }));
+
+    // Create a map to match results back to query configs
+    const queryConfigMap = new Map(TAVILY_QUERIES.map((q, idx) => [q.query, { ...q, index: idx }]));
+
+    const searchResults = await apiGateway.tavily.batchSearch(queries);
+    
+    // Process results and add category/tags
+    for (const result of searchResults) {
+      const queryConfig = queryConfigMap.get(result.query);
+      if (queryConfig) {
+        const articlesWithMeta = result.articles.map(article => ({
           ...article,
           category: queryConfig.category,
           tags: queryConfig.tags,
         }));
-      } catch (error: any) {
-        console.error(`[Tavily Collector] Error searching "${queryConfig.query}":`, error.message);
-        return [];
+        
+        allArticles.push(...articlesWithMeta);
       }
-    });
-    
-    const searchResults = await Promise.allSettled(searchPromises);
-    allArticles = searchResults
-      .filter(result => result.status === 'fulfilled')
-      .map(result => (result as PromiseFulfilledResult<Array<TavilyArticle & { category: string; tags: string[] }>>).value)
-      .flat();
+    }
     
     // Remove duplicates by URL
     const uniqueArticles = new Map<string, TavilyArticle & { category: string; tags: string[] }>();

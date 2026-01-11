@@ -9,15 +9,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser, useAuth } from '@clerk/clerk-react';
-import { getEventsWithCausalChains } from '../lib/supabase';
+import { getEventsWithCausalChainsSearch, getUserPreferences } from '../lib/supabase';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import AppSidebar from '../components/AppSidebar';
+import OnboardingBanner from '../components/OnboardingBanner';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Metric from '../components/ui/Metric';
 import SectionHeader from '../components/ui/SectionHeader';
-import { Activity, Globe, Clock, ArrowRight, Building2, MapPin, TrendingUp } from 'lucide-react';
+import { Activity, Globe, Clock, ArrowRight, Building2, MapPin, TrendingUp, Sparkles } from 'lucide-react';
 
 interface EventWithChain {
   id: string;
@@ -29,6 +30,7 @@ interface EventWithChain {
   confidence: number | null;
   created_at: string;
   nucigen_causal_chains: any[];
+  isPersonalized?: boolean;
 }
 
 function DashboardContent() {
@@ -40,8 +42,23 @@ function DashboardContent() {
   const isFullyLoaded = userLoaded && authLoaded;
   
   const [events, setEvents] = useState<EventWithChain[]>([]);
+  const [preferences, setPreferences] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Load preferences
+  useEffect(() => {
+    async function fetchPreferences() {
+      if (!user?.id) return;
+      try {
+        const preferencesData = await getUserPreferences(user.id).catch(() => null);
+        setPreferences(preferencesData);
+      } catch (err) {
+        console.error('Error loading preferences:', err);
+      }
+    }
+    fetchPreferences();
+  }, [user?.id]);
 
   useEffect(() => {
     async function fetchEvents() {
@@ -59,7 +76,29 @@ function DashboardContent() {
 
       try {
         setLoading(true);
-        const data = await getEventsWithCausalChains(user.id);
+        
+        // Use getEventsWithCausalChainsSearch to benefit from preference-based filtering
+        const searchOptions: any = {
+          limit: 20, // Get more events for better selection
+        };
+
+        // Apply preference-based filters if available
+        if (preferences) {
+          if (preferences.preferred_sectors && preferences.preferred_sectors.length > 0) {
+            searchOptions.sectorFilter = preferences.preferred_sectors;
+          }
+          if (preferences.preferred_regions && preferences.preferred_regions.length > 0) {
+            searchOptions.regionFilter = preferences.preferred_regions;
+          }
+          if (preferences.preferred_event_types && preferences.preferred_event_types.length > 0) {
+            searchOptions.eventTypeFilter = preferences.preferred_event_types;
+          }
+          if (preferences.min_impact_score !== null && preferences.min_impact_score !== undefined) {
+            searchOptions.minImpactScore = preferences.min_impact_score;
+          }
+        }
+
+        const data = await getEventsWithCausalChainsSearch(searchOptions, user.id);
         setEvents(data || []);
       } catch (err: any) {
         console.error('Error loading events:', err);
@@ -70,16 +109,26 @@ function DashboardContent() {
     }
 
     fetchEvents();
-  }, [user?.id, isFullyLoaded]);
+  }, [user?.id, isFullyLoaded, preferences]);
 
-  // Get top 3-5 events (prioritized by impact * confidence)
+  // Get top 3-5 events (prioritize personalized events, then by impact * confidence)
   const topEvents = events
     .map(event => ({
       ...event,
       priority: (event.impact_score || 0) * (event.confidence || 0),
+      isPersonalized: (event as any).isPersonalized || false,
     }))
-    .sort((a, b) => b.priority - a.priority)
+    .sort((a, b) => {
+      // Prioritize personalized events
+      if (a.isPersonalized && !b.isPersonalized) return -1;
+      if (!a.isPersonalized && b.isPersonalized) return 1;
+      // Then by priority score
+      return b.priority - a.priority;
+    })
     .slice(0, 5);
+
+  // Count personalized events
+  const personalizedCount = events.filter(e => (e as any).isPersonalized).length;
 
   // Calculate real stats
   const totalEvents = events.length;
@@ -134,8 +183,11 @@ function DashboardContent() {
 
         {/* Main Content */}
         <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-12 w-full">
-        {/* Real Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-12">
+          {/* Onboarding Banner - Encourage users to complete profile */}
+          <OnboardingBanner />
+          
+          {/* Real Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-12">
           <Metric
             label="Events Ingested"
             value={totalEvents}
@@ -151,6 +203,13 @@ function DashboardContent() {
             value={formatTimeAgo(lastUpdate)}
             icon={Clock}
           />
+          {personalizedCount > 0 && (
+            <Metric
+              label="Personalized Events"
+              value={personalizedCount}
+              icon={Sparkles}
+            />
+          )}
         </div>
 
         {/* What Matters Now */}
@@ -194,6 +253,12 @@ function DashboardContent() {
                       {event.summary}
                     </h3>
                     <div className="flex flex-wrap items-center gap-3">
+                      {(event as any).isPersonalized && (
+                        <Badge variant="critical">
+                          <Sparkles className="w-3 h-3 mr-1.5" />
+                          For you
+                        </Badge>
+                      )}
                       {event.sector && (
                         <Badge variant="sector">
                           <Building2 className="w-3 h-3 mr-1.5" />

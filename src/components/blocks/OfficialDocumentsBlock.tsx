@@ -7,7 +7,7 @@
 import { OfficialDocumentsBlock as OfficialDocumentsBlockType } from '../../types/blocks';
 import SectionHeader from '../ui/SectionHeader';
 import Card from '../ui/Card';
-import { FileText, ExternalLink, Building2, Scale, Globe, Bank, Users } from 'lucide-react';
+import { FileText, ExternalLink, Building2, Scale, Globe, Landmark, Users } from 'lucide-react';
 
 interface OfficialDocumentsBlockProps {
   block: OfficialDocumentsBlockType;
@@ -40,7 +40,7 @@ export default function OfficialDocumentsBlock({ block, documents }: OfficialDoc
       case 'institution':
         return Building2;
       case 'central_bank':
-        return Bank;
+        return Landmark;
       case 'international_org':
         return Globe;
       default:

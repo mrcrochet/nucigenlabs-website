@@ -40,7 +40,7 @@ function ProfileContent() {
         const data = await getUserProfile(user.id);
         setProfile(data);
       } catch (err) {
-        console.error('Error loading profile:', err);
+        console.error('Error loading profile :', err);
       } finally {
         setLoading(false);
       }

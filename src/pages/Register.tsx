@@ -57,8 +57,9 @@ export default function Register() {
 
       if (result.status === 'complete') {
         await setActive({ session: result.createdSessionId });
-        // Redirect to onboarding
-        navigate('/onboarding', { replace: true });
+        // Redirect to dashboard - onboarding is now optional
+        // Users can complete it later via the banner
+        navigate('/dashboard', { replace: true });
       } else {
         setError('Sign up incomplete. Please try again.');
       }

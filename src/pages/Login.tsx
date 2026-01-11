@@ -53,15 +53,9 @@ export default function Login() {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
         
-        // Check if user has completed onboarding (using Clerk user ID)
-        const finalUserId = userId || user?.id;
-        const completed = finalUserId ? await hasCompletedOnboarding(finalUserId) : false;
-        
-        if (completed) {
-          navigate(from, { replace: true });
-        } else {
-          navigate('/onboarding', { replace: true });
-        }
+        // Always redirect to dashboard - onboarding is now optional
+        // Users can complete it later via the banner
+        navigate(from || '/dashboard', { replace: true });
       } else {
         setError('Sign in incomplete. Please try again.');
       }

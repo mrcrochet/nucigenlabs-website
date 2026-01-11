@@ -18,14 +18,19 @@ export default function Toast({ message, type, onClose, duration = 5000 }: Toast
   }, [onClose, duration]);
 
   return (
-    <div className="fixed top-24 right-6 z-[100] animate-in slide-in-from-top-5 fade-in duration-300">
-      <div className={`backdrop-blur-xl border rounded-xl px-6 py-4 shadow-2xl min-w-[320px] max-w-md ${
+    <div 
+      className="fixed top-24 right-6 z-[100] animate-in slide-in-from-top-5 fade-in duration-300"
+      role="alert"
+      aria-live={type === 'error' ? 'assertive' : 'polite'}
+      aria-atomic="true"
+    >
+      <div className={`backdrop-blur-xl border rounded-xl px-6 py-4 shadow-2xl min-w-[320px] max-w-md transition-all duration-300 ${
         type === 'success'
           ? 'bg-green-950/40 border-green-500/30'
           : 'bg-red-950/40 border-red-500/30'
       }`}>
         <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 mt-0.5">
+          <div className="flex-shrink-0 mt-0.5" aria-hidden="true">
             {type === 'success' ? (
               <CheckCircle size={20} className="text-green-400" />
             ) : (
@@ -39,10 +44,10 @@ export default function Toast({ message, type, onClose, duration = 5000 }: Toast
           </p>
           <button
             onClick={onClose}
-            className="flex-shrink-0 text-slate-400 hover:text-white transition-colors"
+            className="flex-shrink-0 text-slate-400 hover:text-white transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent rounded"
             aria-label="Close notification"
           >
-            <X size={18} />
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
       </div>

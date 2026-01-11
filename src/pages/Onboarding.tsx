@@ -66,6 +66,28 @@ export default function Onboarding() {
   
   const authLoading = !userLoaded || !authLoaded;
 
+  // Debug logging
+  useEffect(() => {
+    console.log('[Onboarding] Component mounted/updated', {
+      userLoaded,
+      authLoaded,
+      isSignedIn,
+      userId: user?.id,
+      authLoading,
+    });
+  }, [userLoaded, authLoaded, isSignedIn, user?.id, authLoading]);
+
+  // Catch and log any errors during render
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      console.error('[Onboarding] Global error caught:', event.error);
+      setError(event.error?.message || 'An unexpected error occurred');
+    };
+
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, []);
+
   // Basic profile data
   const [formData, setFormData] = useState({
     company: '',
@@ -89,15 +111,16 @@ export default function Onboarding() {
 
   const [focusAreaInput, setFocusAreaInput] = useState('');
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated (but don't redirect during form submission)
   useEffect(() => {
-    if (authLoaded && !isSignedIn) {
+    if (authLoaded && !isSignedIn && !loading) {
       navigate('/login', { 
         replace: true,
         state: { from: { pathname: '/onboarding' } }
       });
     }
-  }, [authLoaded, isSignedIn, navigate]);
+  }, [authLoaded, isSignedIn, navigate, loading]);
+
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -131,33 +154,85 @@ export default function Onboarding() {
       return;
     }
 
+    // Validation: at least one sector must be selected
+    if (preferences.preferred_sectors.length === 0) {
+      setError('Please select at least one sector');
+      setLoading(false);
+      return;
+    }
+
     try {
       // Step 1: Update basic profile (backward compatibility)
       // Map role to professional_role (not system role)
-      const { role, ...otherFormData } = formData;
-      await updateUserProfile({
-        ...otherFormData,
-        professional_role: role, // Map to professional_role
-        // Use first selected sector for backward compatibility
-        sector: preferences.preferred_sectors[0] || formData.sector,
-      }, user.id); // Pass Clerk user ID
+      const { role, sector: _sector, ...otherFormData } = formData;
+      
+      try {
+        // Get user email from Clerk for initial user creation
+        const userEmail = user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || null;
+        
+        const profileResult = await updateUserProfile({
+          company: formData.company,
+          professional_role: role, // Map to professional_role
+          intended_use: formData.intended_use,
+          exposure: formData.exposure || null,
+          // Always use first selected sector for backward compatibility
+          sector: preferences.preferred_sectors[0],
+          // Include email for initial user creation (will be ignored if user exists)
+          email: userEmail,
+        }, user.id); // Pass Clerk user ID
+
+        if (!profileResult) {
+          throw new Error('Profile update returned no data');
+        }
+      } catch (profileError: any) {
+        console.error('Error updating profile:', profileError);
+        throw new Error(`Failed to save profile: ${profileError.message || 'Unknown error'}`);
+      }
 
       // Step 2: Save preferences (Phase 5)
-      await updateUserPreferences({
-        preferred_sectors: preferences.preferred_sectors,
-        preferred_regions: preferences.preferred_regions,
-        preferred_event_types: preferences.preferred_event_types,
-        focus_areas: preferences.focus_areas,
-        feed_priority: preferences.feed_priority,
-        min_impact_score: preferences.min_impact_score,
-        min_confidence_score: preferences.min_confidence_score,
-        preferred_time_horizons: preferences.preferred_time_horizons,
-      }, user.id); // Pass Clerk user ID
+      try {
+        const preferencesResult = await updateUserPreferences({
+          preferred_sectors: preferences.preferred_sectors,
+          preferred_regions: preferences.preferred_regions,
+          preferred_event_types: preferences.preferred_event_types,
+          focus_areas: preferences.focus_areas,
+          feed_priority: preferences.feed_priority,
+          min_impact_score: preferences.min_impact_score,
+          min_confidence_score: preferences.min_confidence_score,
+          preferred_time_horizons: preferences.preferred_time_horizons,
+        }, user.id); // Pass Clerk user ID
 
+        if (!preferencesResult) {
+          throw new Error('Preferences update returned no data');
+        }
+      } catch (prefsError: any) {
+        console.error('Error updating preferences:', prefsError);
+        throw new Error(`Failed to save preferences: ${prefsError.message || 'Unknown error'}`);
+      }
+
+      // Step 3: Trigger personalized collection immediately (non-blocking)
+      const apiUrl = import.meta.env.DEV 
+        ? 'http://localhost:3001/personalized-collect'
+        : '/api/personalized-collect';
+      
+      fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      }).catch(err => {
+        // Don't block navigation if API call fails
+        console.error('Failed to trigger personalized collection:', err);
+      });
+
+      // Wait a brief moment to ensure all database operations are committed
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Only navigate after all data is saved successfully
+      setLoading(false);
       navigate('/dashboard', { replace: true });
     } catch (err: any) {
-      setError(err.message || 'Failed to save profile');
-    } finally {
+      console.error('Onboarding error:', err);
+      setError(err.message || 'Failed to save profile. Please try again.');
       setLoading(false);
     }
   };
@@ -173,6 +248,29 @@ export default function Onboarding() {
       setCurrentStep(currentStep - 1);
     }
   };
+
+  // Early return for error state
+  if (error && !loading && !authLoading) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center px-4 py-12">
+        <div className="max-w-2xl w-full text-center">
+          <div className="mb-6 p-6 bg-red-500/10 border border-red-500/20 rounded-lg">
+            <p className="text-sm text-red-400 mb-2 font-medium">Error loading onboarding page</p>
+            <p className="text-xs text-slate-500 mb-4">{error}</p>
+            <button
+              onClick={() => {
+                setError('');
+                window.location.reload();
+              }}
+              className="px-6 py-3 bg-[#E1463E] text-white rounded-lg hover:bg-[#E1463E]/90 transition-colors text-sm font-light"
+            >
+              Reload Page
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center px-4 py-12">

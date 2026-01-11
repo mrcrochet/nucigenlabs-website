@@ -16,14 +16,9 @@ export default function AuthCallback() {
 
       try {
         if (isSignedIn && user) {
-          // Check if user has completed onboarding (using Clerk user ID)
-          const completed = await hasCompletedOnboarding(user.id);
-          
-          if (completed) {
-            navigate('/dashboard', { replace: true });
-          } else {
-            navigate('/onboarding', { replace: true });
-          }
+          // Always redirect to dashboard - onboarding is now optional
+          // Users can complete it later via the banner
+          navigate('/dashboard', { replace: true });
         } else {
           navigate('/login', { replace: true });
         }

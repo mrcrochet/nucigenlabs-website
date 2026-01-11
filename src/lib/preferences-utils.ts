@@ -36,8 +36,51 @@ export interface EventForRelevance {
 
 /**
  * Calculate relevance score for an event based on user preferences
+ * 
+ * This function now supports ML-based prediction via API call.
+ * Falls back to rule-based calculation if ML is not available.
  */
-export function calculateEventRelevance(
+export async function calculateEventRelevance(
+  event: EventForRelevance,
+  preferences: UserPreferences | null,
+  userId?: string,
+  eventId?: string,
+  useML: boolean = true
+): Promise<number> {
+  // Try ML prediction if available and user/event IDs provided
+  if (useML && userId && eventId) {
+    try {
+      const apiUrl = import.meta.env.DEV
+        ? 'http://localhost:3001/api/predict-relevance'
+        : '/api/predict-relevance';
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId, userId }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.relevanceScore !== undefined) {
+          return data.relevanceScore;
+        }
+      }
+    } catch (error) {
+      // Fall through to rule-based calculation
+      console.warn('[calculateEventRelevance] ML prediction failed, using fallback:', error);
+    }
+  }
+
+  // Fallback: Rule-based calculation (original logic)
+  return calculateEventRelevanceFallback(event, preferences);
+}
+
+/**
+ * Fallback rule-based relevance calculation
+ * (Original implementation kept for backward compatibility)
+ */
+export function calculateEventRelevanceFallback(
   event: EventForRelevance,
   preferences: UserPreferences | null
 ): number {
@@ -126,18 +169,31 @@ export function calculateEventRelevance(
 /**
  * Sort events based on user preferences
  */
-export function sortEventsByPreferences<T extends EventForRelevance>(
+export async function sortEventsByPreferences<T extends EventForRelevance>(
   events: T[],
-  preferences: UserPreferences | null
-): T[] {
+  preferences: UserPreferences | null,
+  userId?: string,
+  useML: boolean = true
+): Promise<T[]> {
   if (!preferences) {
     return events; // Return as-is if no preferences
   }
 
-  const eventsWithScores = events.map(event => ({
-    ...event,
-    relevanceScore: calculateEventRelevance(event, preferences),
-  }));
+  // Calculate relevance scores (with ML if available)
+  const eventsWithScores = await Promise.all(
+    events.map(async (event) => {
+      // Extract event ID from event if available (assuming event has id field)
+      const eventId = (event as any).id;
+      const relevanceScore = await calculateEventRelevance(
+        event,
+        preferences,
+        userId,
+        eventId,
+        useML
+      );
+      return { ...event, relevanceScore };
+    })
+  );
 
   switch (preferences.feed_priority) {
     case 'relevance':
@@ -207,11 +263,14 @@ export function filterEventsByPreferences<T extends EventForRelevance>(
 /**
  * Check if an event is highly relevant (score >= 0.7)
  */
-export function isEventHighlyRelevant(
+export async function isEventHighlyRelevant(
   event: EventForRelevance,
-  preferences: UserPreferences | null
-): boolean {
-  const relevanceScore = calculateEventRelevance(event, preferences);
+  preferences: UserPreferences | null,
+  userId?: string,
+  eventId?: string,
+  useML: boolean = true
+): Promise<boolean> {
+  const relevanceScore = await calculateEventRelevance(event, preferences, userId, eventId, useML);
   return relevanceScore >= 0.7;
 }
 

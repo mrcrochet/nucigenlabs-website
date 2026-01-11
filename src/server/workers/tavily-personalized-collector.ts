@@ -42,6 +42,12 @@ interface UserPreferences {
   min_confidence_score?: number;
 }
 
+interface UserProfile {
+  intended_use?: string;
+  company?: string;
+  professional_role?: string;
+}
+
 interface TavilyArticle {
   title: string;
   url: string;
@@ -52,10 +58,13 @@ interface TavilyArticle {
 }
 
 /**
- * Build personalized Tavily queries from user preferences
+ * Build personalized Tavily queries from user preferences and profile
  * Creates intelligent, targeted queries that match user interests
  */
-function buildPersonalizedQueries(preferences: UserPreferences): string[] {
+function buildPersonalizedQueries(
+  preferences: UserPreferences,
+  userProfile?: UserProfile
+): string[] {
   const queries: string[] = [];
   
   // Base query components
@@ -103,6 +112,45 @@ function buildPersonalizedQueries(preferences: UserPreferences): string[] {
     }
   }
   
+  // Query 6: Use intended_use for contextual queries
+  if (userProfile?.intended_use) {
+    // Extract keywords from intended_use and create queries
+    const intendedUseLower = userProfile.intended_use.toLowerCase();
+    const keywords = intendedUseLower.match(
+      /\b(monitor|track|identify|regulatory|geopolitical|supply chain|energy|commodity|market|policy|risk|compliance|trade|sanctions|tariffs)\b/g
+    ) || [];
+    
+    if (keywords.length > 0) {
+      const uniqueKeywords = [...new Set(keywords)].slice(0, 3);
+      for (const keyword of uniqueKeywords) {
+        if (sectors.length > 0) {
+          queries.push(`${keyword} developments ${sectors[0]} industry news 2025`);
+        } else {
+          queries.push(`${keyword} developments news 2025`);
+        }
+      }
+    }
+  }
+  
+  // Query 7: Company-specific queries (if company is provided)
+  if (userProfile?.company && sectors.length > 0) {
+    queries.push(`${userProfile.company} ${sectors[0]} industry news developments 2025`);
+  }
+  
+  // Query 8: Professional role-specific queries
+  if (userProfile?.professional_role) {
+    const role = userProfile.professional_role.toLowerCase();
+    if (sectors.length > 0) {
+      if (role.includes('analyst') || role.includes('researcher')) {
+        queries.push(`${sectors[0]} market analysis research insights 2025`);
+      } else if (role.includes('trader') || role.includes('portfolio')) {
+        queries.push(`${sectors[0]} market movements trading signals 2025`);
+      } else if (role.includes('executive') || role.includes('decision')) {
+        queries.push(`${sectors[0]} strategic business decisions policy 2025`);
+      }
+    }
+  }
+  
   // If no preferences, use generic queries
   if (queries.length === 0) {
     queries.push('recent geopolitical events economic impact 2025');
@@ -118,14 +166,47 @@ function buildPersonalizedQueries(preferences: UserPreferences): string[] {
  */
 export async function collectPersonalizedEventsForUser(
   userId: string,
-  preferences: UserPreferences
+  preferences: UserPreferences,
+  userProfile?: UserProfile
 ): Promise<{ inserted: number; skipped: number; errors: number }> {
   try {
     console.log(`[Personalized Collector] Collecting for user ${userId}...`);
     
-    // Build personalized queries
-    const queries = buildPersonalizedQueries(preferences);
+    // Fetch user profile if not provided
+    let profile = userProfile;
+    if (!profile) {
+      const { data: userProfileData } = await supabase
+        .from('users')
+        .select('intended_use, company, professional_role')
+        .eq('id', userId)
+        .maybeSingle();
+      
+      if (userProfileData) {
+        profile = {
+          intended_use: userProfileData.intended_use || undefined,
+          company: userProfileData.company || undefined,
+          professional_role: userProfileData.professional_role || undefined,
+        };
+      }
+    }
+    
+    // Build personalized queries with user profile
+    let queries = buildPersonalizedQueries(preferences, profile);
     console.log(`[Personalized Collector] Generated ${queries.length} personalized queries`);
+    
+    // Optimize queries using ML query optimizer (if available)
+    try {
+      const { optimizeQuery, batchOptimizeQueries } = await import('../ml/query-optimizer.js');
+      const optimizedQueries = await batchOptimizeQueries(queries, {
+        userSectors: preferences.preferred_sectors,
+        userRegions: preferences.preferred_regions,
+        userEventTypes: preferences.preferred_event_types,
+      });
+      queries = Array.from(optimizedQueries.values()).map(q => q.optimizedQuery);
+      console.log(`[Personalized Collector] Optimized ${queries.length} queries using ML`);
+    } catch (error: any) {
+      console.warn('[Personalized Collector] Query optimization failed, using original queries:', error.message);
+    }
     
     let allArticles: TavilyArticle[] = [];
     
@@ -281,9 +362,32 @@ export async function collectPersonalizedEventsForAllUsers(): Promise<{
     let totalSkipped = 0;
     let totalErrors = 0;
     
+    // Fetch user profiles for all users
+    const userIds = preferencesList.map(p => p.user_id);
+    const { data: userProfiles } = await supabase
+      .from('users')
+      .select('id, intended_use, company, professional_role')
+      .in('id', userIds);
+    
+    const profileMap = new Map<string, UserProfile>();
+    if (userProfiles) {
+      for (const profile of userProfiles) {
+        profileMap.set(profile.id, {
+          intended_use: profile.intended_use || undefined,
+          company: profile.company || undefined,
+          professional_role: profile.professional_role || undefined,
+        });
+      }
+    }
+    
     // Process users sequentially to avoid rate limiting
     for (const prefs of preferencesList) {
-      const result = await collectPersonalizedEventsForUser(prefs.user_id, prefs as UserPreferences);
+      const profile = profileMap.get(prefs.user_id);
+      const result = await collectPersonalizedEventsForUser(
+        prefs.user_id,
+        prefs as UserPreferences,
+        profile
+      );
       totalInserted += result.inserted;
       totalSkipped += result.skipped;
       totalErrors += result.errors;

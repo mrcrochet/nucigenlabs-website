@@ -9,7 +9,9 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { scrapeOfficialDocument, isFirecrawlAvailable } from '../phase4/firecrawl-official-service';
+import { apiGateway } from '../services/api-gateway';
+import { maximizeApiUsage } from '../utils/api-optimizer';
+import { scrapeOfficialDocument } from '../phase4/firecrawl-official-service';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -140,7 +142,7 @@ async function enrichEventWithOfficialDocument(
 export async function enrichPendingOfficialDocuments(
   limit: number = 10
 ): Promise<EnrichmentResult> {
-  if (!isFirecrawlAvailable()) {
+  if (!apiGateway.firecrawl.isAvailable()) {
     console.warn('[OfficialDocEnricher] Firecrawl not available. Skipping enrichment.');
     return { enriched: 0, skipped: 0, errors: 0 };
   }
@@ -217,30 +219,35 @@ export async function enrichPendingOfficialDocuments(
       errors: 0,
     };
 
-    // Process sequentially to respect rate limits
-    for (const { eventId, url } of eventsToEnrich) {
-      // Get nucigen_event_id if exists
-      const { data: nucigenEvent } = await supabase
-        .from('nucigen_events')
-        .select('id')
-        .eq('source_event_id', eventId)
-        .maybeSingle();
+    // Process in parallel using api-optimizer (respects rate limits automatically)
+    const { results, errors } = await maximizeApiUsage(
+      eventsToEnrich,
+      async ({ eventId, url }) => {
+        // Get nucigen_event_id if exists
+        const { data: nucigenEvent } = await supabase
+          .from('nucigen_events')
+          .select('id')
+          .eq('source_event_id', eventId)
+          .maybeSingle();
 
-      const success = await enrichEventWithOfficialDocument(
-        eventId,
-        nucigenEvent?.id || null,
-        url
-      );
+        const success = await enrichEventWithOfficialDocument(
+          eventId,
+          nucigenEvent?.id || null,
+          url
+        );
 
-      if (success) {
-        result.enriched++;
-      } else {
-        result.errors++;
-      }
+        return success;
+      },
+      'firecrawl'
+    );
 
-      // Small delay between requests
-      await new Promise(resolve => setTimeout(resolve, 3000)); // 3 seconds
-    }
+    // Count results
+    const successful = results.filter(r => r === true).length;
+    const failed = results.filter(r => r === false).length;
+    
+    result.enriched = successful;
+    result.errors = failed + errors.length;
+    result.skipped = eventsToEnrich.length - successful - failed; // Events that were skipped during processing
 
     console.log(`[OfficialDocEnricher] Enrichment complete: ${result.enriched} enriched, ${result.skipped} skipped, ${result.errors} errors`);
     return result;

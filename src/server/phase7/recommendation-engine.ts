@@ -6,6 +6,8 @@
 
 import { createClient } from '@supabase/supabase-js';
 import * as dotenv from 'dotenv';
+import { selectRecommendationAction } from '../rl/recommendation-policy.js';
+import { getUserBehaviorPattern } from '../rl/user-behavior-learner.js';
 
 dotenv.config();
 
@@ -50,13 +52,15 @@ interface Recommendation {
 
 /**
  * Generate recommendations for a user based on an event
+ * Now uses RL policy for intelligent recommendation ordering
  */
-export function generateRecommendations(
+export async function generateRecommendations(
   event: Event,
   userPreferences: UserPreferences,
+  userId: string,
   scenarios: any[] = [],
   historicalComparisons: any[] = []
-): Recommendation[] {
+): Promise<Recommendation[]> {
   const recommendations: Recommendation[] = [];
 
   // Check if event matches user preferences
@@ -94,6 +98,25 @@ export function generateRecommendations(
   let priority: 'high' | 'medium' | 'low' = 'medium';
   if (urgencyScore >= 0.7) priority = 'high';
   else if (urgencyScore < 0.4) priority = 'low';
+
+  // Try to use RL policy for recommendation ordering
+  let recommendationOrder: 'relevance' | 'recency' | 'impact' | 'mixed' = 'mixed';
+  try {
+    const behaviorPattern = await getUserBehaviorPattern(userId);
+    const rlAction = await selectRecommendationAction({
+      userId,
+      userPreferences: userPreferences as any,
+      behaviorPattern: behaviorPattern as any,
+      context: {
+        timeOfDay: new Date().getHours() < 12 ? 'morning' : 'afternoon',
+        dayOfWeek: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][new Date().getDay()],
+        recentEvents: [],
+      },
+    });
+    recommendationOrder = rlAction.order;
+  } catch (error: any) {
+    console.warn('[RecommendationEngine] RL policy failed, using default:', error.message);
+  }
 
   // Generate recommendations based on event type and impact
   if (impactScore >= 0.8) {
@@ -232,10 +255,11 @@ export async function processUserRecommendations(userId: string): Promise<number
         .order('similarity_score', { ascending: false })
         .limit(3);
 
-      // Generate recommendations
-      const recommendations = generateRecommendations(
+      // Generate recommendations (using RL policy if available)
+      const recommendations = await generateRecommendations(
         event as Event,
         preferences as UserPreferences,
+        userId,
         scenarios || [],
         historicalComparisons || []
       );

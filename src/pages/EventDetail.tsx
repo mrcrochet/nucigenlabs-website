@@ -189,7 +189,8 @@ function EventDetailContent() {
     );
   }
 
-  const chain = event.nucigen_causal_chains[0];
+  // Handle optional causal chain
+  const chain = event.nucigen_causal_chains?.[0] || null;
   
   // Sort blocks by order
   const sortedBlocks = [...blocks].sort((a, b) => a.order - b.order);
@@ -243,23 +244,66 @@ function EventDetailContent() {
         <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-10 py-12 w-full">
         <Card className="p-8">
           {/* Render blocks using BlockRenderer */}
-          {!blocksLoading && sortedBlocks.map((block) => (
-            <BlockRenderer
-              key={block.id}
-              block={block}
-              data={{
-                event,
-                chain,
-                whyItMatters: event.why_it_matters,
-                context,
-                documents: officialDocs,
-              }}
-              onFeedbackClick={() => {
-                setFeedbackComponentType('event_extraction');
-                setShowFeedbackModal(true);
-              }}
-            />
-          ))}
+          {!blocksLoading && sortedBlocks.length > 0 ? (
+            sortedBlocks.map((block) => (
+              <BlockRenderer
+                key={block.id}
+                block={block}
+                data={{
+                  event,
+                  chain,
+                  whyItMatters: event.why_it_matters,
+                  context,
+                  documents: officialDocs,
+                }}
+                onFeedbackClick={() => {
+                  setFeedbackComponentType('event_extraction');
+                  setShowFeedbackModal(true);
+                }}
+              />
+            ))
+          ) : (
+            // Fallback: Display basic event information if no blocks configured
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-xl font-light text-white mb-4">Event Summary</h2>
+                <p className="text-slate-300 font-light leading-relaxed">{event.summary}</p>
+              </div>
+              
+              {event.why_it_matters && (
+                <div>
+                  <h3 className="text-lg font-light text-white mb-3">Why It Matters</h3>
+                  <p className="text-slate-300 font-light leading-relaxed">{event.why_it_matters}</p>
+                </div>
+              )}
+              
+              {chain && (
+                <div>
+                  <h3 className="text-lg font-light text-white mb-3">Causal Chain</h3>
+                  <div className="space-y-4">
+                    {chain.cause && (
+                      <div>
+                        <p className="text-xs text-slate-600 mb-1 font-light uppercase tracking-wide">Cause</p>
+                        <p className="text-slate-300 font-light">{chain.cause}</p>
+                      </div>
+                    )}
+                    {chain.first_order_effect && (
+                      <div>
+                        <p className="text-xs text-slate-600 mb-1 font-light uppercase tracking-wide">First Order Effect</p>
+                        <p className="text-slate-300 font-light">{chain.first_order_effect}</p>
+                      </div>
+                    )}
+                    {chain.second_order_effect && (
+                      <div>
+                        <p className="text-xs text-slate-600 mb-1 font-light uppercase tracking-wide">Second Order Effect</p>
+                        <p className="text-slate-300 font-light">{chain.second_order_effect}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 6. Related Events (Knowledge Graph) */}
           {relationships.length > 0 && (
