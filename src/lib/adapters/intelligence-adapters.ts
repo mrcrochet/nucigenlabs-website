@@ -184,7 +184,6 @@ export function eventWithChainToEvent(event: EventWithChain): Event & {
     first_order_effect: event.first_order_effect || chain?.first_order_effect || null,
     second_order_effect: event.second_order_effect || chain?.second_order_effect || null,
     impact_score: event.impact_score,
-    confidence: event.confidence,
     // Extended properties for causal chain
     causal_chain: chain ? {
       cause: chain.cause,
