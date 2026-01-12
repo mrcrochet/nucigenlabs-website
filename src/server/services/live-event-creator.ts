@@ -1,10 +1,22 @@
 /**
  * Live Event Creator
  * 
- * Recherche d'événements réels en temps réel avec Tavily
- * et création automatique d'événements structurés complets
+ * ⚠️ DEPRECATED — DO NOT USE DIRECTLY
+ * 
+ * This file is deprecated. Use EventAgent instead:
+ * - src/server/agents/event-agent.ts
+ * 
+ * Migration path:
+ * - Replace calls to searchAndCreateLiveEvent() with EventAgent.searchAndExtractEvents()
+ * - EventAgent is the ONLY authorized access point to Tavily/Firecrawl APIs
+ * 
+ * This file is kept temporarily for backward compatibility but will be removed.
+ * 
+ * @deprecated Use EventAgent instead
  */
 
+// MIGRATION: Most Tavily/OpenAI calls now use EventAgent
+// Only historical context still uses Tavily directly (TODO: migrate)
 import { tavily } from '@tavily/core';
 import { createClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
@@ -28,18 +40,17 @@ if (result.error) {
   console.log(`[Live Event Creator] Loaded .env from ${envPath}`);
 }
 
-// Validate environment variables
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error('OPENAI_API_KEY is required. Please check your .env file at the project root.');
-}
-if (!process.env.SUPABASE_URL) {
-  throw new Error('SUPABASE_URL is required. Please check your .env file at the project root.');
-}
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error('SUPABASE_SERVICE_ROLE_KEY is required. Please check your .env file at the project root.');
-}
-if (!process.env.TAVILY_API_KEY) {
-  throw new Error('TAVILY_API_KEY is required. Please check your .env file at the project root.');
+// Validate environment variables (but don't throw at module load - check at runtime)
+function validateEnvVars() {
+  const missing: string[] = [];
+  if (!process.env.OPENAI_API_KEY) missing.push('OPENAI_API_KEY');
+  if (!process.env.SUPABASE_URL) missing.push('SUPABASE_URL');
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+  if (!process.env.TAVILY_API_KEY) missing.push('TAVILY_API_KEY');
+  
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}. Please check your .env file at the project root.`);
+  }
 }
 
 const openai = new OpenAI({
@@ -89,131 +100,58 @@ interface LiveEventResult {
 
 /**
  * Recherche d'événements réels avec Tavily et création automatique
+ * 
+ * MIGRATED: Now uses EventAgent for event extraction
+ * EventAgent is the ONLY authorized access point to Tavily/Firecrawl APIs
  */
 export async function searchAndCreateLiveEvent(
   query: string,
   userId?: string
 ): Promise<LiveEventResult | null> {
-  if (!tavilyClient) {
-    throw new Error('Tavily API key not configured');
-  }
+  // Validate environment variables at runtime
+  validateEnvVars();
 
   try {
     console.log(`[Live Event Creator] Searching for: "${query}"`);
 
-    // 1. Recherche optimisée avec Tavily (maximiser l'utilisation de l'API)
-    console.log(`[Live Event Creator] Searching Tavily with optimized settings...`);
-    
-    const tavilyResponse = await tavilyClient.search(query, {
-      searchDepth: 'advanced', // Recherche approfondie
-      maxResults: 50, // Optimisé: 50 résultats (maximise l'utilisation de Tavily)
-      includeAnswer: true, // Inclure la réponse AI de Tavily (résumé intelligent)
-      includeRawContent: true, // Contenu complet des articles
-      includeImages: false,
-    });
+    // MIGRATION: Use EventAgent instead of direct Tavily calls
+    // EventAgent is the ONLY authorized access point to Tavily/Firecrawl APIs
+    const { EventExtractionAgentImpl } = await import('../agents/event-agent');
+    const eventAgent = new EventExtractionAgentImpl();
 
-    if (!tavilyResponse.results || tavilyResponse.results.length === 0) {
-      console.log('[Live Event Creator] No results from Tavily');
+    console.log(`[Live Event Creator] Using EventAgent for search and extraction...`);
+    
+    // EventAgent handles Tavily search and event extraction
+    const eventsResponse = await eventAgent.searchAndExtractEvents(query);
+
+    if (eventsResponse.error || !eventsResponse.data || eventsResponse.data.length === 0) {
+      console.log('[Live Event Creator] No events extracted:', eventsResponse.error);
       return null;
     }
 
-    console.log(`[Live Event Creator] Found ${tavilyResponse.results.length} articles from Tavily`);
+    console.log(`[Live Event Creator] Extracted ${eventsResponse.data.length} events via EventAgent`);
 
-    // 2. Filtrer et trier les résultats par pertinence et date
-    const filteredResults = tavilyResponse.results
-      .filter((r: any) => {
-        // Filtrer par score de pertinence (minimum 0.4 pour inclure plus de résultats)
-        const score = r.score || 0;
-        return score >= 0.4;
-      })
-      .filter((r: any) => {
-        // Filtrer par date (priorité aux articles récents, mais accepter jusqu'à 30 jours)
-        if (r.publishedDate) {
-          const publishedDate = new Date(r.publishedDate);
-          const daysAgo = (Date.now() - publishedDate.getTime()) / (1000 * 60 * 60 * 24);
-          return daysAgo <= 30; // Articles des 30 derniers jours
-        }
-        return true; // Inclure même sans date (mais avec priorité moindre)
-      })
-      .sort((a: any, b: any) => {
-        // Trier par score de pertinence (décroissant)
-        const scoreA = a.score || 0;
-        const scoreB = b.score || 0;
-        return scoreB - scoreA;
-      })
-      .slice(0, 30); // Prendre les 30 meilleurs résultats
+    // Take the first event (highest quality from EventAgent)
+    const extractedEvent = eventsResponse.data[0];
 
-    console.log(`[Live Event Creator] Filtered to ${filteredResults.length} high-quality articles`);
+    if (!extractedEvent) {
+      console.log('[Live Event Creator] No event extracted');
+      return null;
+    }
 
-    // 3. Combiner les résultats en un texte riche et structuré
-    const combinedContent = [
-      // Réponse AI de Tavily (résumé intelligent)
-      tavilyResponse.answer ? `Tavily AI Summary:\n${tavilyResponse.answer}\n\n---\n\n` : '',
-      // Articles triés par pertinence
-      ...filteredResults.map((r: any, index: number) => 
-        `Article ${index + 1} (Relevance: ${((r.score || 0) * 100).toFixed(0)}%):
-Title: ${r.title || 'No title'}
-Published: ${r.publishedDate || 'Unknown date'}
-URL: ${r.url || 'No URL'}
-Content: ${(r.content || r.rawContent || '').substring(0, 2000)}${(r.content || r.rawContent || '').length > 2000 ? '...' : ''}`
-      ),
-    ].filter(Boolean).join('\n\n---\n\n');
+    // Convert Event (UI contract) to legacy format for backward compatibility
+    // TODO: Migrate this endpoint to use Event[] directly instead of legacy format
+    // For now, we need to convert Event to the legacy format expected by the rest of the function
+    
+    // Extract event type from headline/description (EventAgent doesn't return event_type directly)
+    // We'll use a simple heuristic or extract from the first event's metadata
+    const eventType = extractedEvent.sectors.length > 0 
+      ? (extractedEvent.sectors[0] === 'Finance' ? 'Market' : 
+         extractedEvent.sectors[0] === 'Technology' ? 'Industrial' : 
+         'Geopolitical')
+      : 'Geopolitical';
 
-    // 3. Créer un événement structuré avec OpenAI (Phase 1 amélioré)
-    const extractionPrompt = `You are a geopolitical and economic intelligence analyst. Your task is to extract structured information from real-time search results about a current event.
-
-CRITICAL RULES:
-1. Return ONLY valid JSON, no markdown, no code blocks, no explanations
-2. All scores must be floats between 0 and 1
-3. Use null (not "null" string) for unknown information
-4. Be FACTUAL and CURRENT - focus on recent/ongoing events
-5. Summary must be max 2 sentences, factual only
-6. why_it_matters must link event to economic/strategic impact (1-2 sentences)
-7. actors must be an array (can be empty [])
-8. If information is unknown, use null
-
-JSON Schema (return ONLY this structure):
-{
-  "event_type": "Geopolitical | Industrial | SupplyChain | Regulatory | Security | Market",
-  "event_subtype": "string|null",
-  "summary": "max 2 sentences, factual, current event",
-  "country": "string|null",
-  "region": "string|null",
-  "sector": "string|null",
-  "actors": ["string"],
-  "why_it_matters": "1-2 sentences linking event to economic/strategic impact",
-  "first_order_effect": "string|null",
-  "second_order_effect": "string|null",
-  "impact_score": 0.0,
-  "confidence": 0.0
-}
-
-Search Query: ${query}
-
-Tavily Search Results (${filteredResults.length} high-quality articles):
-${combinedContent.substring(0, 20000)} // Optimisé: plus de contexte (20,000 chars)
-
-Return ONLY the JSON object, nothing else.`;
-
-    const extractionCompletion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a precise data extraction system. Return ONLY valid JSON, no other text. Focus on CURRENT, REAL events.',
-        },
-        {
-          role: 'user',
-          content: extractionPrompt,
-        },
-      ],
-      temperature: 0.1,
-      response_format: { type: 'json_object' },
-    });
-
-    const extractedData = JSON.parse(extractionCompletion.choices[0]?.message?.content || '{}');
-
-    // 4. Créer d'abord un enregistrement source dans events (requis pour source_event_id)
+    // Create source event in 'events' table
     console.log(`[Live Event Creator] Creating source event in 'events' table...`);
     
     const { data: sourceEvent, error: sourceEventError } = await supabase
@@ -221,47 +159,48 @@ Return ONLY the JSON object, nothing else.`;
       .insert({
         source: 'tavily_live_search',
         source_id: `live_search_${Date.now()}`,
-        title: extractedData.summary || query,
-        description: extractedData.why_it_matters || null,
-        content: combinedContent.substring(0, 5000), // Stocker le contenu source
-        published_at: new Date().toISOString(),
-        url: filteredResults[0]?.url || null,
-        status: 'processed', // Directement marqué comme processed car on crée l'événement structuré immédiatement
+        title: extractedEvent.headline || query,
+        description: extractedEvent.description || null,
+        content: extractedEvent.description || '', // EventAgent doesn't store raw content
+        published_at: extractedEvent.date || new Date().toISOString(),
+        url: extractedEvent.sources[0]?.url || null,
+        status: 'processed',
       })
       .select()
       .single();
 
     if (sourceEventError) {
       console.error('[Live Event Creator] Source event error:', sourceEventError);
-      throw new Error(`Failed to create source event: ${sourceEventError.message} (Code: ${sourceEventError.code})`);
+      throw new Error(`Failed to create source event: ${sourceEventError.message}`);
     }
 
     if (!sourceEvent || !sourceEvent.id) {
-      console.error('[Live Event Creator] Source event is null or missing ID:', sourceEvent);
       throw new Error('Failed to create source event: No ID returned');
     }
 
     console.log(`[Live Event Creator] Created source event: ${sourceEvent.id}`);
 
-    // 5. Insérer l'événement structuré dans nucigen_events
+    // Insert structured event in nucigen_events
+    // Note: EventAgent returns impact=0 (facts only), but we need to store it
+    // The impact will be calculated later by SignalAgent
     console.log(`[Live Event Creator] Inserting nucigen_event with source_event_id: ${sourceEvent.id}`);
     
     const { data: insertedEvent, error: insertError } = await supabase
       .from('nucigen_events')
       .insert({
-        source_event_id: sourceEvent.id, // Utiliser l'ID de l'événement source créé (DOIT être défini)
-        event_type: extractedData.event_type,
-        event_subtype: extractedData.event_subtype,
-        summary: extractedData.summary,
-        country: extractedData.country,
-        region: extractedData.region,
-        sector: extractedData.sector,
-        actors: extractedData.actors || [],
-        why_it_matters: extractedData.why_it_matters,
-        first_order_effect: extractedData.first_order_effect,
-        second_order_effect: extractedData.second_order_effect,
-        impact_score: extractedData.impact_score,
-        confidence: extractedData.confidence,
+        source_event_id: sourceEvent.id,
+        event_type: eventType,
+        event_subtype: null, // EventAgent doesn't extract subtype
+        summary: extractedEvent.description,
+        country: extractedEvent.location || null,
+        region: extractedEvent.scope === 'regional' ? extractedEvent.location : null,
+        sector: extractedEvent.sectors[0] || null,
+        actors: extractedEvent.actors || [],
+        why_it_matters: null, // EventAgent doesn't extract interpretation
+        first_order_effect: null, // EventAgent doesn't extract predictions
+        second_order_effect: null, // EventAgent doesn't extract predictions
+        impact_score: 0, // EventAgent returns 0 (facts only)
+        confidence: extractedEvent.confidence / 100, // Convert from 0-100 to 0-1
       })
       .select()
       .single();
@@ -272,10 +211,11 @@ Return ONLY the JSON object, nothing else.`;
 
     console.log(`[Live Event Creator] Created event: ${insertedEvent.id}`);
 
-    // 6. Générer la causal chain (Phase 2B)
+    // Generate causal chain (Phase 2B) - kept as is, not part of EventAgent
     const causalChain = await generateCausalChain(insertedEvent);
 
-    // 7. Générer le contexte historique (Tavily + Phase 4)
+    // Generate historical context - NOTE: Still uses Tavily directly
+    // TODO: This should also use EventAgent or a dedicated HistoricalContextAgent
     const historicalContext = await generateHistoricalContext(insertedEvent, query);
 
     return {
@@ -291,6 +231,8 @@ Return ONLY the JSON object, nothing else.`;
 
 /**
  * Génère une causal chain pour l'événement
+ * NOTE: This function still uses OpenAI directly (not part of EventAgent scope)
+ * TODO: Create CausalChainAgent or keep as separate service
  */
 async function generateCausalChain(event: any) {
   try {

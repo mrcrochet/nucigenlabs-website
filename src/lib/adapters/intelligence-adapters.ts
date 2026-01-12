@@ -43,7 +43,33 @@ export function eventsToSignals(events: EventWithChain[]): Signal[] {
 
   eventGroups.forEach((groupEvents, key) => {
     // Only create signal if we have at least 2 related events
-    if (groupEvents.length < 2) return;
+    // BUT: If we have only one event but it's high-impact, create a signal anyway
+    if (groupEvents.length < 2) {
+      // Allow single high-impact events to become signals
+      const singleEvent = groupEvents[0];
+      if (singleEvent && (singleEvent.impact_score || 0) >= 0.7 && (singleEvent.confidence || 0) >= 0.7) {
+        // Create signal from single high-impact event
+        const signal: Signal = {
+          id: `signal-${singleEvent.id}`,
+          type: 'signal',
+          scope: singleEvent.region ? 'regional' : 'global',
+          confidence: Math.round((singleEvent.confidence || 0) * 100),
+          impact: Math.round((singleEvent.impact_score || 0) * 100),
+          horizon: getTimeHorizonFromChain(singleEvent.nucigen_causal_chains?.[0]?.time_horizon),
+          source_count: 1,
+          last_updated: singleEvent.created_at,
+          title: `${singleEvent.sector || 'Global'} ${singleEvent.event_type || 'Event'}`,
+          summary: singleEvent.summary.substring(0, 300),
+          impact_score: Math.round((singleEvent.impact_score || 0) * 100),
+          confidence_score: Math.round((singleEvent.confidence || 0) * 100),
+          time_horizon: getTimeHorizonFromChain(singleEvent.nucigen_causal_chains?.[0]?.time_horizon),
+          related_event_ids: [singleEvent.id],
+          why_it_matters: singleEvent.why_it_matters || `High-impact event in ${singleEvent.sector || 'this sector'}.`,
+        };
+        signals.push(signal);
+      }
+      return;
+    }
 
     const firstEvent = groupEvents[0];
     const totalImpact = groupEvents.reduce((sum, e) => sum + (e.impact_score || 0), 0);

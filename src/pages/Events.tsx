@@ -269,7 +269,10 @@ function EventsContent() {
       
       let errorMessage = error.message || 'Failed to search live events.';
       
-      if (isNetworkError || errorMessage.includes('API server') || errorMessage.includes('Empty response')) {
+      // Check if it's a 500 error from the server
+      if (errorMessage.includes('500') || errorMessage.includes('Internal Server Error')) {
+        errorMessage = 'Server error: The API server encountered an error. This could be due to missing API keys (OpenAI, Tavily) or a server configuration issue. Please check the server logs.';
+      } else if (isNetworkError || errorMessage.includes('API server') || errorMessage.includes('Empty response')) {
         errorMessage = 'Failed to search live events. Please make sure the API server is running. Start it with: npm run api:server';
       }
       

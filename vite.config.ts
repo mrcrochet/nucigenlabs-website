@@ -38,4 +38,11 @@ export default defineConfig({
     // Enable source maps for production debugging (optional)
     sourcemap: false,
   },
+  // Vitest configuration
+  test: {
+    globals: true,
+    environment: 'node',
+    include: ['src/**/*.test.ts', 'src/**/*.spec.ts'],
+    exclude: ['node_modules', 'dist'],
+  },
 });

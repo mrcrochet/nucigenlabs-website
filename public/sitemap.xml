@@ -5,73 +5,73 @@
         http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
   <url>
     <loc>https://nucigenlabs.com/</loc>
-    <lastmod>2026-01-11</lastmod>
+    <lastmod>2026-01-12</lastmod>
     <changefreq>daily</changefreq>
     <priority>1</priority>
   </url>
   <url>
     <loc>https://nucigenlabs.com/intelligence</loc>
-    <lastmod>2026-01-11</lastmod>
+    <lastmod>2026-01-12</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://nucigenlabs.com/case-studies</loc>
-    <lastmod>2026-01-11</lastmod>
+    <lastmod>2026-01-12</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://nucigenlabs.com/pricing</loc>
-    <lastmod>2026-01-11</lastmod>
+    <lastmod>2026-01-12</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://nucigenlabs.com/papers</loc>
-    <lastmod>2026-01-11</lastmod>
+    <lastmod>2026-01-12</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://nucigenlabs.com/partners</loc>
-    <lastmod>2026-01-11</lastmod>
+    <lastmod>2026-01-12</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://nucigenlabs.com/learn-more</loc>
-    <lastmod>2026-01-11</lastmod>
+    <lastmod>2026-01-12</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://nucigenlabs.com/request-access</loc>
-    <lastmod>2026-01-11</lastmod>
+    <lastmod>2026-01-12</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://nucigenlabs.com/level/geopolitical</loc>
-    <lastmod>2026-01-11</lastmod>
+    <lastmod>2026-01-12</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://nucigenlabs.com/level/industrial</loc>
-    <lastmod>2026-01-11</lastmod>
+    <lastmod>2026-01-12</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://nucigenlabs.com/level/supply-chain</loc>
-    <lastmod>2026-01-11</lastmod>
+    <lastmod>2026-01-12</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://nucigenlabs.com/level/market</loc>
-    <lastmod>2026-01-11</lastmod>
+    <lastmod>2026-01-12</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>

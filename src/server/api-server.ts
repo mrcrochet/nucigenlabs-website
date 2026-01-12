@@ -76,11 +76,28 @@ app.post('/live-search', async (req, res) => {
       });
     }
   } catch (error: any) {
-    console.error('[API] Error:', error);
+    console.error('[API] Live search error:', error);
+    console.error('[API] Error stack:', error.stack);
+    
+    // Provide more detailed error messages
+    let errorMessage = error.message || 'Internal server error';
+    
+    // Check for common issues
+    if (error.message?.includes('API key') || error.message?.includes('required')) {
+      errorMessage = `Configuration error: ${error.message}. Please check your .env file.`;
+    } else if (error.message?.includes('Tavily')) {
+      errorMessage = `Tavily API error: ${error.message}. Please check your TAVILY_API_KEY.`;
+    } else if (error.message?.includes('OpenAI')) {
+      errorMessage = `OpenAI API error: ${error.message}. Please check your OPENAI_API_KEY.`;
+    } else if (error.message?.includes('Supabase')) {
+      errorMessage = `Database error: ${error.message}. Please check your Supabase configuration.`;
+    }
+    
     // Ensure we always send valid JSON
     res.status(500).json({
       success: false,
-      error: error.message || 'Internal server error',
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
 });
@@ -224,11 +241,98 @@ app.post('/api/predict-relevance', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
+// Signal Agent endpoint
+app.post('/api/signals', async (req, res) => {
+  try {
+    const { events, user_preferences } = req.body;
+
+    if (!events || !Array.isArray(events)) {
+      return res.status(400).json({
+        success: false,
+        error: 'events array is required',
+      });
+    }
+
+    console.log(`[API] Signal generation request: ${events.length} events`);
+
+    // Import SignalAgent dynamically
+    const { IntelligenceSignalAgent } = await import('./agents/signal-agent.js');
+    const signalAgent = new IntelligenceSignalAgent();
+
+    const response = await signalAgent.generateSignals({
+      events,
+      user_preferences,
+    });
+
+    if (response.error) {
+      return res.status(500).json({
+        success: false,
+        error: response.error,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      signals: response.data || [],
+      metadata: response.metadata,
+    });
+  } catch (error: any) {
+    console.error('[API] Signal generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+const server = app.listen(PORT, () => {
   console.log(`🚀 API Server running on http://localhost:${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/health`);
   console.log(`   Live Search: POST http://localhost:${PORT}/live-search`);
   console.log(`   Personalized Collect: POST http://localhost:${PORT}/personalized-collect`);
   console.log(`   Predict Relevance: POST http://localhost:${PORT}/api/predict-relevance`);
+  console.log(`   Generate Signals: POST http://localhost:${PORT}/api/signals`);
+  console.log(`\n   Server is ready to accept requests. Press Ctrl+C to stop.\n`);
+});
+
+// Graceful shutdown handling
+process.on('SIGINT', () => {
+  console.log('\n\n[API Server] Received SIGINT. Shutting down gracefully...');
+  server.close(() => {
+    console.log('[API Server] Server closed. Goodbye!');
+    process.exit(0);
+  });
+  
+  // Force shutdown after 10 seconds
+  setTimeout(() => {
+    console.error('[API Server] Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n\n[API Server] Received SIGTERM. Shutting down gracefully...');
+  server.close(() => {
+    console.log('[API Server] Server closed. Goodbye!');
+    process.exit(0);
+  });
+  
+  // Force shutdown after 10 seconds
+  setTimeout(() => {
+    console.error('[API Server] Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+});
+
+// Handle uncaught errors
+process.on('uncaughtException', (error) => {
+  console.error('[API Server] Uncaught Exception:', error);
+  server.close(() => {
+    process.exit(1);
+  });
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[API Server] Unhandled Rejection at:', promise, 'reason:', reason);
 });
 

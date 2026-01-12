@@ -12,7 +12,7 @@ import {
   getEventsWithCausalChainsSearch, 
   getUserPreferences,
 } from '../lib/supabase';
-import { eventsToSignals, filterSignalsByPreferences } from '../lib/adapters/intelligence-adapters';
+import { getSignalsViaAgent } from '../lib/api/signal-api';
 import type { Signal } from '../types/intelligence';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
@@ -59,7 +59,8 @@ function IntelligenceFeedContent() {
     fetchPreferences();
   }, [user?.id]);
 
-  // Fetch events and convert to signals
+  // Fetch signals via SignalAgent (NO DIRECT EVENT ACCESS)
+  // Intelligence page consumes ONLY Signal[] - never Event[]
   const fetchSignals = useCallback(async () => {
     if (!isFullyLoaded) return;
 
@@ -74,7 +75,7 @@ function IntelligenceFeedContent() {
       setLoading(true);
       setError('');
 
-      // Build search options
+      // Build search options for events (agent needs them internally)
       let searchOptions: any = {
         searchQuery: debouncedSearchQuery || undefined,
         limit: 100,
@@ -115,26 +116,28 @@ function IntelligenceFeedContent() {
         }
       }
 
-      // Fetch events (source of truth)
+      // Fetch events (agent needs them internally, but page never sees Event[])
       const eventsData = await getEventsWithCausalChainsSearch(searchOptions, user.id);
       
-      // Convert events to signals
-      const allSignals = eventsToSignals(eventsData || []);
-      
-      // Filter by preferences
-      const filteredSignals = filterSignalsByPreferences(allSignals, preferences);
+      // Use SignalAgent to generate signals (replaces eventsToSignals + filterSignalsByPreferences)
+      // Page receives ONLY Signal[] - never Event[]
+      const allSignals = await getSignalsViaAgent(eventsData || [], {
+        searchQuery: debouncedSearchQuery,
+        user_preferences: preferences ? {
+          preferred_sectors: preferences.preferred_sectors,
+          preferred_regions: preferences.preferred_regions,
+          preferred_event_types: preferences.preferred_event_types,
+          min_impact_score: preferences.min_impact_score,
+          min_confidence_score: preferences.min_confidence_score,
+        } : undefined,
+      });
       
       // Sort signals based on active tab
-      let sortedSignals = [...filteredSignals];
+      let sortedSignals = [...allSignals];
       
       switch (activeTab) {
         case 'top':
-          // Sort by impact * confidence (highest first)
-          sortedSignals.sort((a, b) => {
-            const scoreA = a.impact_score * a.confidence_score;
-            const scoreB = b.impact_score * b.confidence_score;
-            return scoreB - scoreA;
-          });
+          // Already sorted by agent (impact * confidence)
           break;
         case 'recent':
           // Sort by last_updated (newest first)
