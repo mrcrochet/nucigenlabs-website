@@ -6,7 +6,9 @@ import { useState, useEffect } from 'react';
 import Card from '../ui/Card';
 import SectionHeader from '../ui/SectionHeader';
 import Badge from '../ui/Badge';
+import ErrorState from '../ui/ErrorState';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { fetchMarketPrice, getMarketErrorDisplay, type MarketDataError } from '../../lib/api/market-data-api';
 
 interface AssetStatsCardProps {
   symbol: string;
@@ -15,60 +17,69 @@ interface AssetStatsCardProps {
 export default function AssetStatsCard({ symbol }: AssetStatsCardProps) {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<MarketDataError | null>(null);
+
+  const loadStats = async () => {
+    setLoading(true);
+    setError(null);
+    
+    const { data, error: marketError } = await fetchMarketPrice(symbol);
+
+    if (marketError) {
+      setError(marketError);
+      setStats(null);
+      setLoading(false);
+      return;
+    }
+
+    if (data) {
+      setStats({
+        price: parseFloat(data.price || 0),
+        change: parseFloat(data.change || 0),
+        changePercent: parseFloat(data.change_percent || 0),
+        volume: parseInt(data.volume?.toString() || '0'),
+        volatility: 15.5, // TODO: Calculate from timeseries
+      });
+    } else {
+      setError({
+        code: 'NO_DATA',
+        message: `No data available for ${symbol}`,
+        provider: 'twelvedata',
+        retryable: false,
+      });
+      setStats(null);
+    }
+
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const loadStats = async () => {
-      try {
-        const API_BASE = import.meta.env.DEV ? 'http://localhost:3001' : '/api';
-        const response = await fetch(`${API_BASE}/api/market-data/${symbol}`);
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch stats: ${response.statusText}`);
-        }
-
-        const result = await response.json();
-        
-        if (result.success && result.data) {
-          const data = result.data;
-          setStats({
-            price: parseFloat(data.price || data.close || 0),
-            change: parseFloat(data.change || 0),
-            changePercent: parseFloat(data.percent_change || 0),
-            volume: parseInt(data.volume || 0),
-            volatility: 15.5, // TODO: Calculate from timeseries
-          });
-        } else {
-          // Fallback
-          setStats({
-            price: 150.5,
-            change: 2.5,
-            changePercent: 1.69,
-            volume: 50000000,
-            volatility: 15.5,
-          });
-        }
-      } catch (error) {
-        console.error('Error loading asset stats:', error);
-        // Fallback on error
-        setStats({
-          price: 150.5,
-          change: 2.5,
-          changePercent: 1.69,
-          volume: 50000000,
-          volatility: 15.5,
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadStats();
   }, [symbol]);
 
   if (loading) {
     return (
       <Card>
-        <div className="h-64 animate-pulse bg-background-glass-subtle rounded-lg" />
+        <SectionHeader title={`${symbol} Stats`} />
+        <div className="h-64 animate-pulse bg-background-glass-subtle rounded-lg mt-4" />
+      </Card>
+    );
+  }
+
+  if (error) {
+    const errorDisplay = getMarketErrorDisplay(error);
+    return (
+      <Card>
+        <SectionHeader title={`${symbol} Stats`} />
+        <div className="mt-4">
+          <ErrorState
+            title={errorDisplay.title}
+            message={errorDisplay.message}
+            provider={error.provider}
+            actionLabel={error.retryable ? errorDisplay.actionLabel : undefined}
+            onAction={error.retryable ? loadStats : undefined}
+          />
+        </div>
       </Card>
     );
   }
@@ -76,7 +87,8 @@ export default function AssetStatsCard({ symbol }: AssetStatsCardProps) {
   if (!stats) {
     return (
       <Card>
-        <div className="text-text-secondary text-sm">No stats available</div>
+        <SectionHeader title={`${symbol} Stats`} />
+        <div className="mt-4 text-text-secondary text-sm">No stats available for {symbol}</div>
       </Card>
     );
   }

@@ -31,6 +31,14 @@ dotenv.config();
 const TWELVEDATA_API_KEY = process.env.TWELVEDATA_API_KEY;
 const TWELVEDATA_BASE_URL = 'https://api.twelvedata.com';
 
+// Debug: Log API key status (without exposing the key)
+if (!TWELVEDATA_API_KEY) {
+  console.warn('[Twelve Data] ⚠️  TWELVEDATA_API_KEY not found in environment variables');
+  console.warn('[Twelve Data] Please add TWELVEDATA_API_KEY to your .env file');
+} else {
+  console.log(`[Twelve Data] ✅ API key loaded (${TWELVEDATA_API_KEY.substring(0, 8)}...)`);
+}
+
 // Rate limiting: 8 requests/second (free tier)
 const RATE_LIMIT_DELAY = 125; // ms between requests
 let lastRequestTime = 0;
@@ -61,13 +69,24 @@ async function makeRequest(
   await rateLimit();
 
   const url = new URL(endpoint, TWELVEDATA_BASE_URL);
-  url.searchParams.append('apikey', TWELVEDATA_API_KEY);
+  
+  // Ensure API key is added first
+  if (!TWELVEDATA_API_KEY || TWELVEDATA_API_KEY.trim() === '') {
+    throw new Error('TWELVEDATA_API_KEY is empty or not configured. Please check your .env file.');
+  }
+  
+  url.searchParams.append('apikey', TWELVEDATA_API_KEY.trim());
   
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined) {
       url.searchParams.append(key, String(value));
     }
   });
+  
+  // Debug log (only in development)
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[Twelve Data] Request: ${endpoint} with symbol: ${params.symbol || 'N/A'}`);
+  }
 
   let lastError: Error | null = null;
   const maxRetries = 3;
@@ -89,7 +108,14 @@ async function makeRequest(
       
       // Twelve Data returns error in response body
       if (data.status === 'error') {
-        throw new Error(`Twelve Data API error: ${data.message || 'Unknown error'}`);
+        const errorMessage = data.message || 'Unknown error';
+        
+        // Provide more helpful error messages
+        if (errorMessage.includes('apikey') || errorMessage.includes('API key')) {
+          throw new Error(`Twelve Data API key error: ${errorMessage}. Please verify TWELVEDATA_API_KEY in your .env file.`);
+        }
+        
+        throw new Error(`Twelve Data API error: ${errorMessage}`);
       }
 
       return data;

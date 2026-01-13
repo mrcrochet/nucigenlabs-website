@@ -27,37 +27,8 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks: (id) => {
-          // Vendor chunks for better caching
-          if (id.includes('node_modules')) {
-            // React ecosystem
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
-              return 'react-vendor';
-            }
-            // Clerk (authentication)
-            if (id.includes('@clerk')) {
-              return 'clerk-vendor';
-            }
-            // Supabase
-            if (id.includes('@supabase')) {
-              return 'supabase-vendor';
-            }
-            // Lucide icons (large library)
-            if (id.includes('lucide-react')) {
-              return 'icons-vendor';
-            }
-            // Other large vendors
-            if (id.includes('openai') || id.includes('tavily')) {
-              return 'ai-vendor';
-            }
-            // Everything else from node_modules
-            return 'vendor';
-          }
-        },
-      },
-    },
+    // Let Vite handle chunk splitting automatically to avoid circular dependencies
+    // Manual chunking was causing "useState is undefined" errors in production
     chunkSizeWarningLimit: 600,
     // Enable source maps for production debugging (optional)
     sourcemap: false,

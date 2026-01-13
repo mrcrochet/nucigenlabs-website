@@ -1385,6 +1385,7 @@ export async function searchEvents(options: SearchOptions = {}, userId?: string)
     min_confidence_score: minConfidenceScore,
     limit_count: limit,
     offset_count: offset,
+    user_id: targetUserId, // Pass user_id to filter personalized events
   });
 
   if (error) {
@@ -1454,6 +1455,7 @@ export async function countSearchResults(
     time_horizon_filter: timeHorizonFilter,
     min_impact_score: minImpactScore,
     min_confidence_score: minConfidenceScore,
+    user_id: targetUserId, // Pass user_id to filter personalized events
   });
 
   if (error) {

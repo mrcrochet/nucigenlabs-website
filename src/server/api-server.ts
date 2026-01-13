@@ -59,9 +59,33 @@ app.get('/api/market-data/:symbol', async (req, res) => {
     res.json({ success: true, data: priceData });
   } catch (error: any) {
     console.error('[API] Market data error:', error);
-    res.status(500).json({
+    
+    // Provide clearer error messages
+    let errorMessage = error.message || 'Failed to fetch market data';
+    let statusCode = 500;
+    let errorCode = 'MARKET_DATA_ERROR';
+    
+    if (errorMessage.includes('TWELVEDATA_API_KEY') || errorMessage.includes('not configured')) {
+      errorMessage = 'Twelve Data API key not configured. Please add TWELVEDATA_API_KEY to your .env file.';
+      statusCode = 503; // Service Unavailable
+      errorCode = 'TWELVE_DATA_API_ERROR';
+    } else if (errorMessage.includes('429') || errorMessage.includes('Rate limit')) {
+      errorMessage = 'Rate limit exceeded. Please try again later.';
+      statusCode = 429;
+      errorCode = 'RATE_LIMIT_ERROR';
+    } else if (errorMessage.includes('Invalid API key') || errorMessage.includes('apikey parameter is incorrect')) {
+      errorMessage = 'Invalid Twelve Data API key. Please check your .env file.';
+      statusCode = 401;
+      errorCode = 'INVALID_API_KEY';
+    }
+    
+    // Standardized error response
+    res.status(statusCode).json({
       success: false,
-      error: error.message || 'Failed to fetch market data',
+      error: errorCode,
+      message: errorMessage,
+      provider: 'twelvedata',
+      status: statusCode,
     });
   }
 });
@@ -85,9 +109,37 @@ app.get('/api/market-data/:symbol/timeseries', async (req, res) => {
     res.json({ success: true, data: timeSeriesData });
   } catch (error: any) {
     console.error('[API] Time series error:', error);
-    res.status(500).json({
+    
+    // Provide clearer error messages
+    let errorMessage = error.message || 'Failed to fetch time series data';
+    let statusCode = 500;
+    
+    if (errorMessage.includes('TWELVEDATA_API_KEY') || errorMessage.includes('not configured')) {
+      errorMessage = 'Twelve Data API key not configured. Please add TWELVEDATA_API_KEY to your .env file.';
+      statusCode = 503; // Service Unavailable
+    } else if (errorMessage.includes('429')) {
+      errorMessage = 'Rate limit exceeded. Please try again later.';
+      statusCode = 429;
+    } else if (errorMessage.includes('Invalid API key')) {
+      errorMessage = 'Invalid Twelve Data API key. Please check your .env file.';
+      statusCode = 401;
+    }
+    
+    // Standardized error response
+    const errorCode = errorMessage.includes('API key') || errorMessage.includes('not configured')
+      ? 'TWELVE_DATA_API_ERROR'
+      : errorMessage.includes('429') || errorMessage.includes('Rate limit')
+      ? 'RATE_LIMIT_ERROR'
+      : errorMessage.includes('Invalid API key')
+      ? 'INVALID_API_KEY'
+      : 'MARKET_DATA_ERROR';
+
+    res.status(statusCode).json({
       success: false,
-      error: error.message || 'Failed to fetch time series data',
+      error: errorCode,
+      message: errorMessage,
+      provider: 'twelvedata',
+      status: statusCode,
     });
   }
 });

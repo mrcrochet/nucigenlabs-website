@@ -15,23 +15,44 @@ export default function AssetHeader({ symbol }: AssetHeaderProps) {
   const [change, setChange] = useState(0);
   const [changePercent, setChangePercent] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      
       try {
         const API_BASE = import.meta.env.DEV ? 'http://localhost:3001' : '/api';
         const response = await fetch(`${API_BASE}/api/market-data/${symbol}`);
         
-        if (response.ok) {
-          const result = await response.json();
-          if (result.success && result.data) {
-            setPrice(parseFloat(result.data.price || result.data.close || 0));
-            setChange(parseFloat(result.data.change || 0));
-            setChangePercent(parseFloat(result.data.percent_change || 0));
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          const errorMessage = errorData.error || `Failed to fetch data: ${response.statusText}`;
+          
+          if (errorMessage.includes('TWELVEDATA_API_KEY') || errorMessage.includes('not configured')) {
+            throw new Error('Twelve Data API key not configured');
           }
+          
+          throw new Error(errorMessage);
         }
-      } catch (error) {
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to fetch asset data');
+        }
+        
+        if (result.data) {
+          setPrice(parseFloat(result.data.price || result.data.close || 0));
+          setChange(parseFloat(result.data.change || 0));
+          setChangePercent(parseFloat(result.data.percent_change || result.data.change_percent || 0));
+        } else {
+          throw new Error('No data available for this symbol');
+        }
+      } catch (error: any) {
         console.error('Error loading asset header data:', error);
+        setError(error.message || 'Failed to load asset data');
       } finally {
         setLoading(false);
       }
@@ -51,6 +72,15 @@ export default function AssetHeader({ symbol }: AssetHeaderProps) {
           </h1>
           {loading ? (
             <div className="h-8 w-48 bg-background-glass-subtle rounded animate-pulse" />
+          ) : error ? (
+            <div className="text-sm text-red-400">
+              {error}
+              {error.includes('API key') && (
+                <span className="block text-xs text-text-secondary mt-1">
+                  Check TWELVEDATA_SETUP.md
+                </span>
+              )}
+            </div>
           ) : (
             <div className={`flex items-center gap-2 ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
               {isPositive ? (
