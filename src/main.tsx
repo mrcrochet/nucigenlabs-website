@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import ClerkWrapper from './components/ClerkWrapper';
+import ClerkErrorBoundary from './components/ClerkErrorBoundary';
 import App from './App.tsx';
 import './index.css';
 
@@ -14,8 +15,10 @@ if (!clerkPublishableKey) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ClerkWrapper>
-      <App />
-    </ClerkWrapper>
+    <ClerkErrorBoundary>
+      <ClerkWrapper>
+        <App />
+      </ClerkWrapper>
+    </ClerkErrorBoundary>
   </StrictMode>
 );
