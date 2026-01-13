@@ -44,7 +44,7 @@ function ImpactsPageContent() {
       />
 
       {/* Filters */}
-      <div className="col-span-12">
+      <div className="col-span-1 sm:col-span-12">
         <ImpactFilters
           filters={filters}
           onFiltersChange={setFilters}
@@ -52,7 +52,7 @@ function ImpactsPageContent() {
       </div>
 
       {/* ImpactCardGrid */}
-      <div className="col-span-12">
+      <div className="col-span-1 sm:col-span-12">
         <ImpactCardGrid
           filters={filters}
           signalId={signalId || undefined}

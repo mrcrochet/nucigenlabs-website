@@ -40,13 +40,13 @@ function AssetDetailContent() {
   if (loading) {
     return (
       <AppShell>
-        <div className="col-span-12 space-y-6">
+        <div className="col-span-1 sm:col-span-12 space-y-6">
           <SkeletonCard />
           <div className="grid grid-cols-12 gap-6">
-            <div className="col-span-8">
+            <div className="col-span-1 sm:col-span-8">
               <SkeletonCard />
             </div>
-            <div className="col-span-4">
+            <div className="col-span-1 sm:col-span-4">
               <SkeletonCard />
             </div>
           </div>
@@ -58,7 +58,7 @@ function AssetDetailContent() {
   if (!symbol) {
     return (
       <AppShell>
-        <div className="col-span-12">
+        <div className="col-span-1 sm:col-span-12">
           <div className="text-center py-12">
             <p className="text-text-primary mb-2">Symbol required</p>
             <button
@@ -81,28 +81,28 @@ function AssetDetailContent() {
       />
 
       {/* Header: AssetHeader */}
-      <div className="col-span-12">
+      <div className="col-span-1 sm:col-span-12">
         <AssetHeader symbol={symbol} />
       </div>
 
       {/* Row 2: Left (8) + Right (4) */}
-      <div className="col-span-8">
+      <div className="col-span-1 sm:col-span-8">
         <PriceChartWithMarkers symbol={symbol} />
       </div>
-      <div className="col-span-4">
+      <div className="col-span-1 sm:col-span-4">
         <KeyMetricsPanel symbol={symbol} />
       </div>
 
       {/* Row 3: Left (6) + Right (6) */}
-      <div className="col-span-6">
+      <div className="col-span-1 sm:col-span-6">
         <RelatedEventsList symbol={symbol} />
       </div>
-      <div className="col-span-6">
+      <div className="col-span-1 sm:col-span-6">
         <ActiveSignalsList symbol={symbol} />
       </div>
 
       {/* Row 4: AttributionPanel */}
-      <div className="col-span-12">
+      <div className="col-span-1 sm:col-span-12">
         <AttributionPanel symbol={symbol} />
       </div>
     </AppShell>

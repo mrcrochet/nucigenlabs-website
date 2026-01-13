@@ -235,7 +235,7 @@ function IntelligenceFeedContent() {
   if (!isFullyLoaded) {
     return (
       <AppShell>
-        <div className="col-span-12 flex items-center justify-center min-h-[400px]">
+        <div className="col-span-1 sm:col-span-12 flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-sm text-slate-500 font-light">Loading...</p>
@@ -248,7 +248,7 @@ function IntelligenceFeedContent() {
   if (loading) {
     return (
       <AppShell>
-        <div className="col-span-12">
+        <div className="col-span-1 sm:col-span-12">
           <header className="mb-6">
             <SectionHeader
               title="Intelligence"
@@ -268,7 +268,7 @@ function IntelligenceFeedContent() {
   if (error) {
     return (
       <AppShell>
-        <div className="col-span-12 flex items-center justify-center min-h-[400px]">
+        <div className="col-span-1 sm:col-span-12 flex items-center justify-center min-h-[400px]">
           <div className="max-w-2xl w-full text-center">
             <div className="mb-6 p-6 bg-red-500/10 border border-red-500/20 rounded-xl">
               <p className="text-base text-red-400 font-light mb-2">Unable to load signals</p>
@@ -301,7 +301,7 @@ function IntelligenceFeedContent() {
         description="Live intelligence signals with prioritized insights"
       />
 
-      <div className="col-span-12">
+      <div className="col-span-1 sm:col-span-12">
         <header className="mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">

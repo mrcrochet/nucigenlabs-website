@@ -33,7 +33,7 @@ function MarketsPageContent() {
       />
 
       {/* Row 1: MarketHeader */}
-      <div className="col-span-12">
+      <div className="col-span-1 sm:col-span-12">
         <MarketHeader
           timeframe={timeframe}
           onTimeframeChange={setTimeframe}
@@ -41,19 +41,19 @@ function MarketsPageContent() {
       </div>
 
       {/* Row 2: Left (8) + Right (4) */}
-      <div className="col-span-8">
+      <div className="col-span-1 sm:col-span-8">
         <MainMarketChart
           symbol={selectedSymbol}
           timeframe={timeframe}
         />
       </div>
-      <div className="col-span-4 space-y-6">
+      <div className="col-span-1 sm:col-span-4 space-y-6">
         <AssetStatsCard symbol={selectedSymbol} />
         <RelatedEventsCard symbol={selectedSymbol} />
       </div>
 
       {/* Row 3: AssetTable */}
-      <div className="col-span-12">
+      <div className="col-span-1 sm:col-span-12">
         <AssetTable
           selectedSymbol={selectedSymbol}
           onSymbolSelect={setSelectedSymbol}

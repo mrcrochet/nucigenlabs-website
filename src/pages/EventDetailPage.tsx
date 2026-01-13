@@ -55,14 +55,14 @@ function EventDetailContent() {
   if (loading) {
     return (
       <AppShell>
-        <div className="col-span-12 space-y-6">
+        <div className="col-span-1 sm:col-span-12 space-y-6">
           <SkeletonCard />
           <div className="grid grid-cols-12 gap-6">
-            <div className="col-span-8 space-y-6">
+            <div className="col-span-1 sm:col-span-8 space-y-6">
               <SkeletonCard />
               <SkeletonCard />
             </div>
-            <div className="col-span-4 space-y-6">
+            <div className="col-span-1 sm:col-span-4 space-y-6">
               <SkeletonCard />
               <SkeletonCard />
             </div>
@@ -75,7 +75,7 @@ function EventDetailContent() {
   if (error || !event) {
     return (
       <AppShell>
-        <div className="col-span-12">
+        <div className="col-span-1 sm:col-span-12">
           <div className="text-center py-12">
             <p className="text-text-primary mb-2">Event not found</p>
             <p className="text-sm text-text-secondary mb-4">{error}</p>
@@ -99,16 +99,16 @@ function EventDetailContent() {
       />
 
       {/* Top: EventDetailHeader */}
-      <div className="col-span-12">
+      <div className="col-span-1 sm:col-span-12">
         <EventDetailHeader event={event} />
       </div>
 
       {/* Row 2: Left (8) + Right (4) */}
-      <div className="col-span-8 space-y-6">
+      <div className="col-span-1 sm:col-span-8 space-y-6">
         <EventFactsPanel event={event} />
         <EvidenceSourcesPanel event={event} />
       </div>
-      <div className="col-span-4 space-y-6">
+      <div className="col-span-1 sm:col-span-4 space-y-6">
         <MarketPanel event={event} />
         <RelatedPanel event={event} />
       </div>

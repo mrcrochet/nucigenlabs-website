@@ -188,7 +188,7 @@ function SettingsContent() {
   if (loading) {
     return (
       <AppShell>
-        <div className="col-span-12 flex items-center justify-center min-h-[400px]">
+        <div className="col-span-1 sm:col-span-12 flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-sm text-slate-500 font-light">Loading settings...</p>
@@ -205,7 +205,7 @@ function SettingsContent() {
         description="Manage your preferences and feed settings"
       />
 
-      <div className="col-span-12">
+      <div className="col-span-1 sm:col-span-12">
         <header className="mb-6">
           <SectionHeader
             title="Settings"

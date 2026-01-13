@@ -66,14 +66,14 @@ function SignalDetailContent() {
   if (loading) {
     return (
       <AppShell>
-        <div className="col-span-12 space-y-6">
+        <div className="col-span-1 sm:col-span-12 space-y-6">
           <SkeletonCard />
           <div className="grid grid-cols-12 gap-6">
-            <div className="col-span-8 space-y-6">
+            <div className="col-span-1 sm:col-span-8 space-y-6">
               <SkeletonCard />
               <SkeletonCard />
             </div>
-            <div className="col-span-4 space-y-6">
+            <div className="col-span-1 sm:col-span-4 space-y-6">
               <SkeletonCard />
               <SkeletonCard />
             </div>
@@ -86,7 +86,7 @@ function SignalDetailContent() {
   if (error || !signal) {
     return (
       <AppShell>
-        <div className="col-span-12">
+        <div className="col-span-1 sm:col-span-12">
           <div className="text-center py-12">
             <p className="text-text-primary mb-2">Signal not found</p>
             <p className="text-sm text-text-secondary mb-4">{error}</p>
@@ -110,22 +110,22 @@ function SignalDetailContent() {
       />
 
       {/* Header: SignalHeader */}
-      <div className="col-span-12">
+      <div className="col-span-1 sm:col-span-12">
         <SignalHeader signal={signal} />
       </div>
 
       {/* Row 2: Left (8) + Right (4) */}
-      <div className="col-span-8 space-y-6">
+      <div className="col-span-1 sm:col-span-8 space-y-6">
         <SignalEvidenceGraph signal={signal} />
         <EventStack signal={signal} />
       </div>
-      <div className="col-span-4 space-y-6">
+      <div className="col-span-1 sm:col-span-4 space-y-6">
         <SignalMetricsCard signal={signal} />
         <MarketValidationCard signal={signal} />
       </div>
 
       {/* Row 3: NextActionsBar */}
-      <div className="col-span-12">
+      <div className="col-span-1 sm:col-span-12">
         <NextActionsBar signal={signal} />
       </div>
     </AppShell>

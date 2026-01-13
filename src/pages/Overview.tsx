@@ -37,7 +37,7 @@ function OverviewContent() {
   if (loading) {
     return (
       <AppShell>
-        <div className="col-span-12 flex items-center justify-center h-64">
+        <div className="col-span-1 sm:col-span-12 flex items-center justify-center h-64">
           <div className="text-text-secondary">Loading overview...</div>
         </div>
       </AppShell>
@@ -52,34 +52,34 @@ function OverviewContent() {
       />
 
       {/* Row 1: HeaderBar */}
-      <div className="col-span-12">
+      <div className="col-span-1 sm:col-span-12">
         <HeaderBar />
       </div>
 
       {/* Row 2: KPIGrid (4 cards) */}
-      <div className="col-span-12">
+      <div className="col-span-1 sm:col-span-12">
         <KPIGrid />
       </div>
 
       {/* Row 3: Left (8) + Right (4) */}
-      <div className="col-span-8 space-y-6">
+      <div className="col-span-1 sm:col-span-8 space-y-6">
         <NarrativeCard />
         <TimelineCard />
       </div>
-      <div className="col-span-4">
+      <div className="col-span-1 sm:col-span-4">
         <MarketMoversCard />
       </div>
 
       {/* Row 4: TopSignalsTable */}
-      <div className="col-span-12">
+      <div className="col-span-1 sm:col-span-12">
         <TopSignalsTable />
       </div>
 
       {/* Row 5: Left (6) + Right (6) */}
-      <div className="col-span-6">
+      <div className="col-span-1 sm:col-span-6">
         <RecentEventsFeed />
       </div>
-      <div className="col-span-6">
+      <div className="col-span-1 sm:col-span-6">
         <TriggeredAlertsFeed />
       </div>
     </AppShell>

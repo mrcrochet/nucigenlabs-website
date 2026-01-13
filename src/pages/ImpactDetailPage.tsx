@@ -93,15 +93,15 @@ function ImpactDetailContent() {
   if (loading) {
     return (
       <AppShell>
-        <div className="col-span-12 space-y-6">
+        <div className="col-span-1 sm:col-span-12 space-y-6">
           <SkeletonCard />
           <div className="grid grid-cols-12 gap-6">
-            <div className="col-span-7 space-y-6">
+            <div className="col-span-1 sm:col-span-7 space-y-6">
               <SkeletonCard />
               <SkeletonCard />
               <SkeletonCard />
             </div>
-            <div className="col-span-5 space-y-6">
+            <div className="col-span-1 sm:col-span-5 space-y-6">
               <SkeletonCard />
               <SkeletonCard />
               <SkeletonCard />
@@ -115,7 +115,7 @@ function ImpactDetailContent() {
   if (error || !impact) {
     return (
       <AppShell>
-        <div className="col-span-12">
+        <div className="col-span-1 sm:col-span-12">
           <div className="text-center py-12">
             <p className="text-text-primary mb-2">Impact not found</p>
             <p className="text-sm text-text-secondary mb-4">{error}</p>
@@ -139,7 +139,7 @@ function ImpactDetailContent() {
       />
 
       {/* Header */}
-      <div className="col-span-12">
+      <div className="col-span-1 sm:col-span-12">
         <div className="bg-background-glass-subtle border border-borders-subtle rounded-xl p-6">
           <h1 className="text-2xl font-semibold text-text-primary mb-4">
             {impact.risk_headline}
@@ -151,19 +151,19 @@ function ImpactDetailContent() {
       </div>
 
       {/* Row 2: Left (7) + Right (5) */}
-      <div className="col-span-7 space-y-6">
+      <div className="col-span-1 sm:col-span-7 space-y-6">
         <ScenarioNarrative impact={impact} />
         <AssumptionsList impact={impact} />
         <Pathways impact={impact} />
       </div>
-      <div className="col-span-5 space-y-6">
+      <div className="col-span-1 sm:col-span-5 space-y-6">
         <ProbabilityPanel impact={impact} />
         <AssetsExposurePanel impact={impact} />
         <ChartPack impact={impact} />
       </div>
 
       {/* Row 3: InvalidationPanel */}
-      <div className="col-span-12">
+      <div className="col-span-1 sm:col-span-12">
         <InvalidationPanel impact={impact} />
       </div>
     </AppShell>

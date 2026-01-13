@@ -101,7 +101,7 @@ function EventsFeedContent() {
       />
 
       {/* Left: EventFiltersRail */}
-      <div className="col-span-3">
+      <div className="col-span-1 sm:col-span-3">
         <EventFiltersRail
           filters={filters}
           onFiltersChange={setFilters}
@@ -109,7 +109,7 @@ function EventsFeedContent() {
       </div>
 
       {/* Center: EventsList */}
-      <div className="col-span-6">
+      <div className="col-span-1 sm:col-span-6">
         <EventsList
           events={events}
           loading={loading}

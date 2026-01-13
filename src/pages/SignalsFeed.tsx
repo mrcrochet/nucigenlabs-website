@@ -107,7 +107,7 @@ function SignalsFeedContent() {
       />
 
       {/* Left: SignalFilters */}
-      <div className="col-span-3">
+      <div className="col-span-1 sm:col-span-3">
         <SignalFilters
           filters={filters}
           onFiltersChange={setFilters}
@@ -115,7 +115,7 @@ function SignalsFeedContent() {
       </div>
 
       {/* Center: SignalsTable */}
-      <div className="col-span-9">
+      <div className="col-span-1 sm:col-span-9">
         <SignalsTable
           signals={signals}
           loading={loading}
