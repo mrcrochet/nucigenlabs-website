@@ -19,8 +19,18 @@ export default function PremiumNavigation() {
     navigate('/');
   };
 
-  // Hide navigation on auth and app pages
-  const hideNavPaths = ['/login', '/register', '/auth', '/app', '/onboarding'];
+  // Hide navigation on auth and app pages (all protected routes)
+  const hideNavPaths = [
+    // Auth routes
+    '/login', '/register', '/auth', '/confirm-email', '/forgot-password', '/reset-password',
+    // App routes (all protected routes)
+    '/app', '/dashboard', '/overview',
+    '/intelligence', '/events', '/events-feed',
+    '/signals', '/signals-feed',
+    '/markets', '/impacts',
+    '/alerts', '/research', '/recommendations', '/quality',
+    '/profile', '/settings', '/onboarding'
+  ];
   const shouldHideNav = hideNavPaths.some(path => location.pathname.startsWith(path));
   
   if (shouldHideNav) {

@@ -10,6 +10,9 @@
     "preview": "npx vite preview",
     "typecheck": "npx tsc --noEmit -p tsconfig.app.json",
     "check-env": "node check-env.js",
+    "check-env:backend": "node check-env-backend.js",
+    "verify:supabase": "node verify-supabase-config.js",
+    "seed:test-data": "npx tsx src/server/scripts/seed-test-data.ts",
     "phase1:insert-test": "npx tsx src/server/phase1/insert-test-events.ts",
     "phase1:validate": "npx tsx src/server/phase1/phase1_validate.ts",
     "phase2b:validate": "npx tsx src/server/phase2b/phase2b_validate.ts",
@@ -41,9 +44,10 @@
     "phase8:auto-learning:continuous": "npx tsx src/server/workers/phase8-auto-learning-orchestrator.ts continuous",
     "api:server": "npx tsx src/server/api-server.ts",
     "live:search": "npx tsx src/server/services/live-search-api.ts",
-    "test": "npx vitest run",
-    "test:watch": "npx vitest",
-    "test:ui": "npx vitest --ui"
+    "test": "npx --yes vitest run",
+    "test:watch": "npx --yes vitest",
+    "test:ui": "npx --yes vitest --ui",
+    "test:integration": "npx --yes vitest run --config vitest.config.ts src/server/agents/__tests__/event-signal-integration.test.ts"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.59.2",
@@ -57,6 +61,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cors": "^2.8.5",
+    "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "lucide-react": "^0.344.0",
@@ -64,6 +69,7 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-router-dom": "^7.10.0",
+    "recharts": "^3.6.0",
     "tailwind-merge": "^3.4.0",
     "vaul": "^1.1.2"
   },
@@ -73,7 +79,7 @@
     "@types/express": "^5.0.6",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.7.0",
+    "@vitejs/plugin-react": "^4.3.1",
     "@vitest/ui": "^4.0.16",
     "autoprefixer": "^10.4.18",
     "eslint": "^9.9.1",

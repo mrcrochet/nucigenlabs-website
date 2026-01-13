@@ -66,8 +66,11 @@ describe('EventAgent', () => {
 
       if (result.data) {
         // CRITICAL: EventAgent should NOT assign impact
-        // Impact should be 0 (SignalAgent will assign it later)
-        expect(result.data.impact).toBe(0);
+        // Impact should be null (SignalAgent will assign it later)
+        expect(result.data.impact).toBeNull();
+        
+        // Horizon should also be null (SignalAgent will assign it)
+        expect(result.data.horizon).toBeNull();
         
         // Should not have priority field
         expect(result.data).not.toHaveProperty('priority');

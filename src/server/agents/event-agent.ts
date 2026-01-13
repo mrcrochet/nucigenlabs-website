@@ -25,10 +25,18 @@ import type {
 import type { Event } from '../../types/intelligence';
 import { tavily } from '@tavily/core';
 import OpenAI from 'openai';
-import { createClient } from '@supabase/supabase-js';
+// import { createClient } from '@supabase/supabase-js'; // Reserved for future use (storing raw data)
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+// Import services (EventAgent is the ONLY agent that uses these)
+import { searchEvents as searchNewsAPIEvents, type NewsAPIEvent } from '../services/newsapi-ai-service.js';
+import {
+  MARKET_EVENT_THRESHOLD_PERCENT,
+  TAVILY_RELEVANCE_THRESHOLD,
+  MAX_EVENTS_PER_SEARCH,
+  STORE_RAW_DATA,
+} from '../config/event-agent-config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -41,12 +49,13 @@ dotenv.config();
 // Initialize API clients (ONLY place in codebase that does this)
 let tavilyClient: ReturnType<typeof tavily> | null = null;
 let openaiClient: OpenAI | null = null;
-let supabaseClient: ReturnType<typeof createClient> | null = null;
+// Note: supabaseClient is reserved for future use (e.g., storing raw data)
+// let supabaseClient: ReturnType<typeof createClient> | null = null;
 
 const tavilyApiKey = process.env.TAVILY_API_KEY;
 const openaiApiKey = process.env.OPENAI_API_KEY;
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// const supabaseUrl = process.env.SUPABASE_URL;
+// const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (tavilyApiKey) {
   tavilyClient = tavily({ apiKey: tavilyApiKey });
@@ -62,12 +71,13 @@ if (openaiApiKey) {
   console.warn('[EventAgent] OPENAI_API_KEY not configured');
 }
 
-if (supabaseUrl && supabaseServiceKey) {
-  supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
-  console.log('[EventAgent] Supabase client initialized');
-} else {
-  console.warn('[EventAgent] Supabase not configured');
-}
+// Future: Initialize Supabase client for storing raw data
+// if (supabaseUrl && supabaseServiceKey) {
+//   supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+//   console.log('[EventAgent] Supabase client initialized');
+// } else {
+//   console.warn('[EventAgent] Supabase not configured');
+// }
 
 export class EventExtractionAgentImpl implements EventExtractionAgent {
   /**
@@ -194,13 +204,14 @@ Return ONLY the JSON object, nothing else.`;
 
       // Convert to Event type (UI contract)
       // CRITICAL: EventAgent returns FACTS ONLY - no impact, no priority, no business logic
+      // IMPROVEMENT: Use null for impact/horizon/scope to avoid any interpretation
       const event: Event = {
         id: `event-${Date.now()}-${Math.random().toString(36).substring(7)}`,
         type: 'event',
-        scope: extractedData.region ? 'regional' : 'global', // Factual classification only
+        scope: extractedData.region ? 'regional' : 'global', // Factual classification - could be null in future
         confidence: Math.round((extractedData.confidence || 0.5) * 100), // Data quality, not importance
-        impact: 0, // EventAgent does NOT assign impact - this is a fact, not an interpretation
-        horizon: 'medium', // Default factual classification
+        impact: null, // EventAgent does NOT assign impact - SignalAgent will fill this
+        horizon: null, // EventAgent does NOT assign horizon - SignalAgent will fill this
         source_count: 1,
         last_updated: input.source.published_at || new Date().toISOString(),
         event_id: `event-${Date.now()}`,
@@ -216,6 +227,10 @@ Return ONLY the JSON object, nothing else.`;
             url: input.source.url,
           },
         ],
+        // Store raw data for audit/replay/ML (if enabled)
+        ...(STORE_RAW_DATA && {
+          raw_content_hash: Buffer.from(input.raw_content).toString('base64').substring(0, 64),
+        }),
       };
 
       return {
@@ -278,6 +293,67 @@ Return ONLY the JSON object, nothing else.`;
   }
 
   /**
+   * Search for events using NewsAPI.ai Event Registry
+   * Returns Event[] (FACTS ONLY)
+   */
+  async searchAndExtractEventsFromNewsAPI(
+    query: string,
+    filters?: {
+      dateStart?: string;
+      dateEnd?: string;
+      location?: string;
+      category?: string;
+      keywords?: string[];
+    }
+  ): Promise<AgentResponse<Event[]>> {
+    const startTime = Date.now();
+
+    try {
+      console.log(`[EventAgent] Searching NewsAPI.ai for: "${query}"`);
+
+      const newsAPIResult = await searchNewsAPIEvents(query, {
+        dateStart: filters?.dateStart,
+        dateEnd: filters?.dateEnd,
+        location: filters?.location,
+        category: filters?.category,
+        keywords: filters?.keywords,
+        minArticles: 1,
+      });
+
+      if (!newsAPIResult.events || newsAPIResult.events.length === 0) {
+        return {
+          data: [],
+          error: 'No events found from NewsAPI.ai',
+          metadata: {
+            processing_time_ms: Date.now() - startTime,
+          },
+        };
+      }
+
+      console.log(`[EventAgent] Found ${newsAPIResult.events.length} events from NewsAPI.ai`);
+
+      // Extract events (FACTS ONLY)
+      const eventsResponse = await this.extractEventsFromNewsAPI(newsAPIResult.events);
+
+      return {
+        data: eventsResponse.data || [],
+        error: eventsResponse.error,
+        metadata: {
+          processing_time_ms: Date.now() - startTime,
+        },
+      };
+    } catch (error: any) {
+      return {
+        data: [],
+        error: error.message || 'Failed to search NewsAPI.ai',
+        metadata: {
+          processing_time_ms: Date.now() - startTime,
+        },
+      };
+    }
+  }
+
+  /**
    * Search for events using Tavily (ONLY method that calls Tavily API)
    */
   async searchAndExtractEvents(query: string): Promise<AgentResponse<Event[]>> {
@@ -300,7 +376,7 @@ Return ONLY the JSON object, nothing else.`;
         searchDepth: 'advanced',
         maxResults: 50,
         includeAnswer: true,
-        includeRawContent: true,
+        includeRawContent: true as any, // Tavily type definition issue
         includeImages: false,
       });
 
@@ -319,8 +395,8 @@ Return ONLY the JSON object, nothing else.`;
       // Filter by relevance score (technical filter, not business logic)
       // Note: This is a technical quality filter (Tavily's relevance score), not a business priority filter
       const filteredResults = tavilyResponse.results
-        .filter((r: any) => (r.score || 0) >= 0.3) // Lower threshold - we want facts, not "important" facts
-        .slice(0, 50); // Take more results - EventAgent doesn't decide what's "important"
+        .filter((r: any) => (r.score || 0) >= TAVILY_RELEVANCE_THRESHOLD)
+        .slice(0, MAX_EVENTS_PER_SEARCH);
 
       // Convert to EventExtractionInput
       const extractionInputs: EventExtractionInput[] = filteredResults.map((r: any) => ({
@@ -349,6 +425,158 @@ Return ONLY the JSON object, nothing else.`;
       return {
         data: [],
         error: error.message || 'Failed to search and extract events',
+        metadata: {
+          processing_time_ms: Date.now() - startTime,
+        },
+      };
+    }
+  }
+
+  /**
+   * Extract events from NewsAPI.ai structured events
+   * Converts NewsAPI.ai events to Event[] (FACTS ONLY)
+   */
+  async extractEventsFromNewsAPI(newsEvents: NewsAPIEvent[]): Promise<AgentResponse<Event[]>> {
+    const startTime = Date.now();
+
+    try {
+      const events: Event[] = [];
+
+      for (const newsEvent of newsEvents) {
+        // Extract facts only - no interpretation
+        const event: Event = {
+          id: `newsapi-${newsEvent.id || newsEvent.uri}`,
+          type: 'event',
+          scope: newsEvent.location?.countryCode ? 'regional' : 'global', // Factual - could be null in future
+          confidence: Math.min(100, Math.round((newsEvent.articleCount || 1) * 10)), // Data quality based on article count
+          impact: null, // EventAgent does NOT assign impact - SignalAgent will fill this
+          horizon: null, // EventAgent does NOT assign horizon - SignalAgent will fill this
+          source_count: newsEvent.articleCount || 1,
+          last_updated: newsEvent.date || new Date().toISOString(),
+          event_id: `newsapi-${newsEvent.id || newsEvent.uri}`,
+          headline: newsEvent.title || '',
+          description: newsEvent.summary || newsEvent.title || '',
+          date: newsEvent.date || new Date().toISOString(),
+          location: newsEvent.location?.label || newsEvent.location?.country || null,
+          actors: (newsEvent.concepts || [])
+            .filter((c: any) => c.type === 'person' || c.type === 'org')
+            .map((c: any) => c.label),
+          sectors: (newsEvent.categories || []).map((c: any) => c.label),
+          sources: (newsEvent.articles || []).map((a: any) => ({
+            name: a.source?.title || 'Unknown',
+            url: a.url || '',
+          })),
+          source_type: 'newsapi_ai',
+          newsapi_event_id: newsEvent.uri || newsEvent.id?.toString(),
+          entities: newsEvent.concepts?.map((c: any) => ({
+            id: c.uri,
+            type: c.type === 'person' ? 'person' : c.type === 'org' ? 'organization' : 'concept',
+            name: c.label,
+            score: c.score,
+          })),
+          // Store raw data for audit/replay/ML (if enabled)
+          ...(STORE_RAW_DATA && {
+            raw_content_hash: Buffer.from(JSON.stringify(newsEvent)).toString('base64').substring(0, 64),
+          }),
+        };
+
+        events.push(event);
+      }
+
+      return {
+        data: events,
+        metadata: {
+          processing_time_ms: Date.now() - startTime,
+        },
+      };
+    } catch (error: any) {
+      return {
+        data: [],
+        error: error.message || 'Failed to extract events from NewsAPI.ai',
+        metadata: {
+          processing_time_ms: Date.now() - startTime,
+        },
+      };
+    }
+  }
+
+  /**
+   * Extract events from market data (Twelve Data)
+   * Converts market movements to Event[] (FACTS ONLY)
+   */
+  async extractEventsFromMarketData(marketData: {
+    symbol: string;
+    price: number;
+    change?: number;
+    change_percent?: number;
+    volume?: number;
+    timestamp: string;
+  }): Promise<AgentResponse<Event>> {
+    const startTime = Date.now();
+
+    try {
+      // Extract fact: price change
+      // Use configurable threshold (technical filter, not business logic)
+      const changePercent = marketData.change_percent || 0;
+      const isSignificant = Math.abs(changePercent) >= MARKET_EVENT_THRESHOLD_PERCENT;
+
+      if (!isSignificant) {
+        // Skip minor movements (technical filter, not business filter)
+        return {
+          data: null,
+          error: `Market movement below threshold (${MARKET_EVENT_THRESHOLD_PERCENT}%)`,
+          metadata: {
+            processing_time_ms: Date.now() - startTime,
+          },
+        };
+      }
+
+      const event: Event = {
+        id: `twelvedata-${marketData.symbol}-${Date.now()}`,
+        type: 'event',
+        scope: 'global', // Market data is inherently global - this is factual
+        confidence: 100, // Market data is factual (high confidence in data quality)
+        impact: null, // EventAgent does NOT assign impact - SignalAgent will fill this
+        horizon: null, // EventAgent does NOT assign horizon - SignalAgent will fill this
+        source_count: 1,
+        last_updated: marketData.timestamp,
+        event_id: `twelvedata-${marketData.symbol}-${Date.now()}`,
+        headline: `${marketData.symbol} ${changePercent > 0 ? 'gained' : 'lost'} ${Math.abs(changePercent).toFixed(2)}%`,
+        description: `${marketData.symbol} price changed from previous value. Current price: ${marketData.price}. Change: ${marketData.change || 0}. Volume: ${marketData.volume || 'N/A'}`,
+        date: marketData.timestamp,
+        location: null,
+        actors: [marketData.symbol],
+        sectors: ['Market'],
+        sources: [
+          {
+            name: 'Twelve Data',
+            url: `https://twelvedata.com/stocks/${marketData.symbol}`,
+          },
+        ],
+        source_type: 'twelvedata',
+        market_data: {
+          symbol: marketData.symbol,
+          price: marketData.price,
+          change: marketData.change,
+          change_percent: marketData.change_percent,
+          volume: marketData.volume,
+        },
+        // Store raw data for audit/replay/ML (if enabled)
+        ...(STORE_RAW_DATA && {
+          raw_content_hash: Buffer.from(JSON.stringify(marketData)).toString('base64').substring(0, 64),
+        }),
+      };
+
+      return {
+        data: event,
+        metadata: {
+          processing_time_ms: Date.now() - startTime,
+        },
+      };
+    } catch (error: any) {
+      return {
+        data: null,
+        error: error.message || 'Failed to extract event from market data',
         metadata: {
           processing_time_ms: Date.now() - startTime,
         },

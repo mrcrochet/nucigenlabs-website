@@ -15,6 +15,7 @@ export type IntelligenceType =
   | 'recommendation' 
   | 'alert' 
   | 'analysis' 
+  | 'impact'
   | 'metric';
 
 export type IntelligenceScope = 
@@ -33,10 +34,10 @@ export type TimeHorizon =
 export interface IntelligenceObject {
   id: string;
   type: IntelligenceType;
-  scope: IntelligenceScope;
-  confidence: number; // 0-100
-  impact: number; // 0-100
-  horizon: TimeHorizon;
+  scope: IntelligenceScope | null; // null = not determined (EventAgent), filled by SignalAgent
+  confidence: number; // 0-100 (data quality, not importance)
+  impact: number | null; // null = not assigned (EventAgent), filled by SignalAgent
+  horizon: TimeHorizon | null; // null = not assigned (EventAgent), filled by SignalAgent
   source_count: number;
   last_updated: string; // ISO-8601
 }
@@ -60,7 +61,7 @@ export interface Signal extends IntelligenceObject {
 // 2. EVENT (Events Page - Source of Truth)
 // ============================================
 
-export interface Event extends IntelligenceObject {
+export interface Event extends Omit<IntelligenceObject, 'confidence'> {
   type: 'event';
   event_id: string;
   headline: string;
@@ -83,6 +84,27 @@ export interface Event extends IntelligenceObject {
   second_order_effect?: string | null;
   impact_score?: number | null;
   confidence?: number | null;
+  // New: source tracking
+  source_type?: 'tavily' | 'newsapi_ai' | 'twelvedata' | 'firecrawl' | 'manual';
+  // New: market data (from Twelve Data)
+  market_data?: {
+    symbol?: string;
+    price?: number;
+    change?: number;
+    change_percent?: number;
+    volume?: number;
+  };
+  // New: NewsAPI.ai event ID
+  newsapi_event_id?: string;
+  // New: entities (from NewsAPI.ai)
+  entities?: Array<{
+    id: string;
+    type: 'person' | 'organization' | 'location' | 'sector' | 'concept';
+    name: string;
+    score?: number;
+  }>;
+  // Raw data hash for audit/replay/ML (optional, if STORE_RAW_DATA enabled)
+  raw_content_hash?: string;
 }
 
 // ============================================
@@ -132,7 +154,40 @@ export interface Analysis extends IntelligenceObject {
 }
 
 // ============================================
-// 6. METRIC (Quality Page)
+// 6. IMPACT (Impacts Page - Future Projections)
+// ============================================
+
+export interface Impact extends IntelligenceObject {
+  type: 'impact';
+  risk_headline: string;
+  opportunity?: string; // optional
+  probability: number; // 0-100
+  magnitude: number; // 0-100
+  timeframe: TimeHorizon;
+  linked_signal_ids: string[];
+  affected_assets?: string[];
+  scenario_summary?: string;
+  assumptions?: string[];
+  pathways?: {
+    first_order_effects: Array<{
+      effect: string;
+      confidence: number;
+    }>;
+    second_order_effects: Array<{
+      effect: string;
+      confidence: number;
+    }>;
+  };
+  assets_exposure?: Array<{
+    symbol: string;
+    exposure: 'low' | 'medium' | 'high';
+    sparkline_data?: number[];
+  }>;
+  invalidation_conditions?: string[];
+}
+
+// ============================================
+// 7. METRIC (Quality Page)
 // ============================================
 
 export interface Metric extends IntelligenceObject {

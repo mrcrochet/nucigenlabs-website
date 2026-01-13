@@ -1,0 +1,94 @@
+/**
+ * Responsive Design Utilities
+ * 
+ * Consistent responsive patterns across the application
+ */
+
+/* Container widths - consistent across all pages */
+.container-sm {
+  @apply max-w-4xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+.container-md {
+  @apply max-w-6xl mx-auto px-4 sm:px-6 lg:px-10;
+}
+
+.container-lg {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-12;
+}
+
+/* Responsive text sizes */
+.text-responsive-xl {
+  @apply text-2xl sm:text-3xl md:text-4xl lg:text-5xl;
+}
+
+.text-responsive-lg {
+  @apply text-lg sm:text-xl md:text-2xl;
+}
+
+.text-responsive-base {
+  @apply text-sm sm:text-base;
+}
+
+/* Responsive spacing */
+.spacing-section {
+  @apply py-8 sm:py-12 lg:py-16;
+}
+
+.spacing-section-lg {
+  @apply py-12 sm:py-16 lg:py-24;
+}
+
+/* Responsive grid */
+.grid-responsive {
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6;
+}
+
+.grid-responsive-2 {
+  @apply grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6;
+}
+
+.grid-responsive-4 {
+  @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6;
+}
+
+/* Mobile-first padding */
+.padding-page {
+  @apply px-4 sm:px-6 lg:px-10;
+}
+
+.padding-section {
+  @apply py-6 sm:py-8 lg:py-12;
+}
+
+/* Responsive header */
+.header-responsive {
+  @apply px-4 sm:px-6 lg:px-10 py-4 sm:py-6;
+}
+
+/* Touch-friendly targets on mobile */
+@media (max-width: 768px) {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Improved mobile typography */
+@media (max-width: 640px) {
+  h1 {
+    @apply text-3xl leading-tight;
+  }
+  
+  h2 {
+    @apply text-2xl leading-tight;
+  }
+  
+  h3 {
+    @apply text-xl leading-snug;
+  }
+  
+  p {
+    @apply text-sm leading-relaxed;
+  }
+}

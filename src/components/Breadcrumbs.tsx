@@ -20,11 +20,34 @@ export default function Breadcrumbs() {
     { name: 'Home', url: '/' },
   ];
 
+  // Map route segments to friendly names
+  const routeNames: Record<string, string> = {
+    'dashboard': 'Dashboard',
+    'intelligence': 'Intelligence',
+    'events': 'Events',
+    'alerts': 'Alerts',
+    'research': 'Research',
+    'recommendations': 'Recommendations',
+    'profile': 'Profile',
+    'settings': 'Settings',
+    'quality': 'Quality',
+    'onboarding': 'Onboarding',
+    'login': 'Login',
+    'register': 'Register',
+    'pricing': 'Pricing',
+    'partners': 'Partners',
+    'about': 'About',
+    'terms': 'Terms',
+    'privacy': 'Privacy',
+    'faq': 'FAQ',
+  };
+
   // Build breadcrumbs from path
   let currentPath = '';
   pathSegments.forEach((segment, index) => {
     currentPath += `/${segment}`;
-    const name = segment
+    // Use friendly name if available, otherwise format the segment
+    const name = routeNames[segment] || segment
       .split('-')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ');

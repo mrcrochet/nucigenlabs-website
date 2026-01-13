@@ -18,7 +18,7 @@ import type {
   SignalAgentInput,
   AgentResponse,
 } from '../../lib/agents/agent-interfaces';
-import type { Signal } from '../../types/intelligence';
+import type { Signal, TimeHorizon, IntelligenceScope } from '../../types/intelligence';
 import type { EventWithChain } from '../../lib/supabase';
 
 export class IntelligenceSignalAgent implements SignalAgent {
@@ -235,6 +235,7 @@ export class IntelligenceSignalAgent implements SignalAgent {
    * Create signal from a single high-impact event
    */
   private createSignalFromSingleEvent(event: EventWithChain): Signal {
+    // Determine horizon from causal chain or default to medium
     let horizon: 'immediate' | 'short' | 'medium' | 'long' = 'medium';
     const chain = event.nucigen_causal_chains?.[0];
     if (chain) {
@@ -242,10 +243,15 @@ export class IntelligenceSignalAgent implements SignalAgent {
       else if (chain.time_horizon === 'days') horizon = 'short';
       else if (chain.time_horizon === 'weeks') horizon = 'medium';
       else horizon = 'long';
+    } else if (event.horizon) {
+      // Use horizon from event if available (should be null from EventAgent, but handle gracefully)
+      horizon = event.horizon as TimeHorizon;
     }
 
     let scope: 'global' | 'regional' | 'sectorial' | 'asset' | 'actor' = 'global';
-    if (event.region) {
+    if (event.scope) {
+      scope = event.scope as IntelligenceScope;
+    } else if (event.region) {
       if (['US', 'EU', 'China', 'Asia'].includes(event.region)) {
         scope = 'regional';
       }
@@ -254,19 +260,23 @@ export class IntelligenceSignalAgent implements SignalAgent {
       scope = 'sectorial';
     }
 
+    // Calculate impact: prefer impact_score from DB, fallback to 0 if null
+    const impactValue = event.impact_score ?? event.impact ?? 0;
+    const confidenceValue = event.confidence ?? 0;
+
     return {
       id: `signal-${event.id}`,
       type: 'signal',
       scope,
-      confidence: Math.round((event.confidence || 0) * 100),
-      impact: Math.round((event.impact_score || 0) * 100),
+      confidence: Math.round(confidenceValue * 100),
+      impact: Math.round(impactValue * 100),
       horizon,
       source_count: 1,
       last_updated: event.created_at,
       title: `${event.sector || 'Global'} ${event.event_type || 'Event'}`,
       summary: event.summary.substring(0, 300),
-      impact_score: Math.round((event.impact_score || 0) * 100),
-      confidence_score: Math.round((event.confidence || 0) * 100),
+      impact_score: Math.round(impactValue * 100),
+      confidence_score: Math.round(confidenceValue * 100),
       time_horizon: horizon,
       related_event_ids: [event.id],
       why_it_matters: event.why_it_matters || `High-impact event in ${event.sector || 'this sector'}.`,

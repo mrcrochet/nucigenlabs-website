@@ -1,4 +1,5 @@
 import React, { Component, ReactNode } from 'react';
+import { logErrorToTracker } from '../utils/error-tracker';
 
 interface Props {
   children: ReactNode;
@@ -21,7 +22,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('[ErrorBoundary] Caught error:', error, errorInfo);
+    logErrorToTracker(error, errorInfo);
   }
 
   render() {

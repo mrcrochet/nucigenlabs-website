@@ -11,17 +11,31 @@ import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { 
   getEventsWithCausalChainsSearch, 
   countSearchResults,
+  getEventById,
+  getEventContext,
+  getOfficialDocuments,
+  getEventRelationships,
+  getHistoricalComparisons,
+  getScenarioPredictions,
   type EventWithChain,
+  type EventRelationship,
+  type HistoricalComparison,
+  type ScenarioPrediction,
 } from '../lib/supabase';
+import { cache, CacheKeys } from '../lib/cache';
 import { eventWithChainToEvent } from '../lib/adapters/intelligence-adapters';
 import type { Event } from '../types/intelligence';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
-import AppSidebar from '../components/AppSidebar';
+import AppShell from '../components/layout/AppShell';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SectionHeader from '../components/ui/SectionHeader';
+import SkeletonCard from '../components/ui/SkeletonCard';
 import MetaRow from '../components/ui/MetaRow';
+import EventCardExpanded from '../components/EventCardExpanded';
+import MarketDataPanel from '../components/market/MarketDataPanel';
+import MarketMetricsCompact from '../components/market/MarketMetricsCompact';
 import { MapPin, Building2, TrendingUp, Clock, Search, Filter, X, ChevronLeft, ChevronRight, Sparkles, Loader2 } from 'lucide-react';
 
 function EventsContent() {
@@ -47,6 +61,11 @@ function EventsContent() {
   const [liveSearchQuery, setLiveSearchQuery] = useState('');
   const [isSearchingLive, setIsSearchingLive] = useState(false);
   const [liveSearchError, setLiveSearchError] = useState('');
+  
+  // Expansion state
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+  const [expandedEventDetails, setExpandedEventDetails] = useState<EventDetailData | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState<string | null>(null);
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -78,36 +97,58 @@ function EventsContent() {
       const eventIdsParam = searchParams.get('event_ids');
       const eventIds = eventIdsParam ? eventIdsParam.split(',') : undefined;
 
+      // Check cache first
+      const cacheKey = CacheKeys.events(user.id, debouncedSearchQuery || 'all');
+      const cachedEvents = cache.get<Event[]>(cacheKey);
+      
       // Fetch events with search (using debounced query)
-      const [eventsData, count] = await Promise.all([
-        getEventsWithCausalChainsSearch({
-          searchQuery: debouncedSearchQuery || undefined,
-          sectorFilter: selectedSectors.length > 0 ? selectedSectors : undefined,
-          regionFilter: selectedRegions.length > 0 ? selectedRegions : undefined,
-          eventTypeFilter: selectedEventTypes.length > 0 ? selectedEventTypes : undefined,
-          timeHorizonFilter: selectedTimeHorizons.length > 0 ? selectedTimeHorizons : undefined,
-          limit: eventsPerPage,
-          offset: offset,
-        }, user.id),
-        countSearchResults({
-          searchQuery: debouncedSearchQuery || undefined,
-          sectorFilter: selectedSectors.length > 0 ? selectedSectors : undefined,
-          regionFilter: selectedRegions.length > 0 ? selectedRegions : undefined,
-          eventTypeFilter: selectedEventTypes.length > 0 ? selectedEventTypes : undefined,
-          timeHorizonFilter: selectedTimeHorizons.length > 0 ? selectedTimeHorizons : undefined,
-        }, user.id),
-      ]);
+      let eventsData: EventWithChain[] | null = null;
+      let count = 0;
       
-      // Convert EventWithChain to Event (UI contract)
-      let normalizedEvents = (eventsData || []).map(eventWithChainToEvent);
-      
-      // Filter by event IDs if provided
-      if (eventIds && eventIds.length > 0) {
-        normalizedEvents = normalizedEvents.filter(e => eventIds.includes(e.id));
+      try {
+        [eventsData, count] = await Promise.all([
+          getEventsWithCausalChainsSearch({
+            searchQuery: debouncedSearchQuery || undefined,
+            sectorFilter: selectedSectors.length > 0 ? selectedSectors : undefined,
+            regionFilter: selectedRegions.length > 0 ? selectedRegions : undefined,
+            eventTypeFilter: selectedEventTypes.length > 0 ? selectedEventTypes : undefined,
+            timeHorizonFilter: selectedTimeHorizons.length > 0 ? selectedTimeHorizons : undefined,
+            limit: eventsPerPage,
+            offset: offset,
+          }, user.id),
+          countSearchResults({
+            searchQuery: debouncedSearchQuery || undefined,
+            sectorFilter: selectedSectors.length > 0 ? selectedSectors : undefined,
+            regionFilter: selectedRegions.length > 0 ? selectedRegions : undefined,
+            eventTypeFilter: selectedEventTypes.length > 0 ? selectedEventTypes : undefined,
+            timeHorizonFilter: selectedTimeHorizons.length > 0 ? selectedTimeHorizons : undefined,
+          }, user.id),
+        ]);
+        
+        // Convert EventWithChain to Event (UI contract)
+        let normalizedEvents = (eventsData || []).map(eventWithChainToEvent);
+        
+        // Filter by event IDs if provided
+        if (eventIds && eventIds.length > 0) {
+          normalizedEvents = normalizedEvents.filter(e => eventIds.includes(e.id));
+        }
+        
+        // Cache successful response (3 minutes)
+        cache.set(cacheKey, normalizedEvents, 3 * 60 * 1000);
+        
+        setEvents(normalizedEvents);
+        setTotalCount(count);
+      } catch (fetchError: any) {
+        // Fallback to cache if fetch fails
+        if (cachedEvents && cachedEvents.length > 0) {
+          console.warn('Fetch failed, using cached data:', fetchError.message);
+          setEvents(cachedEvents);
+          setTotalCount(cachedEvents.length);
+          setError('Showing cached data. Some information may be outdated.');
+        } else {
+          throw fetchError;
+        }
       }
-      
-      setEvents(normalizedEvents);
-      setTotalCount(count);
     } catch (err: any) {
       setError(err.message || 'Failed to load events');
       setEvents([]);
@@ -120,6 +161,69 @@ function EventsContent() {
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
+
+  // Types for expanded event details
+  interface EventDetailData {
+    event: any; // EventWithChain from getEventById
+    context: any | null;
+    documents: any[];
+    relationships: EventRelationship[];
+    historicalComparisons: HistoricalComparison[];
+    scenarios: ScenarioPrediction[];
+  }
+
+  // Load all event details for expansion
+  const loadEventDetails = async (eventId: string): Promise<EventDetailData> => {
+    const [eventData, contextData, documentsData, relationshipsData, historicalData, scenariosData] = await Promise.all([
+      getEventById(eventId).catch(() => null),
+      getEventContext(eventId).catch(() => null),
+      getOfficialDocuments(eventId).catch(() => []),
+      getEventRelationships(eventId).catch(() => []),
+      getHistoricalComparisons(eventId).catch(() => []),
+      getScenarioPredictions(eventId).catch(() => []),
+    ]);
+
+    return {
+      event: eventData,
+      context: contextData,
+      documents: documentsData || [],
+      relationships: relationshipsData || [],
+      historicalComparisons: historicalData || [],
+      scenarios: scenariosData || [],
+    };
+  };
+
+  // Handle event expansion/collapse
+  const handleEventExpand = async (eventId: string) => {
+    if (expandedEventId === eventId) {
+      // Collapse if already expanded
+      setExpandedEventId(null);
+      setExpandedEventDetails(null);
+      return;
+    }
+    
+    setExpandedEventId(eventId);
+    setLoadingDetails(eventId);
+    
+    try {
+      const details = await loadEventDetails(eventId);
+      setExpandedEventDetails(details);
+      
+      // Scroll to expanded card after a short delay to allow rendering
+      setTimeout(() => {
+        const element = document.getElementById(`event-card-${eventId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 100);
+    } catch (error) {
+      console.error('Error loading event details:', error);
+      setError('Failed to load event details');
+      setExpandedEventId(null);
+    } finally {
+      setLoadingDetails(null);
+    }
+  };
 
   const getTimeHorizonLabel = (horizon: string) => {
     switch (horizon) {
@@ -284,63 +388,65 @@ function EventsContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-sm text-slate-500 font-light">Loading events...</p>
+      <AppShell>
+        <div className="col-span-12">
+          <header className="mb-6">
+            <SectionHeader
+              title="Events"
+              subtitle="Structured events with causal chains"
+            />
+          </header>
+          <div className="space-y-4">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center px-4">
-        <div className="max-w-2xl w-full text-center">
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
-            <p className="text-sm text-red-400">{error}</p>
+      <AppShell>
+        <div className="col-span-12 flex items-center justify-center min-h-[400px]">
+          <div className="max-w-2xl w-full text-center">
+            <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+            <button
+              onClick={() => navigate('/overview')}
+              className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
+            >
+              Back to Dashboard
+            </button>
           </div>
-          <button
-            onClick={() => navigate('/app')}
-            className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
-          >
-            Back to Dashboard
-          </button>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex">
+    <AppShell>
       <SEO 
         title="Events — Nucigen Labs"
         description="Structured events with causal chains"
       />
 
-      {/* Sidebar */}
-      <AppSidebar />
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col lg:ml-64">
+      <div className="col-span-12">
         {/* Header */}
-        <header className="border-b border-white/[0.02] bg-[#0F0F0F]/30 backdrop-blur-xl">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl sm:text-4xl font-light text-white leading-tight mb-1">
-                  Events
-                </h1>
-                <p className="text-sm text-slate-600 font-light">
-                  {events.length} of {totalCount} event{totalCount !== 1 ? 's' : ''} shown
-                </p>
-              </div>
+        <header className="mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-light text-white leading-tight mb-1">
+                Events
+              </h1>
+              <p className="text-sm text-slate-600 font-light">
+                {events.length} of {totalCount} event{totalCount !== 1 ? 's' : ''} shown
+              </p>
             </div>
           </div>
         </header>
-
-        {/* Main Content */}
-        <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-12 w-full">
         {/* Search and Filters */}
         <div className="mb-8 space-y-4">
           {/* Search Bar */}
@@ -546,20 +652,52 @@ function EventsContent() {
 
         {events.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-lg text-slate-500 font-light mb-4">No events with causal chains found.</p>
-            <p className="text-sm text-slate-600 font-light">
-              Events will appear here once they have been processed and causal chains have been generated.
-            </p>
-          </div>
-        ) : events.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-lg text-slate-500 font-light mb-4">No events match your filters.</p>
-            <button
-              onClick={clearFilters}
-              className="text-sm text-slate-400 hover:text-white transition-colors font-light"
-            >
-              Clear filters to see all events
-            </button>
+            <div className="max-w-md mx-auto">
+              {hasActiveFilters ? (
+                <>
+                  <Filter className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                  <h3 className="text-lg text-white font-light mb-2">No events match your filters</h3>
+                  <p className="text-sm text-slate-400 font-light mb-6">
+                    Try adjusting your filters or search query to find relevant events.
+                  </p>
+                  <button
+                    onClick={clearFilters}
+                    className="px-6 py-3 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
+                  >
+                    Clear All Filters
+                  </button>
+                </>
+              ) : (
+                <>
+                  <TrendingUp className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                  <h3 className="text-lg text-white font-light mb-2">No events available yet</h3>
+                  <p className="text-sm text-slate-400 font-light mb-6">
+                    Events will appear here once they have been processed and causal chains have been generated. Try using live search to find current events.
+                  </p>
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      onClick={() => {
+                        const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+                        if (input) {
+                          input.focus();
+                          input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                      }}
+                      className="px-6 py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white rounded-lg transition-colors text-sm font-light flex items-center gap-2"
+                    >
+                      <Search className="w-4 h-4" />
+                      Try Live Search
+                    </button>
+                    <button
+                      onClick={() => navigate('/intelligence')}
+                      className="px-6 py-3 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
+                    >
+                      View Signals
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         ) : (
           <>
@@ -567,13 +705,16 @@ function EventsContent() {
               {paginatedEvents.map((event) => {
               // Get causal chain from extended Event properties
               const chain = (event as any).causal_chain;
+              const isExpanded = expandedEventId === event.id;
+              const isLoadingDetails = loadingDetails === event.id;
+              const eventDetails = isExpanded ? expandedEventDetails : null;
 
               return (
+                <div key={event.id} id={`event-card-${event.id}`} className="relative">
                 <Card
-                  key={event.id}
                   hover
-                  onClick={() => navigate(`/events/${event.id}`)}
-                  className="p-8"
+                  onClick={() => handleEventExpand(event.id)}
+                  className={`p-8 transition-all duration-300 ${isExpanded ? 'border-white/10' : ''}`}
                 >
                   {/* Event Header */}
                   <div className="mb-6">
@@ -618,7 +759,31 @@ function EventsContent() {
                         }] : []),
                       ]}
                     />
+                    
+                    {/* Compact Market Metrics */}
+                    {event.market_data && (
+                      <div className="mt-4 pt-4 border-t border-white/[0.02]">
+                        <MarketMetricsCompact
+                          data={{
+                            symbol: event.market_data.symbol || 'N/A',
+                            priceChange: event.market_data.change_percent,
+                            volatilityChange: 0, // Will be calculated from API
+                            volumeChange: 0, // Will be calculated from API
+                            timeFrame: '24h',
+                            estimatedImpact: event.impact_score && event.impact_score > 70 ? 'high' : event.impact_score && event.impact_score > 50 ? 'medium' : 'low',
+                            affectedAssets: event.actors.filter(a => a !== event.market_data?.symbol),
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
+
+                  {/* Market Data Panel */}
+                  {event.market_data && (
+                    <div className="mb-8 pb-8 border-b border-white/[0.02]">
+                      <MarketDataPanel event={event} />
+                    </div>
+                  )}
 
                   {/* Why It Matters */}
                   <div className="mb-8 pb-8 border-b border-white/[0.02]">
@@ -703,7 +868,32 @@ function EventsContent() {
                       </div>
                     </div>
                   )}
+
+                  {/* Loading state for details */}
+                  {isLoadingDetails && (
+                    <div className="mt-8 pt-8 border-t border-white/[0.02]">
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-slate-500" />
+                        <span className="ml-3 text-sm text-slate-500 font-light">Loading details...</span>
+                      </div>
+                    </div>
+                  )}
                 </Card>
+
+                {/* Expanded content */}
+                {isExpanded && eventDetails && !isLoadingDetails && (
+                  <div 
+                    className="mt-4 overflow-hidden animate-slide-down"
+                  >
+                    <EventCardExpanded
+                      event={event}
+                      details={eventDetails}
+                      onCollapse={() => handleEventExpand(event.id)}
+                      getTimeHorizonLabel={getTimeHorizonLabel}
+                    />
+                  </div>
+                )}
+                </div>
               );
               })}
             </div>
@@ -761,9 +951,8 @@ function EventsContent() {
             )}
           </>
         )}
-        </main>
       </div>
-    </div>
+    </AppShell>
   );
 }
 

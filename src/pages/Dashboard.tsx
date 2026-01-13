@@ -172,7 +172,7 @@ function DashboardContent() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col lg:ml-64">
         {/* Header */}
-        <header className="border-b border-white/[0.02] bg-[#0F0F0F]/30 backdrop-blur-xl">
+        <header className="border-b border-white/[0.08] bg-[#0F0F0F]/30 backdrop-blur-xl">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
             <SectionHeader
               title="Dashboard"

@@ -39,8 +39,9 @@ interface ProcessingResult {
 
 /**
  * Process a single pending event through Phase 1 and Phase 2B
+ * Exported for API endpoint use
  */
-async function processEvent(eventId: string): Promise<{ phase1Success: boolean; phase2bSuccess: boolean; error?: string }> {
+export async function processEvent(eventId: string): Promise<{ phase1Success: boolean; phase2bSuccess: boolean; error?: string }> {
   let phase1Success = false;
   let phase2bSuccess = false;
   let error: string | undefined;

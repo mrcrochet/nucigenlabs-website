@@ -130,7 +130,13 @@ function EventDetailContent() {
         setScenarios(scenariosData);
       } catch (err: any) {
         console.error('Error loading event:', err);
-        setError(err.message || 'Failed to load event');
+        const errorMessage = err.message || 'Failed to load event';
+        // Provide more helpful error messages
+        if (errorMessage.includes('not found')) {
+          setError(`Event not found. The event with ID "${event_id}" may not exist in the database, or it may still be processing. Please check the Events page to see available events.`);
+        } else {
+          setError(errorMessage);
+        }
       } finally {
         setLoading(false);
       }

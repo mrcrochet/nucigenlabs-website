@@ -19,11 +19,13 @@ import { generateAnalysisFromEvents } from '../lib/adapters/analysis-adapters';
 import type { Analysis } from '../types/intelligence';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
-import AppSidebar from '../components/AppSidebar';
+import AppShell from '../components/layout/AppShell';
+import SkeletonCard from '../components/ui/SkeletonCard';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SectionHeader from '../components/ui/SectionHeader';
-import { BookOpen, Clock, ArrowRight, TrendingUp } from 'lucide-react';
+import Tooltip from '../components/ui/Tooltip';
+import { BookOpen, Clock, ArrowRight, TrendingUp, Search, Sparkles, Loader2, ExternalLink } from 'lucide-react';
 
 function ResearchContent() {
   const { user, isLoaded: userLoaded } = useUser();
@@ -36,6 +38,13 @@ function ResearchContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'medium' | 'long'>('medium');
+  
+  // Deep Research state
+  const [deepResearchQuery, setDeepResearchQuery] = useState('');
+  const [isDeepResearching, setIsDeepResearching] = useState(false);
+  const [deepResearchResult, setDeepResearchResult] = useState<Analysis | null>(null);
+  const [deepResearchError, setDeepResearchError] = useState('');
+  const [deepResearchProgress, setDeepResearchProgress] = useState<string>('');
 
   // Load preferences
   useEffect(() => {
@@ -111,6 +120,62 @@ function ResearchContent() {
     fetchAnalysis();
   }, [fetchAnalysis]);
 
+  // Deep Research handler
+  const handleDeepResearch = async () => {
+    if (!deepResearchQuery.trim() || isDeepResearching) return;
+
+    setIsDeepResearching(true);
+    setDeepResearchError('');
+    setDeepResearchResult(null);
+    setDeepResearchProgress('Collecting sources...');
+
+    try {
+      // Simulate progress updates
+      setTimeout(() => setDeepResearchProgress('Analyzing information...'), 2000);
+      setTimeout(() => setDeepResearchProgress('Synthesizing analysis...'), 4000);
+      
+      const apiUrl = '/api/deep-research';
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: deepResearchQuery.trim(),
+          focus_areas: preferences?.focus_areas || [],
+          time_horizon: activeTab,
+          max_sources: 10,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `Server error: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.analysis) {
+        setDeepResearchProgress('Complete!');
+        setDeepResearchResult(result.analysis);
+        // Add to analyses list
+        setAnalyses(prev => [result.analysis, ...prev]);
+        setDeepResearchQuery('');
+      } else {
+        throw new Error(result.error || 'Failed to generate analysis');
+      }
+    } catch (err: any) {
+      console.error('Deep research error:', err);
+      setDeepResearchError(err.message || 'Failed to conduct deep research');
+      setDeepResearchProgress('');
+    } finally {
+      setTimeout(() => {
+        setIsDeepResearching(false);
+        setDeepResearchProgress('');
+      }, 500);
+    }
+  };
+
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -135,57 +200,109 @@ function ResearchContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-sm text-slate-500 font-light">Loading research analysis...</p>
+      <AppShell>
+        <div className="col-span-12 flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-sm text-slate-500 font-light">Loading research analysis...</p>
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex">
-        <AppSidebar />
-        <div className="flex-1 flex items-center justify-center px-4 lg:ml-64">
+      <AppShell>
+        <div className="col-span-12 flex items-center justify-center min-h-[400px]">
           <div className="max-w-2xl w-full text-center">
             <div className="mb-6 p-6 bg-red-500/10 border border-red-500/20 rounded-xl">
               <p className="text-base text-red-400 font-light mb-2">Unable to load analysis</p>
               <p className="text-sm text-slate-400 font-light">{error}</p>
             </div>
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/overview')}
               className="px-6 py-3 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
             >
-              Back to Dashboard
+              Back to Overview
             </button>
           </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex">
+    <AppShell>
       <SEO 
         title="Research — Nucigen Labs"
         description="Long-form intelligence analysis and case studies"
       />
 
-      <AppSidebar />
-
-      <div className="flex-1 flex flex-col lg:ml-64">
-        <header className="border-b border-white/[0.02] bg-[#0F0F0F]/30 backdrop-blur-xl">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
-            <SectionHeader
-              title="Research"
-              subtitle={`Thematic analysis · ${analyses.length} analysis${analyses.length !== 1 ? 'es' : ''} available`}
-            />
-          </div>
+      <div className="col-span-12">
+        <header className="mb-6">
+          <SectionHeader
+            title="Research"
+            subtitle={`Thematic analysis · ${analyses.length} analysis${analyses.length !== 1 ? 'es' : ''} available`}
+          />
         </header>
+          {/* Deep Research Search */}
+          <div className="mb-8">
+            <Card className="p-6 bg-gradient-to-br from-purple-500/10 to-blue-500/10 border-purple-500/20">
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Sparkles className="w-5 h-5 text-purple-400" />
+                  <h3 className="text-lg font-light text-white">Deep Research</h3>
+                </div>
+                <p className="text-sm text-slate-400 font-light">
+                  Get comprehensive analysis in seconds. Our AI agents work in parallel to collect, analyze, and synthesize information from multiple sources.
+                </p>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-400" />
+                  <input
+                    type="text"
+                    placeholder="Enter your research query (e.g., 'China trade policy impact on global supply chains')..."
+                    value={deepResearchQuery}
+                    onChange={(e) => setDeepResearchQuery(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && deepResearchQuery.trim() && !isDeepResearching) {
+                        handleDeepResearch();
+                      }
+                    }}
+                    disabled={isDeepResearching}
+                    className="w-full pl-12 pr-32 py-3 bg-white/[0.02] border border-purple-500/30 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 focus:bg-white/[0.03] transition-all font-light disabled:opacity-50"
+                  />
+                  <button
+                    onClick={handleDeepResearch}
+                    disabled={!deepResearchQuery.trim() || isDeepResearching}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 bg-purple-500/20 hover:bg-purple-500/30 disabled:opacity-50 disabled:cursor-not-allowed border border-purple-500/30 rounded-lg text-purple-300 text-sm font-light transition-all flex items-center gap-2"
+                  >
+                    {isDeepResearching ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>{deepResearchProgress || 'Researching...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        <span>Start Research</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                
+                {deepResearchError && (
+                  <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                    <p className="text-red-400 text-sm font-light">{deepResearchError}</p>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
 
-        <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-12 w-full">
           {/* Tabs */}
           <div className="flex items-center gap-2 mb-8 border-b border-white/[0.02]">
             {(['medium', 'long'] as const).map(tab => (
@@ -204,15 +321,28 @@ function ResearchContent() {
           </div>
 
           {/* Analysis List */}
-          {analyses.length === 0 ? (
+          {analyses.length === 0 && !deepResearchResult ? (
             <div className="text-center py-20">
-              <BookOpen className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <p className="text-lg text-slate-500 font-light mb-4">
-                No analysis available yet.
-              </p>
-              <p className="text-sm text-slate-600 font-light">
-                Analysis will appear here once we have enough events to identify patterns and trends.
-              </p>
+              <div className="max-w-md mx-auto">
+                <BookOpen className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                <h3 className="text-lg text-white font-light mb-2">No analysis yet</h3>
+                <p className="text-sm text-slate-400 font-light mb-6">
+                  Use Deep Research above to generate comprehensive analysis on any topic. Analysis will also appear here automatically once we have enough events to identify patterns and trends.
+                </p>
+                <button
+                  onClick={() => {
+                    const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+                    if (input) {
+                      input.focus();
+                      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  }}
+                  className="px-6 py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white rounded-lg transition-colors text-sm font-light flex items-center gap-2 mx-auto"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Try Deep Research
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-6">
@@ -288,7 +418,7 @@ function ResearchContent() {
                     {analysis.referenced_event_ids && analysis.referenced_event_ids.length > 0 && (
                       <div className="pt-6 border-t border-white/[0.02]">
                         <button
-                          onClick={() => navigate(`/events?event_ids=${analysis.referenced_event_ids?.join(',')}`)}
+                          onClick={() => navigate(`/events-feed?event_ids=${analysis.referenced_event_ids?.join(',')}`)}
                           className="flex items-center gap-2 text-sm text-slate-500 hover:text-white transition-colors"
                         >
                           View {analysis.referenced_event_ids.length} referenced event{analysis.referenced_event_ids.length !== 1 ? 's' : ''}
@@ -301,9 +431,8 @@ function ResearchContent() {
               ))}
             </div>
           )}
-        </main>
       </div>
-    </div>
+    </AppShell>
   );
 }
 

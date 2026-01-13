@@ -1,8 +1,24 @@
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import './styles/design-tokens.css';
+@import './styles/responsive-utils.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Animation for event card expansion */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 5000px;
+  }
+}
 
 @layer base {
   * {

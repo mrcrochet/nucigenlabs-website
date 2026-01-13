@@ -108,7 +108,7 @@ export default function AppSidebar() {
                   text-sm font-light transition-all
                   ${
                     active
-                      ? 'bg-white/[0.05] text-white border border-white/[0.1]'
+                      ? 'bg-white/[0.05] text-white border border-white/[0.15]'
                       : 'text-slate-400 hover:text-white hover:bg-white/[0.02]'
                   }
                 `}
@@ -136,7 +136,7 @@ export default function AppSidebar() {
                   text-sm font-light transition-all
                   ${
                     active
-                      ? 'bg-white/[0.05] text-white border border-white/[0.1]'
+                      ? 'bg-white/[0.05] text-white border border-white/[0.15]'
                       : 'text-slate-400 hover:text-white hover:bg-white/[0.02]'
                   }
                 `}

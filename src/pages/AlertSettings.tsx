@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
-import AppSidebar from '../components/AppSidebar';
+import AppShell from '../components/layout/AppShell';
 import Card from '../components/ui/Card';
 import SectionHeader from '../components/ui/SectionHeader';
 import { createClient } from '@supabase/supabase-js';
@@ -140,37 +140,31 @@ function AlertSettingsContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-sm text-slate-500 font-light">Loading settings...</p>
+      <AppShell>
+        <div className="col-span-12 flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-sm text-slate-500 font-light">Loading settings...</p>
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex">
+    <AppShell>
       <SEO
         title="Alert Settings — Nucigen Labs"
         description="Configure your alert preferences"
       />
 
-      <AppSidebar />
-
-      <div className="flex-1 flex flex-col lg:ml-64">
-        {/* Header */}
-        <header className="border-b border-white/[0.02] bg-[#0F0F0F]/30 backdrop-blur-xl">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
-            <SectionHeader
-              title="Alert Settings"
-              subtitle="Configure when and how you receive alerts"
-            />
-          </div>
+      <div className="col-span-12">
+        <header className="mb-6">
+          <SectionHeader
+            title="Alert Settings"
+            subtitle="Configure when and how you receive alerts"
+          />
         </header>
-
-        {/* Main Content */}
-        <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-10 py-12 w-full">
           <Card className="p-8 space-y-8">
             {/* Enable/Disable */}
             <div className="flex items-center justify-between pb-6 border-b border-white/[0.02]">
@@ -362,9 +356,8 @@ function AlertSettingsContent() {
               </button>
             </div>
           </Card>
-        </main>
       </div>
-    </div>
+    </AppShell>
   );
 }
 

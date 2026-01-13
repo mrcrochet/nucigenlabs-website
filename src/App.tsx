@@ -1,5 +1,5 @@
 import { Suspense, lazy, useState, useEffect } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import PremiumNavigation from './components/PremiumNavigation';
 import AnimatedBackground from './components/AnimatedBackground';
 import Toast from './components/Toast';
@@ -29,10 +29,21 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 // Application core routes (PHASE 2D)
-const Dashboard = lazy(() => import('./pages/Dashboard'));
+// Legacy pages - now redirected to /overview
+// const Dashboard = lazy(() => import('./pages/Dashboard'));
 const IntelligenceFeed = lazy(() => import('./pages/IntelligenceFeed'));
 const Events = lazy(() => import('./pages/Events'));
 const EventDetail = lazy(() => import('./pages/EventDetail'));
+// New Dashboard UI (UI Spec compliant)
+const Overview = lazy(() => import('./pages/Overview'));
+const EventsFeed = lazy(() => import('./pages/EventsFeed'));
+const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
+const SignalsFeed = lazy(() => import('./pages/SignalsFeed'));
+const SignalDetailPage = lazy(() => import('./pages/SignalDetailPage'));
+const MarketsPage = lazy(() => import('./pages/MarketsPage'));
+const AssetDetailPage = lazy(() => import('./pages/AssetDetailPage'));
+const ImpactsPage = lazy(() => import('./pages/ImpactsPage'));
+const ImpactDetailPage = lazy(() => import('./pages/ImpactDetailPage'));
 // Modules (Beta / Locked)
 const Alerts = lazy(() => import('./pages/Alerts'));
 const Research = lazy(() => import('./pages/Research'));
@@ -96,7 +107,18 @@ function App() {
   });
 
   // Hide navigation and marketing components on auth/app pages
-  const hideMarketingPaths = ['/login', '/register', '/auth', '/app', '/dashboard', '/intelligence', '/events', '/alerts', '/research', '/profile', '/settings', '/onboarding'];
+  // All app routes should hide marketing components (landing page navigation, background, etc.)
+  const hideMarketingPaths = [
+    // Auth routes
+    '/login', '/register', '/auth', '/confirm-email', '/forgot-password', '/reset-password',
+    // App routes (all protected routes)
+    '/app', '/dashboard', '/overview',
+    '/intelligence', '/events', '/events-feed',
+    '/signals', '/signals-feed',
+    '/markets', '/impacts',
+    '/alerts', '/research', '/recommendations', '/quality',
+    '/profile', '/settings', '/onboarding'
+  ];
   const shouldHideMarketing = hideMarketingPaths.some(path => location.pathname.startsWith(path));
 
   return (
@@ -143,11 +165,25 @@ function App() {
         {/* Protected App Routes - PHASE 2D SITEMAP */}
         {/* Level 1 - Application Core */}
         {/* Note: Onboarding is now optional. Users can access all features and complete onboarding when ready via the banner */}
-        <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-        <Route path="/app" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} /> {/* Legacy redirect */}
+        {/* Legacy redirect: /dashboard → /overview (new UI spec compliant page) */}
+        <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
+        <Route path="/app" element={<Navigate to="/overview" replace />} /> {/* Legacy redirect */}
         <Route path="/intelligence" element={<ProtectedRoute><IntelligenceFeed /></ProtectedRoute>} />
-        <Route path="/events" element={<ProtectedRoute><Events /></ProtectedRoute>} />
-        <Route path="/events/:event_id" element={<ProtectedRoute><EventDetail /></ProtectedRoute>} />
+        
+        {/* Legacy redirect: /events → /events-feed (new UI spec compliant page) */}
+        <Route path="/events" element={<Navigate to="/events-feed" replace />} />
+        <Route path="/events/:event_id" element={<Navigate to="/events-feed/:id" replace />} />
+        
+        {/* New Dashboard UI (UI Spec compliant) */}
+        <Route path="/overview" element={<ProtectedRoute><Overview /></ProtectedRoute>} />
+        <Route path="/events-feed" element={<ProtectedRoute><EventsFeed /></ProtectedRoute>} />
+        <Route path="/events-feed/:id" element={<ProtectedRoute><EventDetailPage /></ProtectedRoute>} />
+        <Route path="/signals-feed" element={<ProtectedRoute><SignalsFeed /></ProtectedRoute>} />
+        <Route path="/signals/:id" element={<ProtectedRoute><SignalDetailPage /></ProtectedRoute>} />
+        <Route path="/markets" element={<ProtectedRoute><MarketsPage /></ProtectedRoute>} />
+        <Route path="/markets/:symbol" element={<ProtectedRoute><AssetDetailPage /></ProtectedRoute>} />
+        <Route path="/impacts" element={<ProtectedRoute><ImpactsPage /></ProtectedRoute>} />
+        <Route path="/impacts/:id" element={<ProtectedRoute><ImpactDetailPage /></ProtectedRoute>} />
         
         {/* Level 2 - Modules (Beta / Locked) */}
         <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />

@@ -235,13 +235,27 @@ function RecommendationsContent() {
           {/* Recommendations List */}
           {recommendations.length === 0 ? (
             <div className="text-center py-20">
-              <Target className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <p className="text-lg text-slate-500 font-light mb-4">
-                No recommendations available.
-              </p>
-              <p className="text-sm text-slate-600 font-light">
-                Recommendations will appear here once we detect high-impact signals relevant to your preferences.
-              </p>
+              <div className="max-w-md mx-auto">
+                <Target className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                <h3 className="text-lg text-white font-light mb-2">No recommendations yet</h3>
+                <p className="text-sm text-slate-400 font-light mb-6">
+                  Recommendations will appear here once we detect high-impact signals relevant to your preferences. Complete your onboarding to receive personalized recommendations.
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={() => navigate('/onboarding')}
+                    className="px-6 py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white rounded-lg transition-colors text-sm font-light"
+                  >
+                    Complete Onboarding
+                  </button>
+                  <button
+                    onClick={() => navigate('/intelligence')}
+                    className="px-6 py-3 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
+                  >
+                    View Signals
+                  </button>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">

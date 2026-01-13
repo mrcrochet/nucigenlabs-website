@@ -5,6 +5,7 @@ import { updateUserProfile, updateUserPreferences } from '../lib/supabase';
 import { Building2, Briefcase, Target, TrendingUp, Zap, X } from 'lucide-react';
 import SEO from '../components/SEO';
 import MultiSelect from '../components/ui/MultiSelect';
+import { useToast } from '../hooks/useToast';
 
 // Available options for multi-select
 const SECTOR_OPTIONS = [
@@ -59,6 +60,7 @@ export default function Onboarding() {
   const { user, isLoaded: userLoaded } = useUser();
   const { isLoaded: authLoaded, isSignedIn } = useClerkAuth();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentStep, setCurrentStep] = useState(1);
@@ -229,7 +231,14 @@ export default function Onboarding() {
 
       // Only navigate after all data is saved successfully
       setLoading(false);
-      navigate('/dashboard', { replace: true });
+      
+      // Show success message before navigation
+      showToast('Profile saved successfully!', 'success');
+      
+      // Small delay to show toast, then navigate
+      setTimeout(() => {
+        navigate('/intelligence', { replace: true });
+      }, 1000);
     } catch (err: any) {
       console.error('Onboarding error:', err);
       setError(err.message || 'Failed to save profile. Please try again.');
@@ -289,17 +298,22 @@ export default function Onboarding() {
           </p>
           
           {/* Progress indicator */}
-          <div className="flex items-center justify-center gap-2 mb-6">
-            {[1, 2, 3].map((step) => (
-              <div
-                key={step}
-                className={`h-1.5 rounded-full transition-all ${
-                  step <= currentStep
-                    ? 'bg-[#E1463E] w-8'
-                    : 'bg-white/10 w-1.5'
-                }`}
-              />
-            ))}
+          <div className="mb-8">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              {[1, 2, 3].map((step) => (
+                <div
+                  key={step}
+                  className={`h-2 rounded-full transition-all ${
+                    step <= currentStep
+                      ? 'bg-[#E1463E] w-12'
+                      : 'bg-white/10 w-2'
+                  }`}
+                />
+              ))}
+            </div>
+            <p className="text-xs text-slate-500 font-light text-center">
+              Step {currentStep} of {totalSteps}
+            </p>
           </div>
         </div>
 

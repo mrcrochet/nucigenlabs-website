@@ -834,8 +834,14 @@ export async function getEventById(eventId: string) {
     );
   }
 
+  if (!eventId || eventId.trim() === '') {
+    throw new Error('Event ID is required');
+  }
+
   // Note: Events are public, no authentication required
   // RLS policies control access if needed
+
+  console.log(`[getEventById] Looking for event with ID: ${eventId}`);
 
   // First, try to find in nucigen_events by ID
   let { data, error } = await supabase
@@ -857,8 +863,14 @@ export async function getEventById(eventId: string) {
     .maybeSingle();
 
   if (error) {
-    console.error('Supabase error:', error);
+    console.error('[getEventById] Supabase error (by id):', error);
     throw new Error(error.message || 'Failed to fetch event');
+  }
+
+  if (data) {
+    console.log(`[getEventById] Found event by ID: ${data.id}`);
+  } else {
+    console.log(`[getEventById] Event not found by ID, trying source_event_id...`);
   }
 
   // If not found by ID, try to find by source_event_id (in case the provided ID is from events table)
@@ -882,23 +894,145 @@ export async function getEventById(eventId: string) {
       .maybeSingle();
 
     if (errorBySourceId) {
-      console.error('Supabase error (by source_event_id):', errorBySourceId);
+      console.error('[getEventById] Supabase error (by source_event_id):', errorBySourceId);
       throw new Error(errorBySourceId.message || 'Failed to fetch event');
     }
 
     if (dataBySourceId) {
+      console.log(`[getEventById] Found event by source_event_id: ${dataBySourceId.id}`);
       data = dataBySourceId;
+    } else {
+      console.log(`[getEventById] Event not found by source_event_id either`);
     }
   }
 
   if (!data) {
-    throw new Error('Event not found');
+    // Try one more time: check if this might be an ID from the events table
+    // and see if we can find any nucigen_event that references it
+    const { data: eventsTableData, error: eventsTableError } = await supabase
+      .from('events')
+      .select('id, status')
+      .eq('id', eventId)
+      .maybeSingle();
+    
+    if (eventsTableError) {
+      console.error('[getEventById] Error checking events table:', eventsTableError);
+    }
+    
+    if (eventsTableData) {
+      console.log(`[getEventById] Found in events table (status: ${eventsTableData.status}), searching for nucigen_event...`);
+      
+      // Try one more time to find nucigen_event by source_event_id
+      // Sometimes the first query might have failed due to timing
+      const { data: retryData, error: retryError } = await supabase
+        .from('nucigen_events')
+        .select(`
+          *,
+          nucigen_causal_chains (
+            id,
+            cause,
+            first_order_effect,
+            second_order_effect,
+            affected_sectors,
+            affected_regions,
+            time_horizon,
+            confidence
+          )
+        `)
+        .eq('source_event_id', eventId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (retryError) {
+        console.error('[getEventById] Retry error:', retryError);
+      }
+      
+      if (retryData) {
+        console.log(`[getEventById] Found nucigen_event on retry: ${retryData.id}`);
+        data = retryData;
+      } else {
+        // Event exists in events table but no nucigen_event yet
+        // Automatically trigger processing via API
+        console.log(`[getEventById] Event found in events table but no nucigen_event. Triggering automatic processing...`);
+        
+        try {
+          // Call API endpoint to process the event
+          // Use /api prefix which will be proxied by Vite to the API server
+          const apiUrl = import.meta.env.VITE_API_URL || '/api';
+          const response = await fetch(`${apiUrl}/process-event`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ eventId }),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `Failed to process event: ${response.statusText}`);
+          }
+
+          const result = await response.json();
+          
+          if (result.success && result.nucigenEventId) {
+            console.log(`[getEventById] Event processed successfully. New nucigen_event ID: ${result.nucigenEventId}`);
+            
+            // Fetch the newly created event
+            const { data: newEventData, error: newEventError } = await supabase
+              .from('nucigen_events')
+              .select(`
+                *,
+                nucigen_causal_chains (
+                  id,
+                  cause,
+                  first_order_effect,
+                  second_order_effect,
+                  affected_sectors,
+                  affected_regions,
+                  time_horizon,
+                  confidence
+                )
+              `)
+              .eq('id', result.nucigenEventId)
+              .maybeSingle();
+            
+            if (newEventError) {
+              console.error('[getEventById] Error fetching newly created event:', newEventError);
+              throw new Error('Event was processed but could not be retrieved. Please refresh the page.');
+            }
+            
+            if (newEventData) {
+              data = newEventData;
+            } else {
+              throw new Error('Event was processed but not found. Please refresh the page.');
+            }
+          } else {
+            throw new Error(result.error || 'Failed to process event');
+          }
+        } catch (apiError: any) {
+          console.error('[getEventById] Error calling process-event API:', apiError);
+          
+          // If API call fails, provide helpful error message
+          const statusMessage = eventsTableData.status === 'processing' 
+            ? 'The event is currently being processed.'
+            : eventsTableData.status === 'pending'
+            ? 'The event is pending processing. Automatic processing failed - please try again in a few moments.'
+            : 'The event may still be processing. Automatic processing failed - please try again in a few moments.';
+          
+          throw new Error(`Event found in events table but no processed event (nucigen_event) exists yet. ${statusMessage} Error: ${apiError.message}`);
+        }
+      }
+    } else {
+      // Not found in either table
+      throw new Error(`Event not found. ID: ${eventId}. Please check that the event exists in the database.`);
+    }
   }
 
   // Ensure event has at least one causal chain (but don't throw, handle gracefully)
   // Make causal chains optional for display
   if (!data.nucigen_causal_chains || data.nucigen_causal_chains.length === 0) {
-    console.warn(`Event ${eventId} has no causal chain yet`);
+    console.warn(`[getEventById] Event ${eventId} has no causal chain yet`);
     // Return event with empty causal chains array instead of throwing
     data.nucigen_causal_chains = [];
   }

@@ -10,6 +10,7 @@ import cors from 'cors';
 import { searchAndCreateLiveEvent } from './services/live-event-creator.js';
 import { collectPersonalizedEventsForUser } from './workers/tavily-personalized-collector.js';
 import { predictRelevance } from './ml/relevance-predictor.js';
+import { getRealTimePrice, getTimeSeries } from './services/twelvedata-service.js';
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
@@ -41,9 +42,110 @@ app.use(express.json());
 import { auditMiddleware } from './middleware/audit-middleware.js';
 app.use(auditMiddleware);
 
+// Performance middleware
+import { performanceMiddleware, getPerformanceMetricsHandler } from './middleware/performance-middleware.js';
+app.use(performanceMiddleware);
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// Market Data Endpoints
+app.get('/api/market-data/:symbol', async (req, res) => {
+  try {
+    const { symbol } = req.params;
+    const priceData = await getRealTimePrice(symbol);
+    res.json({ success: true, data: priceData });
+  } catch (error: any) {
+    console.error('[API] Market data error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch market data',
+    });
+  }
+});
+
+app.get('/api/market-data/:symbol/timeseries', async (req, res) => {
+  try {
+    const { symbol } = req.params;
+    const { interval = '1h', days = '7' } = req.query;
+    
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - parseInt(days as string));
+    
+    const timeSeriesData = await getTimeSeries(symbol, {
+      interval: interval as any,
+      start_date: startDate.toISOString().split('T')[0],
+      end_date: endDate.toISOString().split('T')[0],
+      outputsize: parseInt(days as string) * 24, // Approximate
+    });
+    
+    res.json({ success: true, data: timeSeriesData });
+  } catch (error: any) {
+    console.error('[API] Time series error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch time series data',
+    });
+  }
+});
+
+// Performance metrics endpoint
+app.get('/metrics', getPerformanceMetricsHandler);
+
+// Track user action endpoint (for analytics)
+app.post('/track-action', async (req, res) => {
+  try {
+    const { userId, eventId, recommendationId, actionType, sessionId, pageUrl, referrer, timeSpentSeconds, scrollDepth, feedPosition, feedType, recommendationPriority } = req.body;
+
+    if (!userId || !actionType) {
+      return res.status(400).json({
+        success: false,
+        error: 'userId and actionType are required',
+      });
+    }
+
+    // Import and use recordUserAction
+    const { recordUserAction } = await import('./rl/user-behavior-learner.js');
+    
+    // Map to UserAction interface (requires userId, eventId, actionType, timestamp)
+    const action = {
+      userId,
+      eventId: eventId || 'unknown',
+      actionType: actionType as 'click' | 'view' | 'read' | 'share' | 'bookmark' | 'ignore' | 'feedback_positive' | 'feedback_negative',
+      timestamp: new Date(),
+      metadata: {
+        sessionId,
+        pageUrl,
+        referrer,
+        timeSpentSeconds,
+        scrollDepth,
+        feedPosition,
+        feedType,
+        recommendationPriority,
+        recommendationId,
+      },
+    };
+
+    const success = await recordUserAction(action);
+
+    if (success) {
+      res.json({ success: true });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to record action',
+      });
+    }
+  } catch (error: any) {
+    console.error('[API] Error tracking action:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to track action',
+    });
+  }
 });
 
 // Live search endpoint
@@ -98,6 +200,127 @@ app.post('/live-search', async (req, res) => {
       success: false,
       error: errorMessage,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    });
+  }
+});
+
+// Deep Research endpoint - comprehensive analysis in seconds (like ChatGPT Deep Research)
+app.post('/deep-research', async (req, res) => {
+  try {
+    const { query, focus_areas, time_horizon, max_sources } = req.body;
+
+    if (!query || typeof query !== 'string' || !query.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'query is required',
+      });
+    }
+
+    console.log(`[API] Deep research request: "${query}"`);
+
+    const { deepResearchAgent } = await import('./agents/deep-research-agent.js');
+    
+    const result = await deepResearchAgent.conductResearch({
+      query: query.trim(),
+      focus_areas,
+      time_horizon: time_horizon || 'medium',
+      max_sources: max_sources || 10,
+    });
+
+    if (result.error || !result.data) {
+      return res.status(500).json({
+        success: false,
+        error: result.error || 'Failed to conduct research',
+        metadata: result.metadata,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      ...result.data,
+      metadata: result.metadata,
+    });
+  } catch (error: any) {
+    console.error('[API] Deep research error:', error);
+    
+    // Provide more detailed error messages
+    let errorMessage = error.message || 'Failed to conduct research';
+    
+    // Check for common issues
+    if (error.message?.includes('API key') || error.message?.includes('required')) {
+      errorMessage = `Configuration error: ${error.message}. Please check your .env file for OPENAI_API_KEY and TAVILY_API_KEY.`;
+    } else if (error.message?.includes('Tavily')) {
+      errorMessage = `Tavily API error: ${error.message}. Please check your TAVILY_API_KEY.`;
+    } else if (error.message?.includes('OpenAI')) {
+      errorMessage = `OpenAI API error: ${error.message}. Please check your OPENAI_API_KEY.`;
+    } else if (error.message?.includes('Supabase')) {
+      errorMessage = `Database error: ${error.message}. Please check your Supabase configuration.`;
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    });
+  }
+});
+
+// Process event endpoint - automatically process an event from events table to nucigen_events
+app.post('/process-event', async (req, res) => {
+  try {
+    const { eventId } = req.body;
+    
+    if (!eventId || typeof eventId !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'eventId is required',
+      });
+    }
+
+    if (!supabase) {
+      return res.status(500).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    console.log(`[API] Process event request for: ${eventId}`);
+
+    // Import processEvent function
+    const { processEvent } = await import('./workers/event-processor.js');
+    
+    // Process the event
+    const result = await processEvent(eventId);
+    
+    if (result.error) {
+      return res.status(500).json({
+        success: false,
+        error: result.error,
+        phase1Success: result.phase1Success,
+        phase2bSuccess: result.phase2bSuccess,
+      });
+    }
+
+    // Get the created nucigen_event
+    const { data: nucigenEvent } = await supabase
+      .from('nucigen_events')
+      .select('id')
+      .eq('source_event_id', eventId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    res.status(200).json({
+      success: true,
+      phase1Success: result.phase1Success,
+      phase2bSuccess: result.phase2bSuccess,
+      nucigenEventId: nucigenEvent?.id || null,
+    });
+  } catch (error: any) {
+    console.error('[API] Process event error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to process event',
     });
   }
 });
@@ -285,13 +508,62 @@ app.post('/api/signals', async (req, res) => {
   }
 });
 
+// Impact Agent endpoint
+app.post('/api/impacts', async (req, res) => {
+  try {
+    const { signals, events, user_preferences } = req.body;
+
+    if (!signals || !Array.isArray(signals) || signals.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'signals array is required and must not be empty',
+      });
+    }
+
+    console.log(`[API] Impact generation request: ${signals.length} signals`);
+
+    // Import ImpactAgent dynamically
+    const { impactAgent } = await import('./agents/impact-agent.js');
+
+    const response = await impactAgent.generateImpacts({
+      signals,
+      events,
+      user_preferences,
+    });
+
+    if (response.error) {
+      return res.status(500).json({
+        success: false,
+        error: response.error,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      impacts: response.data || [],
+      metadata: response.metadata,
+    });
+  } catch (error: any) {
+    console.error('[API] Impact generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
 const server = app.listen(PORT, () => {
   console.log(`🚀 API Server running on http://localhost:${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/health`);
   console.log(`   Live Search: POST http://localhost:${PORT}/live-search`);
+  console.log(`   Deep Research: POST http://localhost:${PORT}/deep-research`);
+  console.log(`   Process Event: POST http://localhost:${PORT}/process-event`);
   console.log(`   Personalized Collect: POST http://localhost:${PORT}/personalized-collect`);
   console.log(`   Predict Relevance: POST http://localhost:${PORT}/api/predict-relevance`);
   console.log(`   Generate Signals: POST http://localhost:${PORT}/api/signals`);
+  console.log(`   Generate Impacts: POST http://localhost:${PORT}/api/impacts`);
+  console.log(`   Market Data: GET http://localhost:${PORT}/api/market-data/:symbol`);
+  console.log(`   Time Series: GET http://localhost:${PORT}/api/market-data/:symbol/timeseries`);
   console.log(`\n   Server is ready to accept requests. Press Ctrl+C to stop.\n`);
 });
 

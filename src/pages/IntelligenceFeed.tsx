@@ -13,14 +13,19 @@ import {
   getUserPreferences,
 } from '../lib/supabase';
 import { getSignalsViaAgent } from '../lib/api/signal-api';
+import { cache, CacheKeys } from '../lib/cache';
+import { logComponentError } from '../utils/error-tracker';
+import { analytics } from '../lib/analytics';
+import { measurePageLoad } from '../utils/performance';
 import type { Signal } from '../types/intelligence';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
-import AppSidebar from '../components/AppSidebar';
+import AppShell from '../components/layout/AppShell';
 import OnboardingBanner from '../components/OnboardingBanner';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SectionHeader from '../components/ui/SectionHeader';
+import SkeletonCard from '../components/ui/SkeletonCard';
 import { Search, MapPin, Building2, TrendingUp, Clock, Sparkles, ArrowRight } from 'lucide-react';
 
 function IntelligenceFeedContent() {
@@ -119,18 +124,37 @@ function IntelligenceFeedContent() {
       // Fetch events (agent needs them internally, but page never sees Event[])
       const eventsData = await getEventsWithCausalChainsSearch(searchOptions, user.id);
       
+      // Check cache first
+      const cacheKey = CacheKeys.signals(user.id);
+      const cachedSignals = cache.get<Signal[]>(cacheKey);
+      
       // Use SignalAgent to generate signals (replaces eventsToSignals + filterSignalsByPreferences)
       // Page receives ONLY Signal[] - never Event[]
-      const allSignals = await getSignalsViaAgent(eventsData || [], {
-        searchQuery: debouncedSearchQuery,
-        user_preferences: preferences ? {
-          preferred_sectors: preferences.preferred_sectors,
-          preferred_regions: preferences.preferred_regions,
-          preferred_event_types: preferences.preferred_event_types,
-          min_impact_score: preferences.min_impact_score,
-          min_confidence_score: preferences.min_confidence_score,
-        } : undefined,
-      });
+      let allSignals: Signal[];
+      try {
+        allSignals = await getSignalsViaAgent(eventsData || [], {
+          searchQuery: debouncedSearchQuery,
+          user_preferences: preferences ? {
+            preferred_sectors: preferences.preferred_sectors,
+            preferred_regions: preferences.preferred_regions,
+            preferred_event_types: preferences.preferred_event_types,
+            min_impact_score: preferences.min_impact_score,
+            min_confidence_score: preferences.min_confidence_score,
+          } : undefined,
+        });
+        
+        // Cache successful response (5 minutes)
+        cache.set(cacheKey, allSignals, 5 * 60 * 1000);
+      } catch (apiError: any) {
+        // Fallback to cache if API fails
+        if (cachedSignals && cachedSignals.length > 0) {
+          console.warn('API failed, using cached data:', apiError.message);
+          allSignals = cachedSignals;
+          setError('Showing cached data. Some information may be outdated.');
+        } else {
+          throw apiError;
+        }
+      }
       
       // Sort signals based on active tab
       let sortedSignals = [...allSignals];
@@ -154,7 +178,10 @@ function IntelligenceFeedContent() {
       setSignals(sortedSignals);
       setError('');
     } catch (err: any) {
-      console.error('Error loading signals:', err);
+      logComponentError(err instanceof Error ? err : new Error(String(err)), 'IntelligenceFeed', {
+        userId: user?.id,
+        searchQuery: debouncedSearchQuery,
+      });
       
       let errorMessage = 'Failed to load intelligence signals';
       if (err.message?.includes('not authenticated')) {
@@ -207,31 +234,41 @@ function IntelligenceFeedContent() {
 
   if (!isFullyLoaded) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-sm text-slate-500 font-light">Loading...</p>
+      <AppShell>
+        <div className="col-span-12 flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-sm text-slate-500 font-light">Loading...</p>
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-sm text-slate-500 font-light">Loading intelligence signals...</p>
+      <AppShell>
+        <div className="col-span-12">
+          <header className="mb-6">
+            <SectionHeader
+              title="Intelligence"
+              subtitle="High-level signals synthesized from events"
+            />
+          </header>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex">
-        <AppSidebar />
-        <div className="flex-1 flex items-center justify-center px-4 lg:ml-64">
+      <AppShell>
+        <div className="col-span-12 flex items-center justify-center min-h-[400px]">
           <div className="max-w-2xl w-full text-center">
             <div className="mb-6 p-6 bg-red-500/10 border border-red-500/20 rounded-xl">
               <p className="text-base text-red-400 font-light mb-2">Unable to load signals</p>
@@ -253,175 +290,187 @@ function IntelligenceFeedContent() {
             </div>
           </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex">
+    <AppShell>
       <SEO 
         title="Intelligence Feed — Nucigen Labs"
         description="Live intelligence signals with prioritized insights"
       />
 
-      <AppSidebar />
-
-      <div className="flex-1 flex flex-col lg:ml-64">
-        <header className="border-b border-white/[0.02] bg-[#0F0F0F]/30 backdrop-blur-xl">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
-            <div className="flex items-center justify-between">
+      <div className="col-span-12">
+        <header className="mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
               <SectionHeader
                 title="Intelligence Feed"
                 subtitle={`Synthesized signals · Updated ${signals[0] ? formatTimeAgo(signals[0].last_updated) : 'recently'}`}
               />
-              {signals.length > 0 && (
-                <Badge variant="critical" className="flex items-center gap-1.5">
-                  <Sparkles className="w-3 h-3" />
-                  {signals.length} signal{signals.length !== 1 ? 's' : ''}
-                </Badge>
-              )}
             </div>
+            {signals.length > 0 && (
+              <Badge variant="critical" className="flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3" />
+                {signals.length} signal{signals.length !== 1 ? 's' : ''}
+              </Badge>
+            )}
           </div>
         </header>
 
-        <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-12 w-full">
-          <OnboardingBanner />
+        <OnboardingBanner />
           
-          {/* Search Bar */}
-          <div className="mb-6">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-              <input
-                type="text"
-                placeholder="Search signals, sectors, regions..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-white/[0.02] border border-white/[0.05] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-white/10 focus:bg-white/[0.03] transition-all font-light"
-              />
-            </div>
+        {/* Search Bar */}
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search signals, sectors, regions..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-white/[0.02] border border-white/[0.05] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-white/10 focus:bg-white/[0.03] transition-all font-light"
+            />
           </div>
+        </div>
 
-          {/* Tabs */}
-          <div className="flex items-center gap-2 mb-8 border-b border-white/[0.02]">
-            {(['top', 'recent', 'critical'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-6 py-3 text-sm font-light transition-all border-b-2 ${
-                  activeTab === tab
-                    ? 'text-white border-[#E1463E]'
-                    : 'text-slate-500 border-transparent hover:text-white'
-                }`}
-              >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            ))}
-          </div>
+        {/* Tabs */}
+        <div className="flex items-center gap-2 mb-8 border-b border-white/[0.02]">
+          {(['top', 'recent', 'critical'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-6 py-3 text-sm font-light transition-all border-b-2 ${
+                activeTab === tab
+                  ? 'text-white border-[#E1463E]'
+                  : 'text-slate-500 border-transparent hover:text-white'
+              }`}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </div>
 
-          {/* Signals List */}
-          {signals.length === 0 ? (
-            <div className="text-center py-20">
-              <div className="max-w-md mx-auto">
-                {debouncedSearchQuery ? (
-                  <>
-                    <p className="text-lg text-slate-500 font-light mb-4">No signals found</p>
-                    <p className="text-sm text-slate-600 font-light">
-                      Try adjusting your search or filters.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-lg text-slate-500 font-light mb-4">No intelligence signals available</p>
-                    <p className="text-sm text-slate-600 font-light">
-                      Signals will appear here once events are processed and synthesized.
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {signals.map((signal) => (
-                <Card
-                  key={signal.id}
-                  hover
-                  onClick={() => {
-                    // Navigate to events page filtered by related events
-                    if (signal.related_event_ids.length > 0) {
-                      navigate(`/events?event_ids=${signal.related_event_ids.join(',')}`);
-                    } else {
-                      navigate('/events');
-                    }
-                  }}
-                  className="p-6"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-3">
-                        <h3 className="text-lg font-light text-white leading-snug">
-                          {signal.title}
-                        </h3>
-                        <Badge variant={getImpactBadgeVariant(signal.impact_score)}>
-                          {signal.impact_score}% impact
-                        </Badge>
-                        <Badge variant="neutral">
-                          {signal.confidence_score}% confidence
-                        </Badge>
-                        <Badge variant="level">
-                          {getHorizonLabel(signal.time_horizon)}
-                        </Badge>
-                      </div>
-                      
-                      <p className="text-slate-300 font-light leading-relaxed mb-4">
-                        {signal.summary}
-                      </p>
-
-                      {signal.why_it_matters && (
-                        <p className="text-sm text-slate-400 font-light italic mb-4">
-                          {signal.why_it_matters}
-                        </p>
-                      )}
-
-                      <div className="flex items-center gap-4 text-xs text-slate-500">
-                        <span className="flex items-center gap-1.5">
-                          <Clock className="w-3 h-3" />
-                          {formatTimeAgo(signal.last_updated)}
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <TrendingUp className="w-3 h-3" />
-                          {signal.source_count} related event{signal.source_count !== 1 ? 's' : ''}
-                        </span>
-                        {signal.scope !== 'global' && (
-                          <span className="flex items-center gap-1.5">
-                            <MapPin className="w-3 h-3" />
-                            {signal.scope}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    
+        {/* Signals List */}
+        {signals.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="max-w-md mx-auto">
+              {debouncedSearchQuery ? (
+                <>
+                  <Search className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                  <h3 className="text-lg text-white font-light mb-2">No signals found</h3>
+                  <p className="text-sm text-slate-400 font-light mb-6">
+                    Try adjusting your search query or filters to find relevant signals.
+                  </p>
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
+                  >
+                    Clear Search
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+                  <h3 className="text-lg text-white font-light mb-2">No intelligence signals yet</h3>
+                  <p className="text-sm text-slate-400 font-light mb-6">
+                    Complete your onboarding to receive personalized intelligence signals based on your preferences.
+                  </p>
+                  <div className="flex gap-3 justify-center">
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (signal.related_event_ids.length > 0) {
-                          navigate(`/events?event_ids=${signal.related_event_ids.join(',')}`);
-                        } else {
-                          navigate('/events');
-                        }
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 bg-white/[0.02] border border-white/[0.05] rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.03] transition-all text-sm font-light"
+                      onClick={() => navigate('/onboarding')}
+                      className="px-6 py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white rounded-lg transition-colors text-sm font-light"
                     >
-                      View Events
-                      <ArrowRight className="w-4 h-4" />
+                      Complete Onboarding
+                    </button>
+                    <button
+                      onClick={() => navigate('/events-feed')}
+                      className="px-6 py-3 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
+                    >
+                      Browse Events
                     </button>
                   </div>
-                </Card>
-              ))}
+                </>
+              )}
             </div>
-          )}
-        </main>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {signals.map((signal, index) => (
+              <Card
+                key={signal.id}
+                hover
+                onClick={() => {
+                  // Track click
+                  analytics.trackEventClick(signal.id, index, user?.id);
+                  // Navigate to signals detail page
+                  navigate(`/signals/${signal.id}`);
+                }}
+                className="p-4 sm:p-6 transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_0_25px_rgba(225,70,62,0.35)]"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-3">
+                      <h3 className="text-lg font-light text-white leading-snug">
+                        {signal.title}
+                      </h3>
+                      <Badge variant={getImpactBadgeVariant(signal.impact_score)}>
+                        {signal.impact_score}% impact
+                      </Badge>
+                      <Badge variant="neutral">
+                        {signal.confidence_score}% confidence
+                      </Badge>
+                      <Badge variant="level">
+                        {getHorizonLabel(signal.time_horizon)}
+                      </Badge>
+                    </div>
+                    
+                    <p className="text-slate-300 font-light leading-relaxed mb-4">
+                      {signal.summary}
+                    </p>
+
+                    {signal.why_it_matters && (
+                      <p className="text-sm text-slate-400 font-light italic mb-4">
+                        {signal.why_it_matters}
+                      </p>
+                    )}
+
+                    <div className="flex items-center gap-4 text-xs text-slate-500">
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3 h-3" />
+                        {formatTimeAgo(signal.last_updated)}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <TrendingUp className="w-3 h-3" />
+                        {signal.source_count} related event{signal.source_count !== 1 ? 's' : ''}
+                      </span>
+                      {signal.scope !== 'global' && (
+                        <span className="flex items-center gap-1.5">
+                          <MapPin className="w-3 h-3" />
+                          {signal.scope}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/signals/${signal.id}`);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-white/[0.02] border border-white/[0.05] rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.03] transition-all text-sm font-light"
+                  >
+                    View Details
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
+    </AppShell>
   );
 }
 

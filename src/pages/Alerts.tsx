@@ -18,7 +18,8 @@ import { detectAlertsFromSignals } from '../lib/adapters/alert-adapters';
 import type { Alert } from '../types/intelligence';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
-import AppSidebar from '../components/AppSidebar';
+import AppShell from '../components/layout/AppShell';
+import SkeletonCard from '../components/ui/SkeletonCard';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SectionHeader from '../components/ui/SectionHeader';
@@ -138,194 +139,212 @@ function AlertsContent() {
 
   if (!isFullyLoaded) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-sm text-slate-500 font-light">Loading...</p>
+      <AppShell>
+        <div className="col-span-12 flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-sm text-slate-500 font-light">Loading...</p>
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-sm text-slate-500 font-light">Loading alerts...</p>
+      <AppShell>
+        <div className="col-span-12">
+          <header className="mb-6">
+            <SectionHeader
+              title="Alerts"
+              subtitle="Loading alerts..."
+            />
+          </header>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex">
-        <AppSidebar />
-        <div className="flex-1 flex items-center justify-center px-4 lg:ml-64">
+      <AppShell>
+        <div className="col-span-12 flex items-center justify-center min-h-[400px]">
           <div className="max-w-2xl w-full text-center">
             <div className="mb-6 p-6 bg-red-500/10 border border-red-500/20 rounded-xl">
               <p className="text-base text-red-400 font-light mb-2">Unable to load alerts</p>
               <p className="text-sm text-slate-400 font-light">{error}</p>
             </div>
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/overview')}
               className="px-6 py-3 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
             >
-              Back to Dashboard
+              Back to Overview
             </button>
           </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   const unreadCount = alerts.length; // All alerts are "unread" in this implementation
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex">
+    <AppShell>
       <SEO 
         title="Alerts — Nucigen Labs"
         description="Critical alerts requiring immediate attention"
       />
 
-      <AppSidebar />
-
-      <div className="flex-1 flex flex-col lg:ml-64">
-        <header className="border-b border-white/[0.02] bg-[#0F0F0F]/30 backdrop-blur-xl">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
-            <div className="flex items-center justify-between">
-              <SectionHeader
-                title="Alerts"
-                subtitle={`Thresholds exceeded · ${unreadCount} active alert${unreadCount !== 1 ? 's' : ''}`}
-              />
-              {unreadCount > 0 && (
-                <Badge variant="critical" className="flex items-center gap-1.5">
-                  <Bell className="w-3 h-3" />
-                  {unreadCount} unread
-                </Badge>
-              )}
-            </div>
+      <div className="col-span-12">
+        <header className="mb-6">
+          <div className="flex items-center justify-between">
+            <SectionHeader
+              title="Alerts"
+              subtitle={`Thresholds exceeded · ${unreadCount} active alert${unreadCount !== 1 ? 's' : ''}`}
+            />
+            {unreadCount > 0 && (
+              <Badge variant="critical" className="flex items-center gap-1.5">
+                <Bell className="w-3 h-3" />
+                {unreadCount} unread
+              </Badge>
+            )}
           </div>
         </header>
 
-        <main className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 lg:px-10 py-12 w-full">
-          {/* Tabs */}
-          <div className="flex items-center gap-2 mb-8 border-b border-white/[0.02]">
-            {(['all', 'critical'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-6 py-3 text-sm font-light transition-all border-b-2 ${
-                  activeTab === tab
-                    ? 'text-white border-[#E1463E]'
-                    : 'text-slate-500 border-transparent hover:text-white'
+        {/* Tabs */}
+        <div className="flex items-center gap-2 mb-8 border-b border-white/[0.02]">
+          {(['all', 'critical'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-6 py-3 text-sm font-light transition-all border-b-2 ${
+                activeTab === tab
+                  ? 'text-white border-[#E1463E]'
+                  : 'text-slate-500 border-transparent hover:text-white'
+              }`}
+            >
+              {tab === 'critical' ? 'Critical Only' : 'All Alerts'}
+            </button>
+          ))}
+        </div>
+
+        {/* Alerts List */}
+        {alerts.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="max-w-md mx-auto">
+              <Bell className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+              <h3 className="text-lg text-white font-light mb-2">All clear</h3>
+              <p className="text-sm text-slate-400 font-light mb-6">
+                No alerts at this time. Alerts will appear here when critical thresholds are exceeded based on your preferences.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => navigate('/settings/alerts')}
+                  className="px-6 py-3 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
+                >
+                  Configure Alerts
+                </button>
+                <button
+                  onClick={() => navigate('/intelligence')}
+                  className="px-6 py-3 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
+                >
+                  View Signals
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {alerts.map((alert) => (
+              <Card 
+                key={alert.id} 
+                className={`p-6 ${
+                  alert.severity === 'critical' 
+                    ? 'border-red-500/20 bg-red-500/5' 
+                    : alert.severity === 'high'
+                    ? 'border-yellow-500/20 bg-yellow-500/5'
+                    : ''
                 }`}
               >
-                {tab === 'critical' ? 'Critical Only' : 'All Alerts'}
-              </button>
-            ))}
-          </div>
-
-          {/* Alerts List */}
-          {alerts.length === 0 ? (
-            <div className="text-center py-20">
-              <Bell className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <p className="text-lg text-slate-500 font-light mb-4">
-                No alerts at this time.
-              </p>
-              <p className="text-sm text-slate-600 font-light">
-                Alerts will appear here when critical thresholds are exceeded.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {alerts.map((alert) => (
-                <Card 
-                  key={alert.id} 
-                  className={`p-6 ${
-                    alert.severity === 'critical' 
-                      ? 'border-red-500/20 bg-red-500/5' 
-                      : alert.severity === 'high'
-                      ? 'border-yellow-500/20 bg-yellow-500/5'
-                      : ''
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className={`p-2 rounded-lg ${
-                          alert.severity === 'critical'
-                            ? 'bg-red-500/20 border border-red-500/30'
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className={`p-2 rounded-lg ${
+                        alert.severity === 'critical'
+                          ? 'bg-red-500/20 border border-red-500/30'
+                          : alert.severity === 'high'
+                          ? 'bg-yellow-500/20 border border-yellow-500/30'
+                          : 'bg-orange-500/20 border border-orange-500/30'
+                      }`}>
+                        <AlertTriangle className={`w-5 h-5 ${
+                          alert.severity === 'critical' 
+                            ? 'text-red-400' 
                             : alert.severity === 'high'
-                            ? 'bg-yellow-500/20 border border-yellow-500/30'
-                            : 'bg-orange-500/20 border border-orange-500/30'
-                        }`}>
-                          <AlertTriangle className={`w-5 h-5 ${
-                            alert.severity === 'critical' 
-                              ? 'text-red-400' 
-                              : alert.severity === 'high'
-                              ? 'text-yellow-400'
-                              : 'text-orange-400'
-                          }`} />
+                            ? 'text-yellow-400'
+                            : 'text-orange-400'
+                        }`} />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant={getSeverityBadgeVariant(alert.severity)}>
+                            {alert.severity}
+                          </Badge>
+                          <Badge variant="neutral">
+                            {alert.impact}% impact
+                          </Badge>
+                          <Badge variant="level">
+                            {alert.confidence}% confidence
+                          </Badge>
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Badge variant={getSeverityBadgeVariant(alert.severity)}>
-                              {alert.severity}
-                            </Badge>
-                            <Badge variant="neutral">
-                              {alert.impact}% impact
-                            </Badge>
-                            <Badge variant="level">
-                              {alert.confidence}% confidence
-                            </Badge>
-                          </div>
-                          <h3 className="text-lg font-light text-white mb-2">
-                            {alert.title}
-                          </h3>
-                          <p className="text-sm text-slate-300 font-light leading-relaxed mb-2">
-                            {alert.trigger_reason}
-                          </p>
-                          <p className="text-xs text-slate-500 font-light mb-3">
-                            Threshold exceeded: {alert.threshold_exceeded}
-                          </p>
-                          <div className="flex items-center gap-4 text-xs text-slate-500">
-                            <span className="flex items-center gap-1.5">
-                              <Clock className="w-3 h-3" />
-                              {formatTimeAgo(alert.last_updated)}
-                            </span>
-                            {alert.related_event_ids && alert.related_event_ids.length > 0 && (
-                              <button
-                                onClick={() => navigate(`/events?event_ids=${alert.related_event_ids?.join(',')}`)}
-                                className="flex items-center gap-1.5 text-slate-500 hover:text-white transition-colors"
-                              >
-                                View {alert.related_event_ids.length} related event{alert.related_event_ids.length !== 1 ? 's' : ''}
-                                <ArrowRight className="w-3 h-3" />
-                              </button>
-                            )}
-                          </div>
+                        <h3 className="text-lg font-light text-white mb-2">
+                          {alert.title}
+                        </h3>
+                        <p className="text-sm text-slate-300 font-light leading-relaxed mb-2">
+                          {alert.trigger_reason}
+                        </p>
+                        <p className="text-xs text-slate-500 font-light mb-3">
+                          Threshold exceeded: {alert.threshold_exceeded}
+                        </p>
+                        <div className="flex items-center gap-4 text-xs text-slate-500">
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="w-3 h-3" />
+                            {formatTimeAgo(alert.last_updated)}
+                          </span>
+                          {alert.related_event_ids && alert.related_event_ids.length > 0 && (
+                            <button
+                              onClick={() => navigate(`/events-feed?event_ids=${alert.related_event_ids?.join(',')}`)}
+                              className="flex items-center gap-1.5 text-slate-500 hover:text-white transition-colors"
+                            >
+                              View {alert.related_event_ids.length} related event{alert.related_event_ids.length !== 1 ? 's' : ''}
+                              <ArrowRight className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => {
-                        // Mark as read (would call API in production)
-                        console.log('Mark alert as read:', alert.id);
-                      }}
-                      className="px-4 py-2 text-xs bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors flex items-center gap-1.5"
-                    >
-                      <CheckCircle className="w-3 h-3" />
-                      Mark Read
-                    </button>
                   </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </main>
+                  <button
+                    onClick={() => {
+                      // Mark as read (would call API in production)
+                      console.log('Mark alert as read:', alert.id);
+                    }}
+                    className="px-4 py-2 text-xs bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors flex items-center gap-1.5"
+                  >
+                    <CheckCircle className="w-3 h-3" />
+                    Mark Read
+                  </button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
-    </div>
+    </AppShell>
   );
 }
 
