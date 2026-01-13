@@ -48,7 +48,47 @@ app.use(performanceMiddleware);
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+  // Check if critical services are configured
+  const twelvedataConfigured = !!process.env.TWELVEDATA_API_KEY;
+  const supabaseConfigured = !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  res.json({ 
+    status: 'ok',
+    services: {
+      twelvedata: twelvedataConfigured ? 'configured' : 'missing',
+      supabase: supabaseConfigured ? 'configured' : 'missing',
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Health check for Twelve Data specifically
+app.get('/health/twelvedata', async (req, res) => {
+  try {
+    if (!process.env.TWELVEDATA_API_KEY) {
+      return res.status(503).json({
+        status: 'unavailable',
+        error: 'TWELVEDATA_API_KEY not configured',
+        message: 'Please add TWELVEDATA_API_KEY to your environment variables',
+      });
+    }
+    
+    // Try a simple request to verify the key works
+    const { getRealTimePrice } = await import('./services/twelvedata-service.js');
+    await getRealTimePrice('AAPL');
+    
+    res.json({
+      status: 'ok',
+      configured: true,
+      message: 'Twelve Data API is configured and working',
+    });
+  } catch (error: any) {
+    res.status(503).json({
+      status: 'error',
+      configured: !!process.env.TWELVEDATA_API_KEY,
+      error: error.message || 'Twelve Data API check failed',
+    });
+  }
 });
 
 // Market Data Endpoints

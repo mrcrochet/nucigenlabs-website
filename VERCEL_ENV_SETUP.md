@@ -2,19 +2,25 @@
 
 ## Variables d'environnement requises
 
-Votre application utilise **3 variables d'environnement** qui doivent être configurées sur Vercel :
+Votre application utilise **4 variables d'environnement** qui doivent être configurées sur Vercel :
 
-### 1. Supabase URL
+### 1. Clerk Publishable Key (🔴 REQUIS pour l'authentification)
+```
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_c21vb3RoLWVlbC0zMy5jbGVyay5hY2NvdW50cy5kZXYk
+```
+**⚠️ IMPORTANT** : Sans cette variable, vous aurez l'erreur `useAuth can only be used within ClerkProvider`
+
+### 2. Supabase URL
 ```
 VITE_SUPABASE_URL=https://igyrrebxrywokxgmtogl.supabase.co
 ```
 
-### 2. Supabase Anon Key (clé publique)
+### 3. Supabase Anon Key (clé publique)
 ```
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlneXJyZWJ4cnl3b2t4Z210b2dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzMzc4MDYsImV4cCI6MjA4MTkxMzgwNn0.Qg5f86nLE7ET3DxDZjmdLbQtogNWU9zOs7S7A1hdJ2Q
 ```
 
-### 3. NewsAPI Key
+### 4. NewsAPI Key
 ```
 VITE_NEWS_API_KEY=3f496fd50f0040f3a3ebdf569047834c
 ```
@@ -37,19 +43,26 @@ VITE_NEWS_API_KEY=3f496fd50f0040f3a3ebdf569047834c
 3. **Ajoutez chaque variable**
    Pour chaque variable ci-dessous, cliquez sur **Add New** et remplissez :
    
-   **Variable 1 :**
+   **Variable 1 (🔴 PRIORITAIRE) :**
+   - **Key** : `VITE_CLERK_PUBLISHABLE_KEY`
+   - **Value** : `pk_test_c21vb3RoLWVlbC0zMy5jbGVyay5hY2NvdW50cy5kZXYk`
+   - **Environments** : Cochez toutes les cases (Production, Preview, Development)
+   - Cliquez sur **Save**
+   - ⚠️ **Sans cette variable, l'authentification ne fonctionnera pas**
+
+   **Variable 2 :**
    - **Key** : `VITE_SUPABASE_URL`
    - **Value** : `https://igyrrebxrywokxgmtogl.supabase.co`
    - **Environments** : Cochez toutes les cases (Production, Preview, Development)
    - Cliquez sur **Save**
 
-   **Variable 2 :**
+   **Variable 3 :**
    - **Key** : `VITE_SUPABASE_ANON_KEY`
    - **Value** : `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlneXJyZWJ4cnl3b2t4Z210b2dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYzMzc4MDYsImV4cCI6MjA4MTkxMzgwNn0.Qg5f86nLE7ET3DxDZjmdLbQtogNWU9zOs7S7A1hdJ2Q`
    - **Environments** : Cochez toutes les cases (Production, Preview, Development)
    - Cliquez sur **Save**
 
-   **Variable 3 :**
+   **Variable 4 :**
    - **Key** : `VITE_NEWS_API_KEY`
    - **Value** : `3f496fd50f0040f3a3ebdf569047834c`
    - **Environments** : Cochez toutes les cases (Production, Preview, Development)
