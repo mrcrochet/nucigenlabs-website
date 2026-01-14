@@ -12,9 +12,10 @@ interface MainContentProps {
 export default function MainContent({ children }: MainContentProps) {
   return (
     <main className="flex-1 overflow-y-auto w-full">
-      <div className="max-w-[1280px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
+      <div className="max-w-[1280px] mx-auto px-2 sm:px-4 py-2 sm:py-4">
         {/* Responsive grid: 1 col mobile, 12 cols desktop */}
-        <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 sm:gap-6">
+        {/* Reduced gap for more space: gap-3 sm:gap-4 instead of gap-4 sm:gap-6 */}
+        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4">
           {children}
         </div>
       </div>

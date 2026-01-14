@@ -142,6 +142,59 @@ export default function AdvancedFeatures() {
           })}
         </div>
 
+        {/* How we validate section */}
+        <ParallaxSection speed={0.35} className="mt-16">
+          <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.1] rounded-2xl p-10 sm:p-12">
+            <div className="text-center mb-8">
+              <p className="text-xs text-slate-500 font-light tracking-[0.3em] mb-4">
+                HOW PREDICTIONS ARE VALIDATED
+              </p>
+              <h3 className="text-2xl md:text-3xl font-light text-white mb-6">
+                Scientific validation, not black-box predictions
+              </h3>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+              <div className="space-y-4">
+                <div className="flex items-start gap-4">
+                  <div className="w-2 h-2 rounded-full bg-[#E1463E]/50 mt-2 flex-shrink-0"></div>
+                  <div>
+                    <p className="text-sm text-slate-300 font-light leading-relaxed">
+                      <span className="text-white font-medium">Continuous back-testing:</span> Predictions are continuously validated against real market reactions. When prediction error increases, models are automatically recalibrated.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="w-2 h-2 rounded-full bg-[#E1463E]/50 mt-2 flex-shrink-0"></div>
+                  <div>
+                    <p className="text-sm text-slate-300 font-light leading-relaxed">
+                      <span className="text-white font-medium">Multi-layer validation:</span> High-impact signals undergo additional validation layers, including cross-model consensus and historical pattern matching.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-start gap-4">
+                  <div className="w-2 h-2 rounded-full bg-[#E1463E]/50 mt-2 flex-shrink-0"></div>
+                  <div>
+                    <p className="text-sm text-slate-300 font-light leading-relaxed">
+                      <span className="text-white font-medium">Systematic monitoring:</span> The system is monitored like a scientific instrument, not a black box. Performance metrics, error rates, and calibration drift are tracked continuously.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-4">
+                  <div className="w-2 h-2 rounded-full bg-[#E1463E]/50 mt-2 flex-shrink-0"></div>
+                  <div>
+                    <p className="text-sm text-slate-300 font-light leading-relaxed">
+                      <span className="text-white font-medium">Transparent methodology:</span> Our 94% accuracy and 12K+ signals are not claims—they are measured outcomes from a system designed for reliability, not hype.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ParallaxSection>
+
         <ParallaxSection speed={0.4} className="mt-16">
           <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.1] rounded-2xl p-12 text-center relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-red-500/[0.05] to-orange-500/[0.05] rounded-2xl"></div>

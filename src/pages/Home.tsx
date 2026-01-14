@@ -6,7 +6,6 @@ import SEO from '../components/SEO';
 import CountdownTimer from '../components/CountdownTimer';
 import LiveNewsFeed from '../components/LiveNewsFeed';
 import FourLevels from '../components/FourLevels';
-import WhoThisIsFor from '../components/WhoThisIsFor';
 import Mission from '../components/Mission';
 import AdvancedFeatures from '../components/AdvancedFeatures';
 import HowPeopleUseNucigen from '../components/HowPeopleUseNucigen';
@@ -41,9 +40,30 @@ export default function Home() {
             <span className="text-[#E1463E]">Before it moves.</span>
           </h1>
 
-          <p className="text-base sm:text-lg md:text-xl text-slate-400 leading-relaxed font-light mb-4 sm:mb-6 max-w-4xl mx-auto px-4">
+          <p className="text-base sm:text-lg md:text-xl text-slate-400 leading-relaxed font-light mb-6 sm:mb-8 max-w-4xl mx-auto px-4">
             Nucigen Labs transforms global news into predictive market signals in real-time.
           </p>
+
+          {/* Concrete value propositions */}
+          <div className="mb-8 sm:mb-12 max-w-4xl mx-auto px-4">
+            <div className="grid sm:grid-cols-3 gap-4 sm:gap-6">
+              <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded-lg p-4 sm:p-5 text-center hover:border-white/[0.12] transition-all duration-300">
+                <p className="text-sm sm:text-base text-slate-300 font-light leading-relaxed">
+                  Reduce blind spots in geopolitical and supply chain risk
+                </p>
+              </div>
+              <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded-lg p-4 sm:p-5 text-center hover:border-white/[0.12] transition-all duration-300">
+                <p className="text-sm sm:text-base text-slate-300 font-light leading-relaxed">
+                  Detect second-order risks before they become consensus
+                </p>
+              </div>
+              <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded-lg p-4 sm:p-5 text-center hover:border-white/[0.12] transition-all duration-300">
+                <p className="text-sm sm:text-base text-slate-300 font-light leading-relaxed">
+                  Turn narrative uncertainty into structured signals
+                </p>
+              </div>
+            </div>
+          </div>
 
           <p className="text-base md:text-lg text-slate-500 leading-relaxed font-light mb-8 max-w-3xl mx-auto min-h-[4rem]">
             <TypewriterText
@@ -225,6 +245,83 @@ export default function Home() {
                 A strategic information-to-decision platform.
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Example - Moved up for immediate understanding */}
+      <section className="relative px-4 sm:px-6 py-16 sm:py-24">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-8 sm:mb-12">
+            <div className="inline-block mb-4 sm:mb-6 px-3 sm:px-4 py-1 rounded-full border border-white/10 bg-white/[0.02] backdrop-blur-sm">
+              <span className="text-[10px] text-slate-600 font-light tracking-[0.25em]">EXAMPLE</span>
+            </div>
+            <h3 className="text-2xl sm:text-3xl md:text-4xl font-light text-white mb-3 sm:mb-4 px-2">
+              How it works in practice
+            </h3>
+            <p className="text-sm sm:text-base text-slate-400 font-light max-w-2xl mx-auto mb-6 sm:mb-8 px-4">
+              See how we transform a real-world event into actionable market intelligence
+            </p>
+          </div>
+
+          {/* Simple 4-step flow */}
+          <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] rounded-xl p-6 sm:p-8 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 sm:gap-6">
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-lg bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center mx-auto mb-3">
+                  <span className="text-[#E1463E] font-bold text-lg">1</span>
+                </div>
+                <p className="text-xs text-slate-500 font-light mb-2 tracking-wider uppercase">Event</p>
+                <p className="text-sm text-white font-light leading-relaxed">
+                  Strike shuts lithium mine in Chile
+                </p>
+              </div>
+              <div className="flex items-center justify-center sm:items-center">
+                <span className="hidden sm:inline text-2xl text-slate-600/40">→</span>
+                <span className="sm:hidden text-xl text-slate-600/40 my-2">↓</span>
+              </div>
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-lg bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center mx-auto mb-3">
+                  <span className="text-[#E1463E] font-bold text-lg">2</span>
+                </div>
+                <p className="text-xs text-slate-500 font-light mb-2 tracking-wider uppercase">Signal</p>
+                <p className="text-sm text-white font-light leading-relaxed">
+                  Battery supply tightens → EV costs rise
+                </p>
+              </div>
+              <div className="flex items-center justify-center sm:items-center">
+                <span className="hidden sm:inline text-2xl text-slate-600/40">→</span>
+                <span className="sm:hidden text-xl text-slate-600/40 my-2">↓</span>
+              </div>
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-lg bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center mx-auto mb-3">
+                  <span className="text-[#E1463E] font-bold text-lg">3</span>
+                </div>
+                <p className="text-xs text-slate-500 font-light mb-2 tracking-wider uppercase">Impact</p>
+                <p className="text-sm text-white font-light leading-relaxed">
+                  EV margin compression expected
+                </p>
+              </div>
+              <div className="flex items-center justify-center sm:items-center">
+                <span className="hidden sm:inline text-2xl text-slate-600/40">→</span>
+                <span className="sm:hidden text-xl text-slate-600/40 my-2">↓</span>
+              </div>
+              <div className="text-center">
+                <div className="w-12 h-12 rounded-lg bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center mx-auto mb-3">
+                  <span className="text-[#E1463E] font-bold text-lg">4</span>
+                </div>
+                <p className="text-xs text-slate-500 font-light mb-2 tracking-wider uppercase">Market</p>
+                <p className="text-sm text-white font-light leading-relaxed">
+                  EV stocks under pressure before repricing
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center">
+            <p className="text-xs sm:text-sm text-slate-500 font-light italic">
+              You receive this signal hours or days before prices adjust, giving you time to position.
+            </p>
           </div>
         </div>
       </section>
