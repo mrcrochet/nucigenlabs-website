@@ -20,6 +20,8 @@ import Home from './pages/Home';
 // Public marketing routes
 const Pricing = lazy(() => import('./pages/Pricing'));
 const PartnerProgram = lazy(() => import('./pages/PartnerProgram'));
+const Intelligence = lazy(() => import('./pages/Intelligence'));
+const CaseStudies = lazy(() => import('./pages/CaseStudies'));
 // Auth routes - Preload critical auth routes for smooth transitions
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
@@ -149,6 +151,8 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/partners" element={<PartnerProgram />} />
+        <Route path="/intelligence-page" element={<Intelligence />} />
+        <Route path="/case-studies" element={<CaseStudies />} />
         <Route path="/about" element={<About />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />

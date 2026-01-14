@@ -45,19 +45,19 @@ export default function CaseStudies() {
         keywords="market intelligence case studies, predictive analytics examples, geopolitical analysis case studies, supply chain intelligence, market prediction examples"
       />
 
-      <section className="relative min-h-screen px-6 py-32">
+      <section className="relative min-h-screen px-4 sm:px-6 py-16 sm:py-32">
         <div className="max-w-6xl mx-auto w-full">
-          <div className="text-center mb-32 animate-in fade-in duration-700">
-            <div className="inline-block mb-8 px-4 py-1.5 rounded-full border border-white/10 bg-white/[0.02] backdrop-blur-sm">
-              <span className="text-xs text-slate-500 font-light tracking-[0.2em]">STRATEGIC INTELLIGENCE</span>
+          <div className="text-center mb-20 sm:mb-32 animate-in fade-in duration-700">
+            <div className="inline-block mb-6 sm:mb-8 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full border border-white/10 bg-white/[0.02] backdrop-blur-sm">
+              <span className="text-[10px] sm:text-xs text-slate-500 font-light tracking-[0.2em]">STRATEGIC INTELLIGENCE</span>
             </div>
 
-            <h1 className="text-6xl md:text-8xl font-extralight mb-12 leading-[1.05] tracking-[-0.02em] text-white">
+            <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-8xl font-extralight mb-8 sm:mb-12 leading-[1.05] tracking-[-0.02em] text-white">
               Intelligence built on<br />
               <span className="text-slate-300">consequences, not signals.</span>
             </h1>
 
-            <p className="text-base md:text-xl text-slate-400 leading-[1.9] max-w-3xl mx-auto font-light mb-8 min-h-[3rem]">
+            <p className="text-sm sm:text-base md:text-xl text-slate-400 leading-[1.9] max-w-3xl mx-auto font-light mb-6 sm:mb-8 min-h-[3rem] px-4">
               <TypewriterText
                 texts={[
                   'Live event-to-supply-chain causality models that identify alpha windows before markets move.',
@@ -72,7 +72,7 @@ export default function CaseStudies() {
               />
             </p>
 
-            <p className="text-sm text-slate-500 font-light mb-14 italic min-h-[2rem]">
+            <p className="text-xs sm:text-sm text-slate-500 font-light mb-10 sm:mb-14 italic min-h-[2rem] px-4">
               <TypewriterText
                 texts={[
                   'Built for analysts, operators, and investors who think in systems — not charts.',
@@ -88,7 +88,7 @@ export default function CaseStudies() {
 
             <Link
               to="/request-access"
-              className="group relative inline-block px-10 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-300 text-sm tracking-wide shadow-lg shadow-[#E1463E]/20 hover:shadow-xl hover:shadow-[#E1463E]/30 hover:scale-[1.02]"
+              className="group relative inline-block px-6 sm:px-10 py-3 sm:py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white font-normal rounded-lg transition-all duration-300 text-xs sm:text-sm tracking-wide shadow-lg shadow-[#E1463E]/20 hover:shadow-xl hover:shadow-[#E1463E]/30 hover:scale-[1.02]"
             >
               <span className="relative z-10">Request Access</span>
               <div className="absolute inset-0 rounded-lg bg-gradient-to-r from-white/0 via-white/10 to-white/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -100,7 +100,7 @@ export default function CaseStudies() {
               <button
                 key={study.id}
                 onClick={() => setSelectedCase(study.id)}
-                className="group relative w-full backdrop-blur-2xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.08] hover:border-white/[0.15] rounded-2xl p-10 md:p-12 transition-all duration-500 hover:shadow-2xl hover:shadow-white/[0.05] text-left overflow-hidden"
+                className="group relative w-full backdrop-blur-2xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.08] hover:border-white/[0.15] rounded-xl sm:rounded-2xl p-6 sm:p-10 md:p-12 transition-all duration-500 hover:shadow-2xl hover:shadow-white/[0.05] text-left overflow-hidden"
               >
                 <div className={`absolute inset-0 bg-gradient-to-br ${study.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-700`}></div>
 
@@ -108,7 +108,7 @@ export default function CaseStudies() {
                   <div className="flex items-start justify-between gap-8 mb-6">
                     <div className="flex-1">
                       <p className="text-[10px] text-slate-600 font-light tracking-[0.2em] mb-4 uppercase">{study.tags}</p>
-                      <h3 className="text-2xl md:text-3xl text-white font-light mb-4 leading-[1.3] tracking-tight group-hover:text-slate-100 transition-colors">
+                      <h3 className="text-xl sm:text-2xl md:text-3xl text-white font-light mb-4 leading-[1.3] tracking-tight group-hover:text-slate-100 transition-colors">
                         {study.title}
                       </h3>
                     </div>
@@ -150,7 +150,7 @@ function CaseStudyDetail({ caseId, onBack }: { caseId: number; onBack: () => voi
 
   return (
     <main className="min-h-screen">
-      <section className="relative min-h-screen px-6 py-32">
+      <section className="relative min-h-screen px-4 sm:px-6 py-16 sm:py-32">
         <div className="max-w-4xl mx-auto w-full">
           <button
             onClick={onBack}
@@ -162,7 +162,7 @@ function CaseStudyDetail({ caseId, onBack }: { caseId: number; onBack: () => voi
 
           <div className="mb-16">
             <p className="text-[10px] text-slate-600 font-light tracking-[0.2em] mb-6 uppercase">{caseContent.tags}</p>
-            <h1 className="text-4xl md:text-6xl font-light text-white mb-8 leading-[1.15] tracking-tight">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-6xl font-light text-white mb-6 sm:mb-8 leading-[1.15] tracking-tight">
               {caseContent.title}
             </h1>
           </div>
