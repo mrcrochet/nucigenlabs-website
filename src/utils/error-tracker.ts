@@ -2,7 +2,10 @@
  * Error Tracking Utility
  * 
  * Centralized error logging and tracking
+ * Now integrated with Sentry
  */
+
+import { captureException, captureMessage } from '../lib/sentry';
 
 interface ErrorLog {
   message: string;
@@ -47,10 +50,14 @@ class ErrorTracker {
     // Always log to console
     console.error(`[ErrorTracker] ${component || 'Unknown'}:`, errorLog.message, metadata || '');
 
-    // In production, you could send to error tracking service (Sentry, etc.)
-    if (import.meta.env.PROD) {
-      // TODO: Send to error tracking service
-      // this.sendToErrorService(errorLog);
+    // Send to Sentry
+    if (typeof error === 'string') {
+      captureMessage(error, 'error');
+    } else {
+      captureException(error, {
+        component: component || 'Unknown',
+        ...metadata,
+      });
     }
   }
 

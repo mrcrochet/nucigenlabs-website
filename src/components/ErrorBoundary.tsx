@@ -1,4 +1,5 @@
 import React, { Component, ReactNode } from 'react';
+import * as Sentry from '@sentry/react';
 import { logErrorToTracker } from '../utils/error-tracker';
 
 interface Props {
@@ -23,6 +24,14 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     logErrorToTracker(error, errorInfo);
+    // Also send to Sentry with React component stack
+    Sentry.captureException(error, {
+      contexts: {
+        react: {
+          componentStack: errorInfo.componentStack,
+        },
+      },
+    });
   }
 
   render() {

@@ -14,6 +14,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
 import OnboardingGuard from './components/OnboardingGuard';
 import ErrorBoundary from './components/ErrorBoundary';
+import { useSentryUser } from './hooks/useSentryUser';
 import Home from './pages/Home';
 
 // Lazy load routes for better performance
@@ -95,6 +96,9 @@ function App() {
   const { toast, showToast, hideToast } = useToast();
   const [showExitModal, setShowExitModal] = useState(false);
   const location = useLocation();
+
+  // Sync Clerk user with Sentry
+  useSentryUser();
 
   // Prefetch critical routes on mount
   useEffect(() => {

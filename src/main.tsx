@@ -1,9 +1,13 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { initSentry } from './lib/sentry';
 import ClerkWrapper from './components/ClerkWrapper';
 import ClerkErrorBoundary from './components/ClerkErrorBoundary';
 import App from './App.tsx';
 import './index.css';
+
+// Initialize Sentry as early as possible
+initSentry();
 
 // Warn if key is missing (for development)
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
