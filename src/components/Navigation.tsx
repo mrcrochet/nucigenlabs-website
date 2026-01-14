@@ -30,9 +30,9 @@ export default function Navigation({ onRequestClearance }: NavigationProps) {
 
             <div className="hidden md:flex items-center gap-8">
               <Link
-                to="/intelligence"
+                to="/intelligence-page"
                 className={`relative text-sm font-light transition-all duration-300 ${
-                  isActive('/intelligence')
+                  isActive('/intelligence-page')
                     ? 'text-white'
                     : 'text-slate-400 hover:text-white'
                 }`}
@@ -117,10 +117,10 @@ export default function Navigation({ onRequestClearance }: NavigationProps) {
           <div className="md:hidden mt-4 backdrop-blur-2xl bg-white/[0.03] border border-white/[0.10] rounded-2xl overflow-hidden shadow-2xl shadow-black/20 animate-in fade-in duration-200">
             <div className="flex flex-col p-4 space-y-1">
               <Link
-                to="/intelligence"
+                to="/intelligence-page"
                 onClick={closeMobileMenu}
                 className={`px-4 py-3 rounded-lg text-sm font-light transition-all duration-200 ${
-                  isActive('/intelligence')
+                  isActive('/intelligence-page')
                     ? 'text-white bg-white/[0.08]'
                     : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
                 }`}

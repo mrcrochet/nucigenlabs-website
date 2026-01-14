@@ -31,6 +31,7 @@ export default function PremiumNavigation() {
     '/alerts', '/research', '/recommendations', '/quality',
     '/profile', '/settings', '/onboarding'
   ];
+  // Note: /intelligence-page and /case-studies are marketing pages, so navigation should show
   const shouldHideNav = hideNavPaths.some(path => location.pathname.startsWith(path));
   
   if (shouldHideNav) {
@@ -48,7 +49,7 @@ export default function PremiumNavigation() {
 
   const navItems = [
     { path: '/', label: 'Platform', icon: Terminal },
-    { path: '/intelligence', label: 'Intelligence', icon: Layers },
+    { path: '/intelligence-page', label: 'Intelligence', icon: Layers },
     { path: '/case-studies', label: 'Case Studies', icon: TrendingUp },
     { path: '/papers', label: 'Research', icon: FileText },
     { path: '/pricing', label: 'Pricing', icon: DollarSign },
