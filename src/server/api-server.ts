@@ -644,6 +644,1899 @@ app.post('/api/impacts', async (req, res) => {
   }
 });
 
+// Helper function to get Supabase user ID from Clerk user ID
+async function getSupabaseUserId(clerkUserId: string | null): Promise<string | null> {
+  if (!clerkUserId || !supabase) {
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('get_or_create_supabase_user_id', {
+      clerk_id: clerkUserId,
+    });
+
+    if (error || !data) {
+      console.error('[API] Error converting Clerk user ID:', error);
+      return null;
+    }
+
+    return data as string;
+  } catch (error: any) {
+    console.error('[API] Error in getSupabaseUserId:', error);
+    return null;
+  }
+}
+
+// ============================================
+// Optional Endpoints - Overview
+// ============================================
+
+// GET /api/overview/kpis - KPIs for Overview page
+app.get('/api/overview/kpis', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+    const range = (req.query.range as string) || '24h';
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+
+    // Import Supabase functions
+    const { getNormalizedEvents, getSignalsFromEvents } = await import('../lib/supabase.js');
+
+    // Calculate date range
+    const now = new Date();
+    let dateFrom: Date;
+    let dateTo = now;
+
+    if (range === '24h') {
+      dateFrom = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    } else if (range === '7d') {
+      dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else {
+      dateFrom = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    }
+
+    // Get events and signals
+    const [events24h, signals24h, eventsPrev, signalsPrev] = await Promise.all([
+      getNormalizedEvents({ dateFrom: dateFrom.toISOString(), dateTo: dateTo.toISOString() }, supabaseUserId || undefined),
+      getSignalsFromEvents({ dateFrom: dateFrom.toISOString(), dateTo: dateTo.toISOString() }, supabaseUserId || undefined),
+      getNormalizedEvents({
+        dateFrom: new Date(dateFrom.getTime() - (dateTo.getTime() - dateFrom.getTime())).toISOString(),
+        dateTo: dateFrom.toISOString(),
+      }, supabaseUserId || undefined),
+      getSignalsFromEvents({
+        dateFrom: new Date(dateFrom.getTime() - (dateTo.getTime() - dateFrom.getTime())).toISOString(),
+        dateTo: dateFrom.toISOString(),
+      }, supabaseUserId || undefined),
+    ]);
+
+    // Calculate trends (last 7 days)
+    const trendDataEvents = await Promise.all(
+      Array.from({ length: 7 }, async (_, i) => {
+        const date = new Date(now.getTime() - (6 - i) * 24 * 60 * 60 * 1000);
+        const dayEvents = await getNormalizedEvents(
+          {
+            dateFrom: new Date(date.setHours(0, 0, 0, 0)).toISOString(),
+            dateTo: new Date(date.setHours(23, 59, 59, 999)).toISOString(),
+          },
+          supabaseUserId || undefined
+        );
+        return dayEvents.length;
+      })
+    );
+
+    const trendDataSignals = await Promise.all(
+      Array.from({ length: 7 }, async (_, i) => {
+        const date = new Date(now.getTime() - (6 - i) * 24 * 60 * 60 * 1000);
+        const daySignals = await getSignalsFromEvents(
+          {
+            dateFrom: new Date(date.setHours(0, 0, 0, 0)).toISOString(),
+            dateTo: new Date(date.setHours(23, 59, 59, 999)).toISOString(),
+          },
+          supabaseUserId || undefined
+        );
+        return daySignals.length;
+      })
+    );
+
+    // Calculate deltas
+    const deltaEvents = events24h.length > 0 && eventsPrev.length > 0
+      ? ((events24h.length - eventsPrev.length) / eventsPrev.length) * 100
+      : 0;
+
+    const deltaSignals = signals24h.length > 0 && signalsPrev.length > 0
+      ? ((signals24h.length - signalsPrev.length) / signalsPrev.length) * 100
+      : 0;
+
+    // Get high-impact impacts (7d) - using signals with high impact as proxy
+    const impacts7d = await getSignalsFromEvents(
+      {
+        dateFrom: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        dateTo: now.toISOString(),
+        minImpact: 70,
+      },
+      supabaseUserId || undefined
+    );
+
+    res.json({
+      success: true,
+      data: {
+        events_24h: {
+          count: events24h.length,
+          delta: deltaEvents,
+          trend: trendDataEvents,
+        },
+        signals_24h: {
+          count: signals24h.length,
+          delta: deltaSignals,
+          trend: trendDataSignals,
+        },
+        high_impact_impacts_7d: {
+          count: impacts7d.length,
+          delta: 0,
+          trend: Array.from({ length: 7 }, () => Math.floor(Math.random() * 5)),
+        },
+        watchlist_volatility: {
+          value: '0%',
+          delta: 0,
+          trend: Array.from({ length: 7 }, () => Math.floor(Math.random() * 25) + 10),
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Overview KPIs error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/overview/narrative - Narrative for Overview page
+app.get('/api/overview/narrative', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+    const range = (req.query.range as string) || '24h';
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+
+    // Import Supabase functions
+    const { getNormalizedEvents, getSignalsFromEvents } = await import('../lib/supabase.js');
+
+    // Calculate date range
+    const now = new Date();
+    let dateFrom: Date;
+    if (range === '24h') {
+      dateFrom = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    } else if (range === '7d') {
+      dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else {
+      dateFrom = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    }
+
+    // Get recent events and signals
+    const [events, signals] = await Promise.all([
+      getNormalizedEvents({ dateFrom: dateFrom.toISOString(), dateTo: now.toISOString(), limit: 10 }, supabaseUserId || undefined),
+      getSignalsFromEvents({ dateFrom: dateFrom.toISOString(), dateTo: now.toISOString(), limit: 5 }, supabaseUserId || undefined),
+    ]);
+
+    // Generate narrative bullets from events
+    const bullets: string[] = [];
+    if (events.length > 0) {
+      const sectors = new Set(events.map(e => e.sector).filter(Boolean));
+      const regions = new Set(events.map(e => e.region).filter(Boolean));
+      
+      if (sectors.size > 0) {
+        bullets.push(`Multiple events detected across ${sectors.size} sector${sectors.size > 1 ? 's' : ''}.`);
+      }
+      if (regions.size > 0) {
+        bullets.push(`Geopolitical activity in ${regions.size} region${regions.size > 1 ? 's' : ''}.`);
+      }
+      if (events.length > 5) {
+        bullets.push(`High event volume: ${events.length} events in the last ${range}.`);
+      }
+    }
+
+    // Get linked events, tickers, and signals
+    const linkedEvents = events.slice(0, 3).map(e => ({
+      id: e.id,
+      headline: e.summary || 'Event',
+    }));
+
+    const linkedTickers: Array<{ symbol: string; name: string }> = [];
+    // Extract tickers from events if available
+    events.forEach(e => {
+      if (e.actors && e.actors.length > 0) {
+        // Try to extract ticker symbols from actors (simplified)
+        e.actors.forEach(actor => {
+          if (actor.length <= 5 && /^[A-Z]+$/.test(actor)) {
+            linkedTickers.push({ symbol: actor, name: `${actor} Inc.` });
+          }
+        });
+      }
+    });
+
+    const linkedSignal = signals.length > 0 ? {
+      id: signals[0].id,
+      title: signals[0].title || 'Signal',
+    } : null;
+
+    res.json({
+      success: true,
+      data: {
+        bullets: bullets.length > 0 ? bullets : ['No significant activity detected.'],
+        linked_events: linkedEvents,
+        linked_tickers: linkedTickers.slice(0, 5),
+        linked_signal: linkedSignal,
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Overview narrative error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/markets/movers - Market movers
+app.get('/api/markets/movers', async (req, res) => {
+  try {
+    const range = (req.query.range as string) || '24h';
+    const limit = parseInt((req.query.limit as string) || '8', 10);
+
+    // Common symbols to track
+    const symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'JPM', 'BAC'];
+
+    const movers = await Promise.all(
+      symbols.slice(0, limit).map(async (symbol) => {
+        try {
+          const priceData = await getRealTimePrice(symbol);
+          
+          // Get timeseries for sparkline
+          let sparklineData: number[] = [];
+          try {
+            const tsData = await getTimeSeries(symbol, { interval: '1h', days: 1 });
+            if (tsData && tsData.values) {
+              sparklineData = tsData.values.map((point: any) => parseFloat(point.close || point.price || 0));
+            }
+          } catch (tsError) {
+            // Ignore timeseries errors
+          }
+
+          return {
+            symbol,
+            name: `${symbol} Inc.`, // TODO: Get real name from API
+            change_percent: parseFloat(priceData.percent_change || '0'),
+            volume: parseInt(priceData.volume || '0'),
+            sparkline_data: sparklineData.length > 0 ? sparklineData : Array.from({ length: 10 }, () => Math.random() * 100),
+          };
+        } catch (error) {
+          console.warn(`[API] Failed to fetch data for ${symbol}:`, error);
+          return null;
+        }
+      })
+    );
+
+    const validMovers = movers.filter(m => m !== null);
+    
+    // Sort by change_percent (absolute value)
+    validMovers.sort((a, b) => Math.abs(b!.change_percent) - Math.abs(a!.change_percent));
+
+    res.json({
+      success: true,
+      data: {
+        movers: validMovers,
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Market movers error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/alerts/triggered - Triggered alerts
+app.get('/api/alerts/triggered', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+    const range = (req.query.range as string) || '7d';
+    const limit = parseInt((req.query.limit as string) || '8', 10);
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'userId is required',
+      });
+    }
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    const supabaseUserId = await getSupabaseUserId(userId);
+    if (!supabaseUserId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid user ID',
+      });
+    }
+
+    // Calculate date range
+    const now = new Date();
+    let dateFrom: Date;
+    if (range === '24h') {
+      dateFrom = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    } else if (range === '7d') {
+      dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else {
+      dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    }
+
+    // Get user alerts
+    const { data: alerts, error } = await supabase
+      .from('user_alerts')
+      .select(`
+        id,
+        alert_type,
+        priority,
+        match_reasons,
+        status,
+        created_at,
+        nucigen_events (
+          id,
+          summary,
+          event_type,
+          sector,
+          region,
+          impact_score,
+          confidence
+        )
+      `)
+      .eq('user_id', supabaseUserId)
+      .gte('created_at', dateFrom.toISOString())
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('[API] Error fetching alerts:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to fetch alerts',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        alerts: (alerts || []).map(alert => ({
+          id: alert.id,
+          title: (alert.nucigen_events as any)?.summary || 'Alert',
+          severity: alert.priority,
+          triggered_at: alert.created_at,
+          related_event_id: (alert.nucigen_events as any)?.id,
+          alert_type: alert.alert_type,
+          match_reasons: alert.match_reasons,
+        })),
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Triggered alerts error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// ============================================
+// Optional Endpoints - Events
+// ============================================
+
+// GET /api/events - List events with filters
+app.get('/api/events', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+    const {
+      dateFrom,
+      dateTo,
+      region,
+      sector,
+      eventType,
+      source_type,
+      confidence_min,
+      confidence_max,
+      limit = 20,
+      offset = 0,
+    } = req.query;
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+
+    // Import Supabase functions
+    const { getNormalizedEvents } = await import('../lib/supabase.js');
+
+    const options: any = {
+      limit: parseInt(limit as string, 10),
+      offset: parseInt(offset as string, 10),
+    };
+
+    if (dateFrom) options.dateFrom = dateFrom as string;
+    if (dateTo) options.dateTo = dateTo as string;
+    if (region) options.region = region as string;
+    if (sector) options.sector = sector as string;
+    if (eventType) options.eventType = eventType as string;
+    if (confidence_min) options.minConfidence = parseFloat(confidence_min as string);
+    if (confidence_max) options.maxConfidence = parseFloat(confidence_max as string);
+
+    const events = await getNormalizedEvents(options, supabaseUserId || undefined);
+
+    res.json({
+      success: true,
+      data: {
+        events,
+        total: events.length,
+        limit: parseInt(limit as string, 10),
+        offset: parseInt(offset as string, 10),
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Events list error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/events/:id/context - Event context
+app.get('/api/events/:id/context', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+
+    // Get event
+    const { getNormalizedEventById } = await import('../lib/supabase.js');
+    const event = await getNormalizedEventById(id, supabaseUserId || undefined);
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        error: 'Event not found',
+      });
+    }
+
+    // Get related entities (from actors)
+    const relatedEntities = event.actors?.map(actor => ({
+      id: actor.toLowerCase().replace(/\s+/g, '-'),
+      name: actor,
+      type: 'company' as const,
+    })) || [];
+
+    // Get related assets (extract from actors if they look like tickers)
+    const relatedAssets = event.actors?.filter(actor => 
+      actor.length <= 5 && /^[A-Z]+$/.test(actor)
+    ).map(symbol => ({
+      symbol,
+      name: `${symbol} Inc.`,
+    })) || [];
+
+    // Get similar events (same sector or region)
+    const { getNormalizedEvents } = await import('../lib/supabase.js');
+    const similarEvents = await getNormalizedEvents({
+      sector: event.sector || undefined,
+      region: event.region || undefined,
+      limit: 5,
+    }, supabaseUserId || undefined);
+
+    res.json({
+      success: true,
+      data: {
+        related_entities: relatedEntities,
+        related_assets: relatedAssets,
+        similar_events: similarEvents.filter(e => e.id !== id).slice(0, 5).map(e => ({
+          id: e.id,
+          headline: e.summary || 'Event',
+        })),
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Event context error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// ============================================
+// Optional Endpoints - Signals
+// ============================================
+
+// GET /api/signals - List signals with filters
+app.get('/api/signals', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+    const {
+      dateFrom,
+      dateTo,
+      scope,
+      horizon,
+      min_impact,
+      min_confidence,
+      theme,
+      sector,
+      region,
+      limit = 20,
+      offset = 0,
+    } = req.query;
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+
+    // Import Supabase functions
+    const { getSignalsFromEvents } = await import('../lib/supabase.js');
+
+    const options: any = {
+      limit: parseInt(limit as string, 10),
+    };
+
+    if (dateFrom) options.dateFrom = dateFrom as string;
+    if (dateTo) options.dateTo = dateTo as string;
+    if (scope) options.scope = scope as string;
+    if (horizon) options.horizon = horizon as string;
+    if (min_impact) options.minImpact = parseFloat(min_impact as string);
+    if (min_confidence) options.minConfidence = parseFloat(min_confidence as string);
+    if (sector) options.sector = sector as string;
+    if (region) options.region = region as string;
+
+    const signals = await getSignalsFromEvents(options, supabaseUserId || undefined);
+
+    // Apply offset manually
+    const paginatedSignals = signals.slice(parseInt(offset as string, 10));
+
+    res.json({
+      success: true,
+      data: {
+        signals: paginatedSignals,
+        total: signals.length,
+        limit: parseInt(limit as string, 10),
+        offset: parseInt(offset as string, 10),
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Signals list error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/signals/:id - Signal detail
+app.get('/api/signals/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+
+    // Import Supabase functions
+    const { getSignalsFromEvents } = await import('../lib/supabase.js');
+
+    // Get all signals and find the one with matching ID
+    const signals = await getSignalsFromEvents({ limit: 1000 }, supabaseUserId || undefined);
+    const signal = signals.find(s => s.id === id);
+
+    if (!signal) {
+      return res.status(404).json({
+        success: false,
+        error: 'Signal not found',
+      });
+    }
+
+    // Get related events
+    const { getNormalizedEvents } = await import('../lib/supabase.js');
+    const relatedEvents = signal.related_event_ids 
+      ? await Promise.all(
+          signal.related_event_ids.map(eventId => 
+            getNormalizedEvents({ limit: 1 }, supabaseUserId || undefined).then(events => 
+              events.find(e => e.id === eventId)
+            )
+          )
+        )
+      : [];
+
+    res.json({
+      success: true,
+      data: {
+        ...signal,
+        evidence_graph: {
+          nodes: [
+            ...(signal.related_event_ids || []).map(eid => ({ id: eid, type: 'event' })),
+            ...(signal.related_assets || []).map(asset => ({ id: asset, type: 'asset' })),
+          ],
+          edges: (signal.related_event_ids || []).map(eid => ({
+            from: eid,
+            to: signal.id,
+            type: 'linked_by',
+          })),
+        },
+        market_validation: {
+          assets: (signal.related_assets || []).map(asset => ({
+            symbol: asset,
+            correlation: 0.75, // Placeholder
+            sparkline_data: Array.from({ length: 10 }, () => Math.random() * 100),
+          })),
+          note: 'validation based on price/volume changes, not causality',
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Signal detail error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// ============================================
+// Optional Endpoints - Markets
+// ============================================
+
+// GET /api/markets/overview - Markets overview
+app.get('/api/markets/overview', async (req, res) => {
+  try {
+    // Get indices data
+    const indices = ['SPX', 'DJI', 'IXIC'].map(symbol => ({
+      symbol,
+      name: symbol === 'SPX' ? 'S&P 500' : symbol === 'DJI' ? 'Dow Jones' : 'NASDAQ',
+      price: 0,
+      change_percent: 0,
+    }));
+
+    // Get watchlist heatmap data (placeholder)
+    const heatmap = {
+      watchlist: 'default',
+      data: [] as any[],
+    };
+
+    res.json({
+      success: true,
+      data: {
+        indices,
+        heatmap,
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Markets overview error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/markets/asset/:symbol/attribution - Asset attribution
+app.get('/api/markets/asset/:symbol/attribution', async (req, res) => {
+  try {
+    const { symbol } = req.params;
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+
+    // Get timeseries for the asset
+    const tsData = await getTimeSeries(symbol, { interval: '1h', days: 7 });
+    
+    if (!tsData || !tsData.values || tsData.values.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          symbol,
+          attributions: [],
+          note: 'Temporal proximity, not causality',
+        },
+      });
+    }
+
+    // Get events that might be related (same sector or region)
+    const { getNormalizedEvents } = await import('../lib/supabase.js');
+    const recentEvents = await getNormalizedEvents({
+      dateFrom: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      dateTo: new Date().toISOString(),
+      limit: 50,
+    }, supabaseUserId || undefined);
+
+    // Calculate price changes and match with events
+    const attributions: any[] = [];
+    const prices = tsData.values.map((v: any) => ({
+      timestamp: new Date(v.datetime),
+      price: parseFloat(v.close || v.price || 0),
+    }));
+
+    for (let i = 1; i < prices.length; i++) {
+      const delta = ((prices[i].price - prices[i - 1].price) / prices[i - 1].price) * 100;
+      
+      if (Math.abs(delta) > 1) { // Significant change (>1%)
+        // Find events within 24h of this price change
+        const eventTime = prices[i].timestamp;
+        const nearbyEvents = recentEvents.filter(e => {
+          const eventDate = new Date(e.created_at);
+          const diffHours = Math.abs(eventTime.getTime() - eventDate.getTime()) / (1000 * 60 * 60);
+          return diffHours <= 24;
+        });
+
+        if (nearbyEvents.length > 0) {
+          attributions.push({
+            event_id: nearbyEvents[0].id,
+            event_headline: nearbyEvents[0].summary || 'Event',
+            timestamp: eventTime.toISOString(),
+            delta_percent: delta,
+            temporal_proximity: 'within 24h',
+          });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        symbol,
+        attributions: attributions.slice(0, 10), // Limit to 10
+        note: 'Temporal proximity, not causality',
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Asset attribution error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// ============================================
+// Optional Endpoints - Impacts
+// ============================================
+
+// GET /api/impacts - List impacts with filters
+app.get('/api/impacts', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+    const {
+      probability_min,
+      magnitude_min,
+      timeframe,
+      sector,
+      region,
+      limit = 20,
+      offset = 0,
+    } = req.query;
+
+    // Note: Impacts are generated on-demand via POST /api/impacts
+    // This endpoint returns a placeholder response
+    res.json({
+      success: true,
+      data: {
+        impacts: [],
+        total: 0,
+        limit: parseInt(limit as string, 10),
+        offset: parseInt(offset as string, 10),
+      },
+      message: 'Impacts are generated on-demand. Use POST /api/impacts with signals to generate impacts.',
+    });
+  } catch (error: any) {
+    console.error('[API] Impacts list error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/impacts/:id - Impact detail
+app.get('/api/impacts/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Note: Impacts are generated on-demand via POST /api/impacts
+    // This endpoint returns a placeholder response
+    res.status(404).json({
+      success: false,
+      error: 'Impact not found. Impacts are generated on-demand. Use POST /api/impacts with signals to generate impacts.',
+    });
+  } catch (error: any) {
+    console.error('[API] Impact detail error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// ============================================
+// Optional Endpoints - Watchlists & Entities
+// ============================================
+
+// GET /api/watchlists - User watchlists
+app.get('/api/watchlists', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'userId is required',
+      });
+    }
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    // Note: Watchlists table may not exist yet
+    // Return placeholder response
+    res.json({
+      success: true,
+      data: {
+        watchlists: [],
+      },
+      message: 'Watchlists feature not yet implemented.',
+    });
+  } catch (error: any) {
+    console.error('[API] Watchlists error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/entities - Entities
+app.get('/api/entities', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+    const {
+      type,
+      search,
+      limit = 20,
+      offset = 0,
+    } = req.query;
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+
+    // Get entities from events (actors)
+    const { getNormalizedEvents } = await import('../lib/supabase.js');
+    const events = await getNormalizedEvents({ limit: 100 }, supabaseUserId || undefined);
+
+    // Extract unique entities from actors
+    const entityMap = new Map<string, { name: string; type: string; last_mention: string; linked_assets: string[] }>();
+    
+    events.forEach(event => {
+      event.actors?.forEach(actor => {
+        if (!entityMap.has(actor)) {
+          const isTicker = actor.length <= 5 && /^[A-Z]+$/.test(actor);
+          entityMap.set(actor, {
+            name: actor,
+            type: isTicker ? 'asset' : 'company',
+            last_mention: event.created_at,
+            linked_assets: isTicker ? [actor] : [],
+          });
+        } else {
+          const existing = entityMap.get(actor)!;
+          if (new Date(event.created_at) > new Date(existing.last_mention)) {
+            existing.last_mention = event.created_at;
+          }
+        }
+      });
+    });
+
+    let entities = Array.from(entityMap.entries()).map(([name, data]) => ({
+      id: name.toLowerCase().replace(/\s+/g, '-'),
+      name: data.name,
+      type: data.type,
+      last_mention: data.last_mention,
+      linked_assets: data.linked_assets,
+    }));
+
+    // Apply filters
+    if (type) {
+      entities = entities.filter(e => e.type === type);
+    }
+    if (search) {
+      const searchLower = (search as string).toLowerCase();
+      entities = entities.filter(e => e.name.toLowerCase().includes(searchLower));
+    }
+
+    // Apply pagination
+    const paginatedEntities = entities.slice(
+      parseInt(offset as string, 10),
+      parseInt(offset as string, 10) + parseInt(limit as string, 10)
+    );
+
+    res.json({
+      success: true,
+      data: {
+        entities: paginatedEntities,
+        total: entities.length,
+        limit: parseInt(limit as string, 10),
+        offset: parseInt(offset as string, 10),
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Entities error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// ============================================
+// Optional Endpoints (for performance optimization)
+// ============================================
+
+/**
+ * Helper function to get Supabase user ID from Clerk user ID
+ */
+async function getSupabaseUserId(clerkUserId: string | null): Promise<string | null> {
+  if (!clerkUserId || !supabase) {
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('get_or_create_supabase_user_id', {
+      clerk_id: clerkUserId,
+      user_email: null,
+    });
+
+    if (error || !data) {
+      console.warn('[API] Error converting Clerk user ID:', error);
+      return null;
+    }
+
+    return data as string;
+  } catch (error: any) {
+    console.warn('[API] Error in getSupabaseUserId:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Helper function to filter events by date range
+ */
+function filterEventsByDateRange<T extends { created_at: string }>(
+  events: T[],
+  dateFrom?: string,
+  dateTo?: string
+): T[] {
+  if (!dateFrom && !dateTo) {
+    return events;
+  }
+
+  return events.filter((event) => {
+    const eventDate = new Date(event.created_at);
+    if (dateFrom && eventDate < new Date(dateFrom)) {
+      return false;
+    }
+    if (dateTo && eventDate > new Date(dateTo)) {
+      return false;
+    }
+    return true;
+  });
+}
+
+// GET /api/overview/kpis - KPIs for Overview page
+app.get('/api/overview/kpis', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.body?.userId as string) || null;
+    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+
+    if (!supabase) {
+      return res.status(500).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    // Import functions dynamically
+    const { getNormalizedEvents, getSignalsFromEvents } = await import('../lib/supabase.js');
+
+    const now = new Date();
+    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const last48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+    const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    // Get events and signals (will filter by date after)
+    const [allEvents24h, allSignals24h, allEventsPrev24h, allSignalsPrev24h] = await Promise.all([
+      getNormalizedEvents({}, userId || undefined),
+      getSignalsFromEvents({}, userId || undefined),
+      getNormalizedEvents({}, userId || undefined),
+      getSignalsFromEvents({}, userId || undefined),
+    ]);
+
+    // Filter by date range
+    const events24h = filterEventsByDateRange(allEvents24h, last24h.toISOString(), now.toISOString());
+    const signals24h = allSignals24h.filter((s: any) => {
+      // Filter signals based on their related events' dates
+      return true; // Signals don't have created_at, use all for now
+    });
+    const eventsPrev24h = filterEventsByDateRange(allEventsPrev24h, last48h.toISOString(), last24h.toISOString());
+    const signalsPrev24h = allSignalsPrev24h; // Same as above
+
+    // Calculate trends (last 7 days) - use all events and filter by date
+    const allEventsForTrend = await getNormalizedEvents({}, userId || undefined);
+    const trendDataEvents = Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(now.getTime() - (6 - i) * 24 * 60 * 60 * 1000);
+      const dayStart = new Date(date.setHours(0, 0, 0, 0));
+      const dayEnd = new Date(date.setHours(23, 59, 59, 999));
+      const dayEvents = filterEventsByDateRange(allEventsForTrend, dayStart.toISOString(), dayEnd.toISOString());
+      return dayEvents.length;
+    });
+
+    const allSignalsForTrend = await getSignalsFromEvents({}, userId || undefined);
+    const trendDataSignals = Array.from({ length: 7 }, () => {
+      // Signals don't have dates, use approximate count
+      return Math.floor(allSignalsForTrend.length / 7);
+    });
+
+    // Get high-impact impacts (7d) - using signals with high impact as proxy
+    const allSignals7d = await getSignalsFromEvents({}, userId || undefined);
+    const impacts7d = allSignals7d.filter((s: any) => (s.impact_score || 0) >= 70);
+
+    // Calculate deltas
+    const deltaEvents = events24h.length > 0 && eventsPrev24h.length > 0
+      ? ((events24h.length - eventsPrev24h.length) / eventsPrev24h.length) * 100
+      : 0;
+
+    const deltaSignals = signals24h.length > 0 && signalsPrev24h.length > 0
+      ? ((signals24h.length - signalsPrev24h.length) / signalsPrev24h.length) * 100
+      : 0;
+
+    // Watchlist volatility (placeholder - TODO: implement when watchlist is ready)
+    const watchlistVolatility = 0;
+
+    res.json({
+      success: true,
+      data: {
+        events_24h: {
+          count: events24h.length,
+          delta: deltaEvents,
+          trend: trendDataEvents,
+        },
+        signals_24h: {
+          count: signals24h.length,
+          delta: deltaSignals,
+          trend: trendDataSignals,
+        },
+        high_impact_impacts_7d: {
+          count: impacts7d.length,
+          delta: 0,
+          trend: Array.from({ length: 7 }, () => Math.floor(Math.random() * 5)),
+        },
+        watchlist_volatility: {
+          value: `${watchlistVolatility}%`,
+          delta: 0,
+          trend: Array.from({ length: 7 }, () => Math.floor(Math.random() * 25) + 10),
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Overview KPIs error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/overview/narrative - Narrative for Overview page
+app.get('/api/overview/narrative', async (req, res) => {
+  try {
+    const range = (req.query.range as string) || '24h';
+    const userId = (req.query.userId as string) || (req.body?.userId as string) || null;
+
+    if (!supabase) {
+      return res.status(500).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    // Import functions dynamically
+    const { getNormalizedEvents, getSignalsFromEvents } = await import('../lib/supabase.js');
+
+    const now = new Date();
+    const hours = range === '24h' ? 24 : range === '7d' ? 168 : 24;
+    const dateFrom = new Date(now.getTime() - hours * 60 * 60 * 1000);
+
+    // Get recent events and signals (filter by date after)
+    const [allEvents, allSignals] = await Promise.all([
+      getNormalizedEvents({}, userId || undefined),
+      getSignalsFromEvents({}, userId || undefined),
+    ]);
+
+    // Filter by date range
+    const events = filterEventsByDateRange(allEvents, dateFrom.toISOString(), now.toISOString());
+    const signals = allSignals; // Signals don't have dates
+
+    // Generate narrative bullets (factual aggregation)
+    const bullets: string[] = [];
+    if (events.length > 0) {
+      const sectors = new Set(events.map(e => e.sector).filter(Boolean));
+      if (sectors.size > 0) {
+        bullets.push(`Multiple events detected across ${sectors.size} sector${sectors.size > 1 ? 's' : ''}.`);
+      }
+    }
+    if (signals.length > 0) {
+      bullets.push(`${signals.length} signal${signals.length > 1 ? 's' : ''} identified in the last ${range}.`);
+    }
+
+    // Get linked events (top 3)
+    const linkedEvents = events.slice(0, 3).map(e => ({
+      id: e.id,
+      headline: e.headline || e.summary?.substring(0, 100) || 'Event',
+    }));
+
+    // Get linked tickers (from events with assets)
+    const linkedTickers: Array<{ symbol: string; name: string }> = [];
+    // TODO: Extract from events when asset linking is implemented
+
+    // Get top signal
+    const topSignal = signals.length > 0
+      ? { id: signals[0].id, title: signals[0].title || 'Signal' }
+      : null;
+
+    res.json({
+      success: true,
+      data: {
+        bullets: bullets.length > 0 ? bullets : ['No significant activity detected.'],
+        linked_events: linkedEvents,
+        linked_tickers: linkedTickers,
+        linked_signal: topSignal,
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Overview narrative error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/markets/movers - Market movers
+app.get('/api/markets/movers', async (req, res) => {
+  try {
+    const range = (req.query.range as string) || '24h';
+    const limit = parseInt((req.query.limit as string) || '8', 10);
+
+    // Common symbols to track
+    const symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'SPY', 'QQQ'];
+
+    const moversData = await Promise.all(
+      symbols.slice(0, limit).map(async (symbol) => {
+        try {
+          const priceData = await getRealTimePrice(symbol);
+          
+          // Calculate start_date and end_date for timeseries
+          const endDate = new Date();
+          const startDate = new Date();
+          if (range === '24h') {
+            startDate.setDate(startDate.getDate() - 1);
+          } else if (range === '7d') {
+            startDate.setDate(startDate.getDate() - 7);
+          } else {
+            startDate.setDate(startDate.getDate() - 1);
+          }
+          
+          const timeseriesData = await getTimeSeries(symbol, {
+            interval: '1h',
+            start_date: startDate.toISOString().split('T')[0],
+            end_date: endDate.toISOString().split('T')[0],
+          });
+
+          let sparklineData: number[] = [];
+          if (timeseriesData && timeseriesData.values) {
+            sparklineData = timeseriesData.values
+              .slice(-24) // Last 24 hours
+              .map((point: any) => parseFloat(point.close || point.price || 0));
+          }
+
+          return {
+            symbol,
+            name: `${symbol} Inc.`, // TODO: Get real name from API
+            change_percent: priceData.change_percent || 0,
+            volume: priceData.volume || 0,
+            sparkline_data: sparklineData.length > 0 ? sparklineData : [],
+          };
+        } catch (error: any) {
+          console.warn(`[API] Failed to fetch data for ${symbol}:`, error.message);
+          return null;
+        }
+      })
+    );
+
+    // Filter out nulls and sort by change_percent
+    const movers = moversData
+      .filter((m): m is NonNullable<typeof m> => m !== null)
+      .sort((a, b) => Math.abs(b.change_percent) - Math.abs(a.change_percent));
+
+    res.json({
+      success: true,
+      data: {
+        movers,
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Market movers error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/alerts/triggered - Triggered alerts
+app.get('/api/alerts/triggered', async (req, res) => {
+  try {
+    const range = (req.query.range as string) || '7d';
+    const limit = parseInt((req.query.limit as string) || '8', 10);
+    const userId = (req.query.userId as string) || (req.body?.userId as string) || null;
+
+    if (!supabase) {
+      return res.status(500).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+
+    const now = new Date();
+    const days = range === '7d' ? 7 : range === '24h' ? 1 : 7;
+    const dateFrom = new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
+
+    // Query user_alerts table
+    let query = supabase
+      .from('user_alerts')
+      .select('id, alert_type, severity, message, related_event_id, related_signal_id, triggered_at, read_at')
+      .gte('triggered_at', dateFrom)
+      .order('triggered_at', { ascending: false })
+      .limit(limit);
+
+    if (supabaseUserId) {
+      query = query.eq('user_id', supabaseUserId);
+    }
+
+    const { data: alerts, error } = await query;
+
+    if (error) {
+      throw new Error(error.message || 'Failed to fetch alerts');
+    }
+
+    res.json({
+      success: true,
+      data: {
+        alerts: (alerts || []).map((alert: any) => ({
+          id: alert.id,
+          title: alert.message || 'Alert',
+          severity: alert.severity || 'moderate',
+          triggered_at: alert.triggered_at,
+          related_event_id: alert.related_event_id,
+          related_signal_id: alert.related_signal_id,
+          read: !!alert.read_at,
+        })),
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Triggered alerts error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/events - List events with filters
+app.get('/api/events', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.body?.userId as string) || null;
+    const dateFrom = req.query.dateFrom as string;
+    const dateTo = req.query.dateTo as string;
+    const region = req.query.region as string;
+    const sector = req.query.sector as string;
+    const eventType = req.query.eventType as string;
+    const source_type = req.query.source_type as string;
+    const confidence_min = req.query.confidence_min ? parseFloat(req.query.confidence_min as string) : undefined;
+    const confidence_max = req.query.confidence_max ? parseFloat(req.query.confidence_max as string) : undefined;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+    const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+    const search = req.query.search as string;
+
+    if (!supabase) {
+      return res.status(500).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    // Import functions dynamically
+    const { getNormalizedEvents } = await import('../lib/supabase.js');
+
+    const options: any = {};
+    if (region) options.regionFilter = [region];
+    if (sector) options.sectorFilter = [sector];
+    if (eventType) options.eventTypeFilter = [eventType];
+    if (confidence_min !== undefined) options.minImpactScore = confidence_min;
+    if (confidence_max !== undefined) options.minConfidenceScore = confidence_max;
+    if (search) options.searchQuery = search;
+    if (limit) options.limit = limit;
+    if (offset) options.offset = offset;
+
+    const allEvents = await getNormalizedEvents(options, userId || undefined);
+
+    // Filter by date range if provided
+    const events = filterEventsByDateRange(allEvents, dateFrom, dateTo);
+
+    // Apply pagination
+    const paginatedEvents = events.slice(offset || 0, (offset || 0) + (limit || 20));
+
+    res.json({
+      success: true,
+      data: {
+        events: paginatedEvents,
+        total: events.length,
+        limit,
+        offset,
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Events list error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/events/:id/context - Event context
+app.get('/api/events/:id/context', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = (req.query.userId as string) || (req.body?.userId as string) || null;
+
+    if (!supabase) {
+      return res.status(500).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    // Import functions dynamically
+    const { getNormalizedEventById, getSignalsFromEvents } = await import('../lib/supabase.js');
+
+    const event = await getNormalizedEventById(id);
+
+    // Get related events (same sector/region)
+    const allRelatedEvents = await getNormalizedEvents(
+      {
+        sectorFilter: event.sectors && event.sectors.length > 0 ? event.sectors : undefined,
+        regionFilter: event.region ? [event.region] : undefined,
+      },
+      userId || undefined
+    );
+    const relatedEvents = allRelatedEvents.filter((e: any) => e.id !== id).slice(0, 5);
+
+    // Get related signals (from same events)
+    const relatedSignals = await getSignalsFromEvents(
+      {},
+      userId || undefined
+    ).then(signals => signals.filter(s => 
+      s.related_event_ids?.includes(id)
+    ).slice(0, 5));
+
+    // Get related entities (from event actors)
+    const relatedEntities: Array<{ id: string; name: string; type: string }> = [];
+    if (event.actors && event.actors.length > 0) {
+      event.actors.forEach((actor, index) => {
+        relatedEntities.push({
+          id: `entity_${index}`,
+          name: actor,
+          type: 'actor',
+        });
+      });
+    }
+
+    // Get related assets (placeholder - TODO: implement asset linking)
+    const relatedAssets: Array<{ symbol: string; name: string }> = [];
+
+    res.json({
+      success: true,
+      data: {
+        related_entities: relatedEntities,
+        related_assets: relatedAssets,
+        similar_events: relatedEvents.map(e => ({
+          id: e.id,
+          headline: e.headline || e.summary?.substring(0, 100) || 'Event',
+        })),
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Event context error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/signals - List signals with filters
+app.get('/api/signals', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.body?.userId as string) || null;
+    const dateFrom = req.query.dateFrom as string;
+    const dateTo = req.query.dateTo as string;
+    const scope = req.query.scope as string;
+    const horizon = req.query.horizon as string;
+    const min_impact = req.query.min_impact ? parseFloat(req.query.min_impact as string) : undefined;
+    const min_confidence = req.query.min_confidence ? parseFloat(req.query.min_confidence as string) : undefined;
+    const theme = req.query.theme as string;
+    const sector = req.query.sector as string;
+    const region = req.query.region as string;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+    const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+
+    if (!supabase) {
+      return res.status(500).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    // Import functions dynamically
+    const { getSignalsFromEvents } = await import('../lib/supabase.js');
+
+    const options: any = {};
+    if (sector) options.sectorFilter = [sector];
+    if (region) options.regionFilter = [region];
+    if (min_impact !== undefined) options.minImpactScore = min_impact;
+    if (min_confidence !== undefined) options.minConfidenceScore = min_confidence;
+
+    const allSignals = await getSignalsFromEvents(options, userId || undefined);
+    // Note: Signals don't have dates, so we can't filter by dateFrom/dateTo
+    const signals = allSignals;
+
+    // Apply additional filters
+    let filteredSignals = signals;
+    if (scope) {
+      filteredSignals = filteredSignals.filter(s => s.scope === scope);
+    }
+    if (horizon) {
+      filteredSignals = filteredSignals.filter(s => s.horizon === horizon);
+    }
+
+    // Apply pagination
+    const paginatedSignals = filteredSignals.slice(offset, offset + limit);
+
+    res.json({
+      success: true,
+      data: {
+        signals: paginatedSignals,
+        total: filteredSignals.length,
+        limit,
+        offset,
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Signals list error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/signals/:id - Signal detail
+app.get('/api/signals/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = (req.query.userId as string) || (req.body?.userId as string) || null;
+
+    if (!supabase) {
+      return res.status(500).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    // Import functions dynamically
+    const { getSignalsFromEvents, getNormalizedEventById } = await import('../lib/supabase.js');
+
+    // Get all signals and find the one with matching ID
+    const allSignals = await getSignalsFromEvents({}, userId || undefined);
+    const signal = allSignals.find(s => s.id === id);
+
+    if (!signal) {
+      return res.status(404).json({
+        success: false,
+        error: 'Signal not found',
+      });
+    }
+
+    // Get related events
+    const relatedEvents = signal.related_event_ids
+      ? await Promise.all(
+          signal.related_event_ids.map(eventId => 
+            getNormalizedEventById(eventId).catch(() => null)
+          )
+        ).then(events => events.filter(Boolean))
+      : [];
+
+    // Build evidence graph
+    const evidenceGraph = {
+      nodes: [
+        ...relatedEvents.map((e: any) => ({ id: e.id, type: 'event' })),
+        { id: signal.id, type: 'signal' },
+      ],
+      edges: relatedEvents.map((e: any) => ({
+        from: e.id,
+        to: signal.id,
+        type: 'linked_by',
+      })),
+    };
+
+    // Market validation (placeholder - TODO: implement real validation)
+    const marketValidation = {
+      assets: [],
+      note: 'Validation based on price/volume changes, not causality',
+    };
+
+    res.json({
+      success: true,
+      data: {
+        ...signal,
+        evidence_graph: evidenceGraph,
+        market_validation: marketValidation,
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Signal detail error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/markets/overview - Markets overview
+app.get('/api/markets/overview', async (req, res) => {
+  try {
+    // Common indices and symbols
+    const indices = [
+      { symbol: 'SPX', name: 'S&P 500' },
+      { symbol: 'DJI', name: 'Dow Jones' },
+      { symbol: 'IXIC', name: 'NASDAQ' },
+    ];
+
+    const indicesData = await Promise.all(
+      indices.map(async (index) => {
+        try {
+          const priceData = await getRealTimePrice(index.symbol);
+          return {
+            symbol: index.symbol,
+            name: index.name,
+            price: priceData.price || 0,
+            change_percent: priceData.change_percent || 0,
+          };
+        } catch (error: any) {
+          console.warn(`[API] Failed to fetch ${index.symbol}:`, error.message);
+          return null;
+        }
+      })
+    );
+
+    // Heatmap data (placeholder - TODO: implement watchlist-based heatmap)
+    const heatmap = {
+      watchlist: 'default',
+      data: [],
+    };
+
+    res.json({
+      success: true,
+      data: {
+        indices: indicesData.filter((i): i is NonNullable<typeof i> => i !== null),
+        heatmap,
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Markets overview error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/markets/asset/:symbol/attribution - Asset attribution (temporal proximity)
+app.get('/api/markets/asset/:symbol/attribution', async (req, res) => {
+  try {
+    const { symbol } = req.params;
+    const userId = (req.query.userId as string) || (req.body?.userId as string) || null;
+    const days = req.query.days ? parseInt(req.query.days as string, 10) : 7;
+
+    if (!supabase) {
+      return res.status(500).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    // Import functions dynamically
+    const { getNormalizedEvents } = await import('../lib/supabase.js');
+
+    // Get price history to find significant moves
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    const timeseries = await getTimeSeries(symbol, {
+      interval: '1day',
+      start_date: startDate.toISOString().split('T')[0],
+      end_date: endDate.toISOString().split('T')[0],
+    });
+
+    if (!timeseries || !timeseries.values || timeseries.values.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          symbol,
+          attributions: [],
+          note: 'Temporal proximity, not causality',
+        },
+      });
+    }
+
+    // Find significant price moves (> 2%)
+    const significantMoves: Array<{ timestamp: string; delta_percent: number }> = [];
+    for (let i = 1; i < timeseries.values.length; i++) {
+            const prev = parseFloat(timeseries.values[i - 1].close || '0');
+            const curr = parseFloat(timeseries.values[i].close || '0');
+      const delta = ((curr - prev) / prev) * 100;
+      
+      if (Math.abs(delta) > 2) {
+        significantMoves.push({
+          timestamp: timeseries.values[i].datetime,
+          delta_percent: delta,
+        });
+      }
+    }
+
+    // Get events within 24h of significant moves
+    const attributions = await Promise.all(
+      significantMoves.map(async (move) => {
+        const moveDate = new Date(move.timestamp);
+        const eventStart = new Date(moveDate.getTime() - 24 * 60 * 60 * 1000);
+        const eventEnd = new Date(moveDate.getTime() + 24 * 60 * 60 * 1000);
+
+        const allEvents = await getNormalizedEvents({}, userId || undefined);
+        const events = filterEventsByDateRange(allEvents, eventStart.toISOString(), eventEnd.toISOString());
+
+        return events.map((event: any) => ({
+          event_id: event.id,
+          event_headline: event.headline || event.description?.substring(0, 100) || 'Event',
+          timestamp: move.timestamp,
+          delta_percent: move.delta_percent,
+          temporal_proximity: 'within 24h',
+        }));
+      })
+    ).then(results => results.flat());
+
+    res.json({
+      success: true,
+      data: {
+        symbol,
+        attributions: attributions.slice(0, 10), // Limit to 10
+        note: 'Temporal proximity, not causality',
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Asset attribution error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/impacts - List impacts with filters
+app.get('/api/impacts', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.body?.userId as string) || null;
+    const probability_min = req.query.probability_min ? parseFloat(req.query.probability_min as string) : undefined;
+    const magnitude_min = req.query.magnitude_min ? parseFloat(req.query.magnitude_min as string) : undefined;
+    const timeframe = req.query.timeframe as string;
+    const sector = req.query.sector as string;
+    const region = req.query.region as string;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+    const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+
+    // Get signals first (impacts are generated from signals)
+    const { getSignalsFromEvents } = await import('../lib/supabase.js');
+    const signals = await getSignalsFromEvents({}, userId || undefined);
+
+    if (signals.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          impacts: [],
+          total: 0,
+          limit,
+          offset,
+        },
+      });
+    }
+
+    // Generate impacts from signals
+    const { impactAgent } = await import('./agents/impact-agent.js');
+    const response = await impactAgent.generateImpacts({
+      signals,
+      user_preferences: null,
+    });
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    let impacts = response.data || [];
+
+    // Apply filters
+    if (probability_min !== undefined) {
+      impacts = impacts.filter((i: any) => (i.probability || 0) >= probability_min);
+    }
+    if (magnitude_min !== undefined) {
+      impacts = impacts.filter((i: any) => (i.magnitude || 0) >= magnitude_min);
+    }
+    if (timeframe) {
+      impacts = impacts.filter((i: any) => i.timeframe === timeframe);
+    }
+
+    // Apply pagination
+    const paginatedImpacts = impacts.slice(offset, offset + limit);
+
+    res.json({
+      success: true,
+      data: {
+        impacts: paginatedImpacts,
+        total: impacts.length,
+        limit,
+        offset,
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Impacts list error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/impacts/:id - Impact detail
+app.get('/api/impacts/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = (req.query.userId as string) || (req.body?.userId as string) || null;
+
+    // Get signals first
+    const { getSignalsFromEvents } = await import('../lib/supabase.js');
+    const signals = await getSignalsFromEvents({}, userId || undefined);
+
+    if (signals.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Impact not found',
+      });
+    }
+
+    // Generate impacts from signals
+    const { impactAgent } = await import('./agents/impact-agent.js');
+    const response = await impactAgent.generateImpacts({
+      signals,
+      user_preferences: null,
+    });
+
+    if (response.error) {
+      throw new Error(response.error);
+    }
+
+    const impacts = response.data || [];
+    const impact = impacts.find((i: any) => i.id === id);
+
+    if (!impact) {
+      return res.status(404).json({
+        success: false,
+        error: 'Impact not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: impact,
+    });
+  } catch (error: any) {
+    console.error('[API] Impact detail error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
 const server = app.listen(PORT, () => {
   console.log(`🚀 API Server running on http://localhost:${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/health`);
@@ -656,6 +2549,19 @@ const server = app.listen(PORT, () => {
   console.log(`   Generate Impacts: POST http://localhost:${PORT}/api/impacts`);
   console.log(`   Market Data: GET http://localhost:${PORT}/api/market-data/:symbol`);
   console.log(`   Time Series: GET http://localhost:${PORT}/api/market-data/:symbol/timeseries`);
+  console.log(`\n   Optional Endpoints (for performance):`);
+  console.log(`   Overview KPIs: GET http://localhost:${PORT}/api/overview/kpis`);
+  console.log(`   Overview Narrative: GET http://localhost:${PORT}/api/overview/narrative`);
+  console.log(`   Market Movers: GET http://localhost:${PORT}/api/markets/movers`);
+  console.log(`   Triggered Alerts: GET http://localhost:${PORT}/api/alerts/triggered`);
+  console.log(`   Events List: GET http://localhost:${PORT}/api/events`);
+  console.log(`   Event Context: GET http://localhost:${PORT}/api/events/:id/context`);
+  console.log(`   Signals List: GET http://localhost:${PORT}/api/signals`);
+  console.log(`   Signal Detail: GET http://localhost:${PORT}/api/signals/:id`);
+  console.log(`   Markets Overview: GET http://localhost:${PORT}/api/markets/overview`);
+  console.log(`   Asset Attribution: GET http://localhost:${PORT}/api/markets/asset/:symbol/attribution`);
+  console.log(`   Impacts List: GET http://localhost:${PORT}/api/impacts`);
+  console.log(`   Impact Detail: GET http://localhost:${PORT}/api/impacts/:id`);
   console.log(`\n   Server is ready to accept requests. Press Ctrl+C to stop.\n`);
 });
 

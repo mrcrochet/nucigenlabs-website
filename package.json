@@ -12,6 +12,7 @@
     "check-env": "node check-env.js",
     "check-env:backend": "node check-env-backend.js",
     "verify:supabase": "node verify-supabase-config.js",
+    "audit:functionality": "node scripts/audit-functionality.js",
     "seed:test-data": "npx tsx src/server/scripts/seed-test-data.ts",
     "phase1:insert-test": "npx tsx src/server/phase1/insert-test-events.ts",
     "phase1:validate": "npx tsx src/server/phase1/phase1_validate.ts",
