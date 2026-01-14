@@ -25,14 +25,20 @@ export default function PremiumNavigation() {
     '/login', '/register', '/auth', '/confirm-email', '/forgot-password', '/reset-password',
     // App routes (all protected routes)
     '/app', '/dashboard', '/overview',
-    '/intelligence', '/events', '/events-feed',
+    '/events', '/events-feed',
     '/signals', '/signals-feed',
     '/markets', '/impacts',
     '/alerts', '/research', '/recommendations', '/quality',
     '/profile', '/settings', '/onboarding'
   ];
+  
+  // Special handling for /intelligence vs /intelligence-page
+  // /intelligence = app route (hide nav), /intelligence-page = marketing route (show nav)
+  const isAppIntelligence = (location.pathname === '/intelligence' || location.pathname.startsWith('/intelligence/')) && 
+                            !location.pathname.startsWith('/intelligence-page');
+  
   // Note: /intelligence-page and /case-studies are marketing pages, so navigation should show
-  const shouldHideNav = hideNavPaths.some(path => location.pathname.startsWith(path));
+  const shouldHideNav = hideNavPaths.some(path => location.pathname.startsWith(path)) || isAppIntelligence;
   
   if (shouldHideNav) {
     return null;

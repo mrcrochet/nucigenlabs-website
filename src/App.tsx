@@ -117,13 +117,19 @@ function App() {
     '/login', '/register', '/auth', '/confirm-email', '/forgot-password', '/reset-password',
     // App routes (all protected routes)
     '/app', '/dashboard', '/overview',
-    '/intelligence', '/events', '/events-feed',  // App Intelligence, NOT /intelligence-page (marketing)
+    '/events', '/events-feed',
     '/signals', '/signals-feed',
     '/markets', '/impacts',
     '/alerts', '/research', '/recommendations', '/quality',  // App Research, NOT /papers (marketing)
     '/profile', '/settings', '/onboarding'
   ];
-  const shouldHideMarketing = hideMarketingPaths.some(path => location.pathname.startsWith(path));
+  
+  // Special handling for /intelligence vs /intelligence-page
+  // /intelligence = app route (hide marketing), /intelligence-page = marketing route (show marketing)
+  // We need exact match or starts with /intelligence/ but NOT /intelligence-page
+  const isAppIntelligence = (location.pathname === '/intelligence' || location.pathname.startsWith('/intelligence/')) && 
+                            !location.pathname.startsWith('/intelligence-page');
+  const shouldHideMarketing = hideMarketingPaths.some(path => location.pathname.startsWith(path)) || isAppIntelligence;
 
   return (
     <div className="relative min-h-screen">
