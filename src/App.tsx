@@ -111,15 +111,16 @@ function App() {
 
   // Hide navigation and marketing components on auth/app pages
   // All app routes should hide marketing components (landing page navigation, background, etc.)
+  // NOTE: Marketing pages (/intelligence-page, /case-studies, /papers) are PUBLIC and should show marketing navigation
   const hideMarketingPaths = [
     // Auth routes
     '/login', '/register', '/auth', '/confirm-email', '/forgot-password', '/reset-password',
     // App routes (all protected routes)
     '/app', '/dashboard', '/overview',
-    '/intelligence', '/events', '/events-feed',
+    '/intelligence', '/events', '/events-feed',  // App Intelligence, NOT /intelligence-page (marketing)
     '/signals', '/signals-feed',
     '/markets', '/impacts',
-    '/alerts', '/research', '/recommendations', '/quality',
+    '/alerts', '/research', '/recommendations', '/quality',  // App Research, NOT /papers (marketing)
     '/profile', '/settings', '/onboarding'
   ];
   const shouldHideMarketing = hideMarketingPaths.some(path => location.pathname.startsWith(path));
@@ -148,13 +149,13 @@ function App() {
 
       <Suspense fallback={<PageLoader />}>
       <Routes>
-        {/* Public Marketing Routes */}
+        {/* Public Marketing Routes - Accessible without authentication */}
         <Route path="/" element={<Home />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/partners" element={<PartnerProgram />} />
-        <Route path="/intelligence-page" element={<Intelligence />} />
-        <Route path="/case-studies" element={<CaseStudies />} />
-        <Route path="/papers" element={<Papers />} />
+        <Route path="/intelligence-page" element={<Intelligence />} /> {/* Marketing Intelligence - Public */}
+        <Route path="/case-studies" element={<CaseStudies />} /> {/* Marketing Case Studies - Public */}
+        <Route path="/papers" element={<Papers />} /> {/* Marketing Research - Public */}
         <Route path="/about" element={<About />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
@@ -174,7 +175,7 @@ function App() {
         {/* Legacy redirect: /dashboard → /overview (new UI spec compliant page) */}
         <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
         <Route path="/app" element={<Navigate to="/overview" replace />} /> {/* Legacy redirect */}
-        <Route path="/intelligence" element={<ProtectedRoute><IntelligenceFeed /></ProtectedRoute>} />
+        <Route path="/intelligence" element={<ProtectedRoute><IntelligenceFeed /></ProtectedRoute>} /> {/* App Intelligence - Protected, different from /intelligence-page */}
         
         {/* Legacy redirect: /events → /events-feed (new UI spec compliant page) */}
         <Route path="/events" element={<Navigate to="/events-feed" replace />} />
@@ -193,7 +194,7 @@ function App() {
         
         {/* Level 2 - Modules (Beta / Locked) */}
         <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
-        <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} />
+        <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} /> {/* App Research - Protected, different from /papers (marketing) */}
         {/* Recommendations (PHASE 7) */}
         <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
         
