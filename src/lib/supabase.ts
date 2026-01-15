@@ -1,7 +1,37 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Support both browser (import.meta.env) and server (process.env) environments
+// Use getters to avoid evaluation issues at import time
+function getSupabaseUrl(): string | undefined {
+  // Check if we're in a Node.js environment (server-side)
+  if (typeof window === 'undefined' && typeof process !== 'undefined' && process.env) {
+    return process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  }
+  // Client-side: use import.meta.env (Vite)
+  try {
+    const meta = typeof import.meta !== 'undefined' ? (import.meta as any) : null;
+    return meta?.env?.VITE_SUPABASE_URL;
+  } catch {
+    return undefined;
+  }
+}
+
+function getSupabaseAnonKey(): string | undefined {
+  // Check if we're in a Node.js environment (server-side)
+  if (typeof window === 'undefined' && typeof process !== 'undefined' && process.env) {
+    return process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+  }
+  // Client-side: use import.meta.env (Vite)
+  try {
+    const meta = typeof import.meta !== 'undefined' ? (import.meta as any) : null;
+    return meta?.env?.VITE_SUPABASE_ANON_KEY;
+  } catch {
+    return undefined;
+  }
+}
+
+const supabaseUrl = getSupabaseUrl();
+const supabaseAnonKey = getSupabaseAnonKey();
 
 // Check if environment variables are properly configured
 const isConfigured = supabaseUrl && 
@@ -959,7 +989,11 @@ export async function getEventById(eventId: string) {
         try {
           // Call API endpoint to process the event
           // Use /api prefix which will be proxied by Vite to the API server
-          const apiUrl = import.meta.env.VITE_API_URL || '/api';
+          const apiUrl = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) 
+            ? import.meta.env.VITE_API_URL 
+            : (typeof process !== 'undefined' && process.env && process.env.VITE_API_URL) 
+              ? process.env.VITE_API_URL 
+              : '/api';
           const response = await fetch(`${apiUrl}/process-event`, {
             method: 'POST',
             headers: {

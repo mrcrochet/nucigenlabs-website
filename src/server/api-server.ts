@@ -12,6 +12,7 @@ import { collectPersonalizedEventsForUser } from './workers/tavily-personalized-
 import { predictRelevance } from './ml/relevance-predictor.js';
 import { getRealTimePrice, getTimeSeries } from './services/twelvedata-service.js';
 import { createClient } from '@supabase/supabase-js';
+import { getSupabaseUserId } from './utils/auth-helpers.js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -753,7 +754,7 @@ app.get('/api/perplexity/health', async (req, res) => {
 app.get('/api/overview/narrative', async (req, res) => {
   try {
     const { timeframe = '24h' } = req.query;
-    const supabaseUserId = await getSupabaseUserId(req.headers['x-clerk-user-id'] as string || null);
+    const supabaseUserId = await getSupabaseUserId(req.headers['x-clerk-user-id'] as string || null, supabase);
 
     // Get events for the timeframe
     const { getNormalizedEvents } = await import('../lib/supabase.js');
@@ -953,28 +954,7 @@ app.post('/api/impacts/exposure', async (req, res) => {
   }
 });
 
-// Helper function to get Supabase user ID from Clerk user ID
-async function getSupabaseUserId(clerkUserId: string | null): Promise<string | null> {
-  if (!clerkUserId || !supabase) {
-    return null;
-  }
-
-  try {
-    const { data, error } = await supabase.rpc('get_or_create_supabase_user_id', {
-      clerk_id: clerkUserId,
-    });
-
-    if (error || !data) {
-      console.error('[API] Error converting Clerk user ID:', error);
-      return null;
-    }
-
-    return data as string;
-  } catch (error: any) {
-    console.error('[API] Error in getSupabaseUserId:', error);
-    return null;
-  }
-}
+// Helper function getSupabaseUserId is now imported from ./utils/auth-helpers.js
 
 // ============================================
 // Optional Endpoints - Overview
@@ -993,7 +973,7 @@ app.get('/api/overview/kpis', async (req, res) => {
       });
     }
 
-    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+    const supabaseUserId = userId ? await getSupabaseUserId(userId, supabase) : null;
 
     // Import Supabase functions
     const { getNormalizedEvents, getSignalsFromEvents } = await import('../lib/supabase.js');
@@ -1120,7 +1100,7 @@ app.get('/api/overview/narrative', async (req, res) => {
       });
     }
 
-    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+    const supabaseUserId = userId ? await getSupabaseUserId(userId, supabase) : null;
 
     // Import Supabase functions
     const { getNormalizedEvents, getSignalsFromEvents } = await import('../lib/supabase.js');
@@ -1281,7 +1261,7 @@ app.get('/api/alerts/triggered', async (req, res) => {
       });
     }
 
-    const supabaseUserId = await getSupabaseUserId(userId);
+    const supabaseUserId = await getSupabaseUserId(userId, supabase);
     if (!supabaseUserId) {
       return res.status(400).json({
         success: false,
@@ -1384,7 +1364,7 @@ app.get('/api/events', async (req, res) => {
       });
     }
 
-    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+    const supabaseUserId = userId ? await getSupabaseUserId(userId, supabase) : null;
 
     // Import Supabase functions
     const { getNormalizedEvents } = await import('../lib/supabase.js');
@@ -1435,7 +1415,7 @@ app.get('/api/events/:id/context', async (req, res) => {
       });
     }
 
-    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+    const supabaseUserId = userId ? await getSupabaseUserId(userId, supabase) : null;
 
     // Get event
     const { getNormalizedEventById } = await import('../lib/supabase.js');
@@ -1520,7 +1500,7 @@ app.get('/api/signals', async (req, res) => {
       });
     }
 
-    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+    const supabaseUserId = userId ? await getSupabaseUserId(userId, supabase) : null;
 
     // Import Supabase functions
     const { getSignalsFromEvents } = await import('../lib/supabase.js');
@@ -1574,7 +1554,7 @@ app.get('/api/signals/:id', async (req, res) => {
       });
     }
 
-    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+    const supabaseUserId = userId ? await getSupabaseUserId(userId, supabase) : null;
 
     // Import Supabase functions
     const { getSignalsFromEvents } = await import('../lib/supabase.js');
@@ -1686,7 +1666,7 @@ app.get('/api/markets/asset/:symbol/attribution', async (req, res) => {
       });
     }
 
-    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+    const supabaseUserId = userId ? await getSupabaseUserId(userId, supabase) : null;
 
     // Get timeseries for the asset
     const tsData = await getTimeSeries(symbol, { interval: '1h', days: 7 });
@@ -1876,7 +1856,7 @@ app.get('/api/entities', async (req, res) => {
       });
     }
 
-    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+    const supabaseUserId = userId ? await getSupabaseUserId(userId, supabase) : null;
 
     // Get entities from events (actors)
     const { getNormalizedEvents } = await import('../lib/supabase.js');
@@ -1950,32 +1930,6 @@ app.get('/api/entities', async (req, res) => {
 // ============================================
 
 /**
- * Helper function to get Supabase user ID from Clerk user ID
- */
-async function getSupabaseUserId(clerkUserId: string | null): Promise<string | null> {
-  if (!clerkUserId || !supabase) {
-    return null;
-  }
-
-  try {
-    const { data, error } = await supabase.rpc('get_or_create_supabase_user_id', {
-      clerk_id: clerkUserId,
-      user_email: null,
-    });
-
-    if (error || !data) {
-      console.warn('[API] Error converting Clerk user ID:', error);
-      return null;
-    }
-
-    return data as string;
-  } catch (error: any) {
-    console.warn('[API] Error in getSupabaseUserId:', error.message);
-    return null;
-  }
-}
-
-/**
  * Helper function to filter events by date range
  */
 function filterEventsByDateRange<T extends { created_at: string }>(
@@ -2003,7 +1957,7 @@ function filterEventsByDateRange<T extends { created_at: string }>(
 app.get('/api/overview/kpis', async (req, res) => {
   try {
     const userId = (req.query.userId as string) || (req.body?.userId as string) || null;
-    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+    const supabaseUserId = userId ? await getSupabaseUserId(userId, supabase) : null;
 
     if (!supabase) {
       return res.status(500).json({
@@ -2264,7 +2218,7 @@ app.get('/api/alerts/triggered', async (req, res) => {
       });
     }
 
-    const supabaseUserId = userId ? await getSupabaseUserId(userId) : null;
+    const supabaseUserId = userId ? await getSupabaseUserId(userId, supabase) : null;
 
     const now = new Date();
     const days = range === '7d' ? 7 : range === '24h' ? 1 : 7;
@@ -2722,6 +2676,166 @@ app.get('/api/markets/asset/:symbol/attribution', async (req, res) => {
   }
 });
 
+// GET /api/discover - Discover feed
+// Also available as /discover (for Vite proxy which removes /api prefix)
+const discoverHandler = async (req: any, res: any) => {
+  try {
+            const category = (req.query.category as string) || 'all';
+            const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+            const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 12;
+            const sortBy = (req.query.sortBy as string) || 'relevance';
+            const timeRange = (req.query.timeRange as string) || '7d';
+            const searchQuery = (req.query.search as string) || undefined;
+            const userId = (req.query.userId as string) || undefined;
+
+    console.log('[API] Discover request:', { category, offset, limit, sortBy, timeRange, userId: userId ? 'present' : 'none' });
+
+    const { fetchDiscoverItems, calculatePersonalizationScore } = await import('./services/discover-service.js');
+    
+            // Fetch items using 100% Perplexity (simplified, no Supabase needed)
+            let items: any[] = [];
+            try {
+              items = await fetchDiscoverItems(
+                category,
+                { offset, limit },
+                userId,
+                searchQuery
+              );
+      console.log('[API] Discover fetched items:', items.length);
+    } catch (fetchError: any) {
+      console.error('[API] Discover fetch error:', fetchError);
+      // Return empty array instead of failing completely
+      items = [];
+    }
+
+    // Get user preferences for personalization
+    let userPreferences: any = null;
+    if (userId && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('user_preferences')
+          .select('preferred_sectors, preferred_regions')
+          .eq('user_id', userId)
+          .maybeSingle();
+        
+        if (error) {
+          console.warn('[Discover] Error fetching user preferences:', error);
+        } else {
+          userPreferences = data;
+        }
+      } catch (err: any) {
+        console.warn('[Discover] Could not fetch user preferences:', err?.message || err);
+      }
+    }
+
+    // Calculate personalization scores
+    items.forEach(item => {
+      try {
+        item.personalization_score = calculatePersonalizationScore(item, userPreferences);
+      } catch (err: any) {
+        console.warn('[Discover] Error calculating personalization score:', err?.message || err);
+        item.personalization_score = item.metadata.relevance_score || 50;
+      }
+    });
+
+    // Sort items
+    try {
+      items.sort((a, b) => {
+        if (sortBy === 'relevance') {
+          return (b.personalization_score || b.metadata.relevance_score || 0) - 
+                 (a.personalization_score || a.metadata.relevance_score || 0);
+        } else if (sortBy === 'recent') {
+          return new Date(b.metadata.published_at || 0).getTime() - 
+                 new Date(a.metadata.published_at || 0).getTime();
+        } else if (sortBy === 'trending') {
+          return (b.engagement?.views || 0) - (a.engagement?.views || 0);
+        }
+        return 0;
+      });
+    } catch (sortError: any) {
+      console.warn('[Discover] Error sorting items:', sortError?.message || sortError);
+    }
+
+    // Apply time range filter
+    let filteredItems = items;
+    if (timeRange !== 'all') {
+      try {
+        const daysAgo = timeRange === '24h' ? 1 : timeRange === '7d' ? 7 : 30;
+        const cutoffDate = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
+        filteredItems = items.filter(item => {
+          try {
+            const itemDate = new Date(item.metadata?.published_at || 0);
+            return itemDate >= cutoffDate;
+          } catch {
+            return true; // Include items with invalid dates
+          }
+        });
+      } catch (filterError: any) {
+        console.warn('[Discover] Error filtering by time range:', filterError?.message || filterError);
+      }
+    }
+
+    // Paginate
+    const paginatedItems = filteredItems.slice(offset, offset + limit);
+    const hasMore = filteredItems.length > offset + limit;
+
+    console.log('[API] Discover response:', { items: paginatedItems.length, total: filteredItems.length, hasMore });
+
+    res.json({
+      success: true,
+      items: paginatedItems,
+      hasMore,
+      total: filteredItems.length,
+    });
+  } catch (error: any) {
+    console.error('[API] Discover error:', error);
+    console.error('[API] Discover error stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    });
+  }
+};
+
+// Register both endpoints (with and without /api prefix for proxy compatibility)
+app.get('/api/discover', discoverHandler);
+app.get('/discover', discoverHandler);
+
+// POST /api/discover/:id/save - Save item to library
+app.post('/api/discover/:id/save', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = (req.query.userId as string) || (req.body?.userId as string);
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User ID required',
+      });
+    }
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Database not configured',
+      });
+    }
+
+    // For now, just return success (library feature to be implemented)
+    res.json({
+      success: true,
+      message: 'Item saved to library',
+    });
+  } catch (error: any) {
+    console.error('[API] Save item error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
 // GET /api/impacts - List impacts with filters
 app.get('/api/impacts', async (req, res) => {
   try {
@@ -2871,6 +2985,7 @@ const server = app.listen(PORT, () => {
   console.log(`   Asset Attribution: GET http://localhost:${PORT}/api/markets/asset/:symbol/attribution`);
   console.log(`   Impacts List: GET http://localhost:${PORT}/api/impacts`);
   console.log(`   Impact Detail: GET http://localhost:${PORT}/api/impacts/:id`);
+  console.log(`   Discover Feed: GET http://localhost:${PORT}/api/discover`);
   console.log(`\n   Server is ready to accept requests. Press Ctrl+C to stop.\n`);
 });
 

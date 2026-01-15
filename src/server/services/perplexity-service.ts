@@ -142,6 +142,7 @@ export interface PerplexityChatResponse {
       role: string;
       content: string;
       citations?: string[];
+      images?: string[];
     };
     delta?: {
       role?: string;
@@ -154,6 +155,7 @@ export interface PerplexityChatResponse {
     total_tokens: number;
   };
   citations?: string[];
+  images?: string[];
   related_questions?: string[];
 }
 

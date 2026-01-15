@@ -4,7 +4,7 @@
 
 interface BadgeProps {
   children: React.ReactNode;
-  variant?: 'default' | 'sector' | 'region' | 'level' | 'critical' | 'neutral';
+  variant?: 'default' | 'sector' | 'region' | 'level' | 'critical' | 'neutral' | 'category';
   className?: string;
 }
 
@@ -17,6 +17,7 @@ export default function Badge({ children, variant = 'default', className = '' }:
     level: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
     critical: 'bg-[#E1463E]/20 text-[#E1463E] border-[#E1463E]/30',
     neutral: 'bg-white/[0.02] text-slate-400 border-white/[0.08]',
+    category: 'bg-green-500/10 text-green-300 border-green-500/20',
   };
 
   return (
