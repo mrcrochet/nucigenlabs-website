@@ -2802,6 +2802,30 @@ const discoverHandler = async (req: any, res: any) => {
 app.get('/api/discover', discoverHandler);
 app.get('/discover', discoverHandler);
 
+// GET /api/market-outlook - Market outlook data (S&P, NASDAQ, Bitcoin, VIX)
+app.get('/api/market-outlook', async (req, res) => {
+  try {
+    const { getMarketOutlook } = await import('./services/finnhub-service.js');
+    const data = await getMarketOutlook();
+    res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('[API] Market outlook error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/trending-companies - Trending companies data
+app.get('/api/trending-companies', async (req, res) => {
+  try {
+    const { getTrendingCompanies } = await import('./services/finnhub-service.js');
+    const data = await getTrendingCompanies();
+    res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('[API] Trending companies error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // POST /api/discover/:id/save - Save item to library
 app.post('/api/discover/:id/save', async (req, res) => {
   try {

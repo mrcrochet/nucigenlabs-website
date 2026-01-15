@@ -7,7 +7,7 @@
 import { useState } from 'react';
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
-import { Bookmark, ExternalLink, TrendingUp, Eye, HelpCircle, Clock, Flame } from 'lucide-react';
+import { Bookmark, ExternalLink, TrendingUp, Eye, HelpCircle, Clock, Flame, AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 import SourceIcon from './SourceIcon';
 
 export interface DiscoverItem {
@@ -35,6 +35,10 @@ export interface DiscoverItem {
     relevance_score: number;
   };
   related_questions?: string[];
+  // New fields for elite features
+  tier?: 'critical' | 'strategic' | 'background'; // Visual hierarchy
+  impact?: string; // "Why it matters" - 1 line max
+  consensus?: 'high' | 'fragmented' | 'disputed'; // Consensus signal
 }
 
 interface DiscoverCardProps {
@@ -93,19 +97,76 @@ export default function DiscoverCard({ item, onSave, onView }: DiscoverCardProps
     return minutes;
   };
 
+  // Determine tier based on relevance and sources
+  const getTier = (): 'critical' | 'strategic' | 'background' => {
+    if (item.tier) return item.tier;
+    const sourceCount = item.sources.length;
+    const relevance = item.metadata.relevance_score || 0;
+    
+    if (relevance >= 90 && sourceCount >= 30) return 'critical';
+    if (relevance >= 70 || sourceCount >= 10) return 'strategic';
+    return 'background';
+  };
+
+  const tier = getTier();
+
+  // Get type description
+  const getTypeDescription = () => {
+    const descriptions: Record<string, string> = {
+      topic: 'Multi-source event cluster',
+      insight: 'Analyst synthesis',
+      article: 'Single-source perspective',
+      trend: 'Emerging pattern',
+    };
+    return descriptions[item.type] || item.type;
+  };
+
+  // Get consensus indicator
+  const getConsensus = () => {
+    if (item.consensus) return item.consensus;
+    const sourceCount = item.sources.length;
+    if (sourceCount >= 40) return 'high';
+    if (sourceCount >= 15) return 'fragmented';
+    return 'disputed';
+  };
+
+  const consensus = getConsensus();
+
+  const consensusConfig = {
+    high: { icon: CheckCircle2, color: 'text-green-400', label: 'High consensus', bg: 'bg-green-400/10', border: 'border-green-400/20' },
+    fragmented: { icon: AlertTriangle, color: 'text-yellow-400', label: 'Fragmented narrative', bg: 'bg-yellow-400/10', border: 'border-yellow-400/20' },
+    disputed: { icon: AlertCircle, color: 'text-red-400', label: 'Disputed views', bg: 'bg-red-400/10', border: 'border-red-400/20' },
+  };
+
+  const consensusInfo = consensusConfig[consensus];
+  const ConsensusIcon = consensusInfo.icon;
+
+  // Tier-based styling
+  const tierClasses = {
+    critical: 'border-[#E1463E]/30 bg-[#E1463E]/5',
+    strategic: 'border-white/10 bg-white/5',
+    background: 'border-white/5 bg-white/[0.02]',
+  };
+
+  const tierPadding = {
+    critical: 'p-6',
+    strategic: 'p-6',
+    background: 'p-4',
+  };
+
   return (
     <Card 
       hover 
       onClick={handleClick}
-      className="p-6 flex flex-col h-full cursor-pointer transition-all duration-200 overflow-hidden"
+      className={`${tierPadding[tier]} flex flex-col h-full cursor-pointer transition-all duration-200 overflow-hidden border ${tierClasses[tier]}`}
     >
-      {/* Thumbnail Image (like Perplexity) */}
-      {item.thumbnail && (
-        <div className="mb-4 -mx-6 -mt-6">
+      {/* Thumbnail Image (hide for background tier) */}
+      {item.thumbnail && tier !== 'background' && (
+        <div className={`mb-4 overflow-hidden rounded-lg ${tier === 'critical' ? '-mx-6 -mt-6' : '-mx-6 -mt-6'}`}>
           <img
             src={item.thumbnail}
             alt={item.title}
-            className="w-full h-48 object-cover"
+            className={`w-full object-cover ${tier === 'critical' ? 'h-64' : 'h-48'}`}
             onError={(e) => {
               // Hide image if it fails to load
               (e.target as HTMLImageElement).style.display = 'none';
@@ -114,20 +175,35 @@ export default function DiscoverCard({ item, onSave, onView }: DiscoverCardProps
         </div>
       )}
 
+      {/* Tier 1: Critical Badge */}
+      {tier === 'critical' && (
+        <div className="mb-3">
+          <span className="inline-flex items-center gap-1 px-3 py-1 bg-[#E1463E]/20 border border-[#E1463E]/40 rounded-full text-xs text-[#E1463E] font-medium">
+            <AlertCircle className="w-3 h-3" />
+            Market Moving
+          </span>
+        </div>
+      )}
+
       {/* Header: Category Badge + Type + Trending */}
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="category">{item.category}</Badge>
-          {item.metadata.relevance_score > 85 && (
+          {item.metadata.relevance_score > 85 && tier !== 'critical' && (
             <span className="flex items-center gap-1 px-2 py-0.5 bg-[#E1463E]/20 border border-[#E1463E]/30 rounded text-xs text-[#E1463E] font-light">
               <Flame className="w-3 h-3" />
               Trending
             </span>
           )}
         </div>
-        <span className="text-xs text-slate-600 font-light uppercase tracking-wide">
-          {item.type}
-        </span>
+        <div className="flex flex-col items-end gap-1">
+          <span className="text-xs text-slate-600 font-light uppercase tracking-wide">
+            {item.type}
+          </span>
+          <span className="text-[10px] text-slate-600 font-light italic">
+            {getTypeDescription()}
+          </span>
+        </div>
       </div>
 
       {/* Title */}
@@ -136,15 +212,35 @@ export default function DiscoverCard({ item, onSave, onView }: DiscoverCardProps
       </h3>
 
       {/* Summary */}
-      <p className="text-sm text-slate-400 font-light mb-4 flex-grow line-clamp-3">
+      <p className={`text-slate-400 font-light mb-4 flex-grow ${tier === 'background' ? 'text-xs line-clamp-2' : 'text-sm line-clamp-3'}`}>
         {item.summary}
       </p>
 
-      {/* Reading Time */}
-      <div className="flex items-center gap-1 text-xs text-slate-600 mb-4">
-        <Clock className="w-3 h-3" />
-        <span className="font-light">{calculateReadingTime(item.summary)} min read</span>
+      {/* Impact / Why it matters (Elite feature) */}
+      {item.impact && (
+        <div className="mb-4 p-3 bg-white/5 border-l-2 border-[#E1463E]/50 rounded">
+          <div className="text-xs text-slate-500 font-light mb-1">Impact:</div>
+          <div className="text-sm text-white font-light">{item.impact}</div>
+        </div>
+      )}
+
+      {/* Consensus Signal */}
+      <div className="mb-4">
+        <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded ${consensusInfo.bg} ${consensusInfo.border} border`}>
+          <ConsensusIcon className={`w-3 h-3 ${consensusInfo.color}`} />
+          <span className={`text-xs font-light ${consensusInfo.color}`}>
+            {consensusInfo.label} ({item.sources.length} sources)
+          </span>
+        </div>
       </div>
+
+      {/* Reading Time (hide for background tier) */}
+      {tier !== 'background' && (
+        <div className="flex items-center gap-1 text-xs text-slate-600 mb-4">
+          <Clock className="w-3 h-3" />
+          <span className="font-light">{calculateReadingTime(item.summary)} min read</span>
+        </div>
+      )}
 
       {/* Tags */}
       {item.tags.length > 0 && (
@@ -185,8 +281,25 @@ export default function DiscoverCard({ item, onSave, onView }: DiscoverCardProps
         </div>
       )}
 
-      {/* Sources */}
+      {/* Sources Count (like Perplexity) */}
       {item.sources.length > 0 && (
+        <div className="mb-4 flex items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center">
+              <span className="text-[8px]">📰</span>
+            </div>
+            <span className="font-light">{item.sources.length} sources</span>
+          </div>
+          {item.metadata.published_at && (
+            <span className="text-xs text-slate-600 font-light">
+              • {formatDate(item.metadata.published_at)}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Sources List (collapsible or in modal) */}
+      {item.sources.length > 0 && tier !== 'background' && (
         <div className="mb-4 space-y-2">
           {item.sources.slice(0, 2).map((source, idx) => (
             <a
@@ -242,7 +355,7 @@ export default function DiscoverCard({ item, onSave, onView }: DiscoverCardProps
               ? 'bg-[#E1463E]/20 text-[#E1463E]'
               : 'bg-white/5 text-slate-500 hover:text-white hover:bg-white/10'
           }`}
-          title={isSaved ? 'Saved' : 'Save to library'}
+          title={isSaved ? 'Saved' : 'Track this topic'}
         >
           <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
         </button>

@@ -98,7 +98,12 @@ export async function fetchDiscoverItems(
     // Sort by relevance and limit
     uniqueItems.sort((a, b) => (b.metadata.relevance_score || 0) - (a.metadata.relevance_score || 0));
 
-    return uniqueItems.slice(0, options.limit);
+    // Enrich items with tier, consensus, and impact
+    const enrichedItems = await Promise.all(
+      uniqueItems.slice(0, options.limit).map(item => enrichItem(item))
+    );
+
+    return enrichedItems;
   } catch (error: any) {
     console.error('[Discover] Error in fetchDiscoverItems:', error);
     return [];
@@ -198,7 +203,7 @@ Focus on developments that matter for decision-makers in finance, geopolitics, a
       title: topic.title || 'Untitled Topic',
       summary: topic.summary || '',
       thumbnail: images[idx] || images[0] || undefined, // Use first available image
-      sources: citations.slice(0, 3).map((url: string, i: number) => ({
+      sources: citations.map((url: string, i: number) => ({
         name: extractDomainName(url) || `Source ${i + 1}`,
         url,
         date: new Date().toISOString(),
@@ -298,7 +303,7 @@ async function generateNewsWithAnalysis(
       title: article.title || 'News Article',
       summary: article.summary || article.why_it_matters || '',
       thumbnail: images[idx] || images[0] || undefined, // Use first available image
-      sources: citations.slice(0, 2).map((url: string, i: number) => ({
+      sources: citations.map((url: string, i: number) => ({
         name: extractDomainName(url) || `Source ${i + 1}`,
         url,
         date: new Date().toISOString(),
@@ -397,7 +402,7 @@ async function generateInsights(
       title: insight.title || 'Strategic Insight',
       summary: insight.summary || insight.implications || '',
       thumbnail: images[idx] || images[0] || undefined, // Use first available image
-      sources: citations.slice(0, 2).map((url: string, i: number) => ({
+      sources: citations.map((url: string, i: number) => ({
         name: extractDomainName(url) || `Source ${i + 1}`,
         url,
         date: new Date().toISOString(),
@@ -577,7 +582,7 @@ Focus on information relevant for decision-makers in finance, geopolitics, and s
       title: result.title || query,
       summary: result.summary || '',
       thumbnail: images[idx] || images[0] || undefined, // Use first available image
-      sources: citations.slice(0, 3).map((url: string, i: number) => ({
+      sources: citations.map((url: string, i: number) => ({
         name: extractDomainName(url) || `Source ${i + 1}`,
         url,
         date: new Date().toISOString(),
@@ -600,6 +605,79 @@ Focus on information relevant for decision-makers in finance, geopolitics, and s
     console.error('[Discover] Error generating search results:', error.message);
     return [];
   }
+}
+
+/**
+ * Determine tier based on relevance and source count
+ */
+function determineTier(item: Partial<DiscoverItem>): 'critical' | 'strategic' | 'background' {
+  const relevance = item.metadata?.relevance_score || 0;
+  const sourceCount = item.sources?.length || 0;
+  
+  if (relevance >= 90 && sourceCount >= 30) return 'critical';
+  if (relevance >= 70 || sourceCount >= 10) return 'strategic';
+  return 'background';
+}
+
+/**
+ * Determine consensus based on source count
+ */
+function determineConsensus(sourceCount: number): 'high' | 'fragmented' | 'disputed' {
+  if (sourceCount >= 40) return 'high';
+  if (sourceCount >= 15) return 'fragmented';
+  return 'disputed';
+}
+
+/**
+ * Generate impact statement (1 line max) using Perplexity
+ */
+async function generateImpact(title: string, summary: string, category: string): Promise<string | undefined> {
+  try {
+    const { chatCompletions } = await import('./perplexity-service.js');
+    
+    const response = await chatCompletions({
+      model: 'sonar',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a financial intelligence analyst. Generate a single-line impact statement (max 80 characters) explaining why this development matters for decision-makers. Be specific and actionable. No jargon.',
+        },
+        {
+          role: 'user',
+          content: `Title: ${title}\nSummary: ${summary}\nCategory: ${category}\n\nGenerate a one-line impact statement.`,
+        },
+      ],
+      max_tokens: 100,
+      return_citations: false,
+    });
+
+    const impact = response.choices[0]?.message?.content?.trim();
+    if (impact && impact.length <= 100) {
+      return impact;
+    }
+    return undefined;
+  } catch (error) {
+    console.warn('[Discover] Failed to generate impact:', error);
+    return undefined;
+  }
+}
+
+/**
+ * Enrich item with elite features (tier, impact, consensus)
+ */
+async function enrichItem(item: DiscoverItem): Promise<DiscoverItem> {
+  const tier = determineTier(item);
+  const consensus = determineConsensus(item.sources.length);
+  
+  // Generate impact asynchronously (don't block)
+  const impactPromise = generateImpact(item.title, item.summary, item.category);
+  
+  return {
+    ...item,
+    tier,
+    consensus,
+    impact: await impactPromise,
+  };
 }
 
 /**
