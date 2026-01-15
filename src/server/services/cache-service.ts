@@ -25,7 +25,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-export type ApiType = 'openai' | 'tavily' | 'firecrawl';
+export type ApiType = 'openai' | 'tavily' | 'firecrawl' | 'perplexity';
 export type CacheStrategy = 'permanent' | 'ttl' | 'versioned';
 
 export interface CacheOptions {

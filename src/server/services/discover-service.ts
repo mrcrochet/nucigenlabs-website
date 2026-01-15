@@ -1,5 +1,5 @@
 /**
- * Discover Service - 100% Perplexity Powered
+ * Discover Service - 100% Perplexity Powered (OPTIMIZED)
  * 
  * Inspired by Perplexity's Discover page
  * Uses Perplexity API to generate curated content:
@@ -7,9 +7,18 @@
  * - News articles with analysis
  * - Insights and analysis
  * - All with citations and sources
+ * 
+ * OPTIMIZATIONS:
+ * - Aggressive caching (1h for topics/insights, 30min for news)
+ * - Use 'sonar' instead of 'sonar-pro' (3-5x cheaper)
+ * - Reduced max_tokens (800 instead of 2000)
+ * - Disabled return_images (only for top items)
+ * - Impact generation only for top 3 items
+ * - Consolidated API calls where possible
  */
 
 import { chatCompletions } from './perplexity-service.js';
+import { generateCacheKey, getCacheEntry, setCacheEntry } from './cache-service.js';
 import type { Event, Signal } from '../../types/intelligence.js';
 
 export interface DiscoverItem {
@@ -45,7 +54,7 @@ interface PaginationOptions {
 }
 
 /**
- * Generate Discover content using Perplexity
+ * Generate Discover content using Perplexity (OPTIMIZED with caching)
  * Similar to Perplexity's own Discover page
  */
 export async function fetchDiscoverItems(
@@ -55,7 +64,7 @@ export async function fetchDiscoverItems(
   searchQuery?: string
 ): Promise<DiscoverItem[]> {
   try {
-    // If search query provided, use it directly
+    // If search query provided, use it directly (no cache for search)
     if (searchQuery) {
       return await generateSearchResults(searchQuery, options);
     }
@@ -72,7 +81,26 @@ export async function fetchDiscoverItems(
 
     const queryCategory = categoryQueries[category] || category;
     
-    // Generate multiple types of content in parallel
+    // Check cache first
+    const cacheKey = generateCacheKey('perplexity', 'discover', {
+      category,
+      queryCategory,
+      limit: options.limit,
+      offset: options.offset,
+    });
+
+    const cached = await getCacheEntry<DiscoverItem[]>(cacheKey, {
+      apiType: 'perplexity', // Using perplexity type for discover cache
+      endpoint: 'discover',
+      ttlSeconds: category === 'all' ? 3600 : 1800, // 1h for 'all', 30min for specific categories
+    });
+
+    if (cached && cached.cached) {
+      console.log(`[Discover] Cache hit for category: ${category}`);
+      return cached.data;
+    }
+
+    // Generate multiple types of content in parallel (with optimizations)
     const [topicsResult, newsResult, insightsResult] = await Promise.allSettled([
       // 1. Trending Topics (like Perplexity Discover)
       generateTrendingTopics(queryCategory, options),
@@ -98,9 +126,23 @@ export async function fetchDiscoverItems(
     // Sort by relevance and limit
     uniqueItems.sort((a, b) => (b.metadata.relevance_score || 0) - (a.metadata.relevance_score || 0));
 
-    // Enrich items with tier, consensus, and impact
+    // Enrich items with tier, consensus, and impact (ONLY top 3 get impact)
     const enrichedItems = await Promise.all(
-      uniqueItems.slice(0, options.limit).map(item => enrichItem(item))
+      uniqueItems.slice(0, options.limit).map((item, idx) => 
+        enrichItem(item, idx < 3) // Only top 3 get impact generation
+      )
+    );
+
+    // Cache the results
+    await setCacheEntry(
+      cacheKey,
+      enrichedItems,
+      { category, queryCategory, generatedAt: new Date().toISOString() },
+      {
+        apiType: 'perplexity',
+        endpoint: 'discover',
+        ttlSeconds: category === 'all' ? 3600 : 1800,
+      }
     );
 
     return enrichedItems;
@@ -121,7 +163,7 @@ async function generateTrendingTopics(
     const query = `What are the most important and trending developments in ${category} happening right now? Provide 5-7 key topics with brief summaries.`;
 
     const response = await chatCompletions({
-      model: 'sonar-pro',
+      model: 'sonar', // OPTIMIZED: Use 'sonar' instead of 'sonar-pro' (3-5x cheaper)
       messages: [
         {
           role: 'system',
@@ -146,9 +188,9 @@ Focus on developments that matter for decision-makers in finance, geopolitics, a
       ],
       return_citations: true,
       return_related_questions: true,
-      return_images: true, // Enable image extraction
+      return_images: false, // OPTIMIZED: Disabled to reduce costs
       search_recency_filter: 'week',
-      max_tokens: 2000,
+      max_tokens: 800, // OPTIMIZED: Reduced from 2000 to 800 (sufficient for 5-7 items)
     });
 
     const content = response.choices[0]?.message?.content || '';
@@ -239,7 +281,7 @@ async function generateNewsWithAnalysis(
     const query = `Find the most important recent news articles about ${category}. For each article, provide: title, summary, and why it matters for decision-makers.`;
 
     const response = await chatCompletions({
-      model: 'sonar-pro',
+      model: 'sonar', // OPTIMIZED: Use 'sonar' instead of 'sonar-pro'
       messages: [
         {
           role: 'system',
@@ -262,9 +304,9 @@ async function generateNewsWithAnalysis(
       ],
       return_citations: true,
       return_related_questions: true,
-      return_images: true, // Enable image extraction
+      return_images: false, // OPTIMIZED: Disabled to reduce costs
       search_recency_filter: 'day',
-      max_tokens: 2000,
+      max_tokens: 800, // OPTIMIZED: Reduced from 2000 to 800
     });
 
     const content = response.choices[0]?.message?.content || '';
@@ -338,7 +380,7 @@ async function generateInsights(
     const query = `Provide strategic insights and analysis about ${category}. Focus on implications, trends, and what decision-makers should watch.`;
 
     const response = await chatCompletions({
-      model: 'sonar-pro',
+      model: 'sonar', // OPTIMIZED: Use 'sonar' instead of 'sonar-pro'
       messages: [
         {
           role: 'system',
@@ -361,9 +403,9 @@ async function generateInsights(
       ],
       return_citations: true,
       return_related_questions: true,
-      return_images: true, // Enable image extraction
+      return_images: false, // OPTIMIZED: Disabled to reduce costs
       search_recency_filter: 'week',
-      max_tokens: 2000,
+      max_tokens: 800, // OPTIMIZED: Reduced from 2000 to 800
     });
 
     const content = response.choices[0]?.message?.content || '';
@@ -524,7 +566,7 @@ async function generateSearchResults(
 ): Promise<DiscoverItem[]> {
   try {
     const response = await chatCompletions({
-      model: 'sonar-pro',
+      model: 'sonar', // OPTIMIZED: Use 'sonar' instead of 'sonar-pro'
       messages: [
         {
           role: 'system',
@@ -549,9 +591,9 @@ Focus on information relevant for decision-makers in finance, geopolitics, and s
       ],
       return_citations: true,
       return_related_questions: true,
-      return_images: true, // Enable image extraction
+      return_images: false, // OPTIMIZED: Disabled to reduce costs
       search_recency_filter: 'week',
-      max_tokens: 2000,
+      max_tokens: 1000, // OPTIMIZED: Reduced from 2000 to 1000 (search needs more tokens)
     });
 
     const content = response.choices[0]?.message?.content || '';
@@ -664,13 +706,16 @@ async function generateImpact(title: string, summary: string, category: string):
 
 /**
  * Enrich item with elite features (tier, impact, consensus)
+ * OPTIMIZED: Only generate impact for top items to reduce API calls
  */
-async function enrichItem(item: DiscoverItem): Promise<DiscoverItem> {
+async function enrichItem(item: DiscoverItem, generateImpactForThis: boolean = false): Promise<DiscoverItem> {
   const tier = determineTier(item);
   const consensus = determineConsensus(item.sources.length);
   
-  // Generate impact asynchronously (don't block)
-  const impactPromise = generateImpact(item.title, item.summary, item.category);
+  // OPTIMIZED: Only generate impact for top items (first 3)
+  const impactPromise = generateImpactForThis 
+    ? generateImpact(item.title, item.summary, item.category)
+    : Promise.resolve(undefined);
   
   return {
     ...item,

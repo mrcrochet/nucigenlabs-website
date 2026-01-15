@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.api_usage_metrics (
     time_window_end TIMESTAMPTZ NOT NULL,   -- End of aggregation window
     
     -- API identification
-    api_type TEXT NOT NULL CHECK (api_type IN ('openai', 'tavily', 'firecrawl')),
+    api_type TEXT NOT NULL CHECK (api_type IN ('openai', 'tavily', 'firecrawl', 'perplexity')),
     api_endpoint TEXT NOT NULL, -- e.g., 'extractEvent', 'search', 'scrapeOfficial'
     feature_name TEXT, -- e.g., 'event-extraction', 'personalized-feed', 'fact-checking'
     
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS public.api_call_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     
     -- API identification
-    api_type TEXT NOT NULL CHECK (api_type IN ('openai', 'tavily', 'firecrawl')),
+    api_type TEXT NOT NULL CHECK (api_type IN ('openai', 'tavily', 'firecrawl', 'perplexity')),
     api_endpoint TEXT NOT NULL,
     feature_name TEXT,
     
