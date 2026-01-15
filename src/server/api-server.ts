@@ -51,12 +51,14 @@ app.get('/health', (req, res) => {
   // Check if critical services are configured
   const twelvedataConfigured = !!process.env.TWELVEDATA_API_KEY;
   const supabaseConfigured = !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const perplexityConfigured = !!process.env.PERPLEXITY_API_KEY;
   
   res.json({ 
     status: 'ok',
     services: {
       twelvedata: twelvedataConfigured ? 'configured' : 'missing',
       supabase: supabaseConfigured ? 'configured' : 'missing',
+      perplexity: perplexityConfigured ? 'configured' : 'missing',
     },
     timestamp: new Date().toISOString(),
   });
@@ -637,6 +639,313 @@ app.post('/api/impacts', async (req, res) => {
     });
   } catch (error: any) {
     console.error('[API] Impact generation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// Perplexity API endpoints
+app.post('/api/perplexity/chat', async (req, res) => {
+  try {
+    const { messages, model, options } = req.body;
+
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({
+        success: false,
+        error: 'messages array is required',
+      });
+    }
+
+    console.log(`[API] Perplexity chat request: ${messages.length} messages`);
+
+    const { chatCompletions } = await import('./services/perplexity-service.js');
+    
+    const response = await chatCompletions({
+      model: model || 'sonar-pro',
+      messages,
+      ...options,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: response,
+    });
+  } catch (error: any) {
+    console.error('[API] Perplexity chat error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// Enrich signal with Perplexity
+app.post('/api/signals/:id/enrich', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { user_preferences } = req.body;
+
+    console.log(`[API] Signal enrichment request for signal: ${id}`);
+
+    // Get signal data (you might want to fetch from database)
+    // For now, we'll use the data from the request body
+    const { signalTitle, signalSummary, sector, region } = req.body;
+
+    // Ensure we have at least a title and summary
+    const finalSignalTitle = signalTitle || 'Signal';
+    const finalSignalSummary = signalSummary || 'Signal detected with significant implications';
+    
+    if (!finalSignalTitle || !finalSignalSummary) {
+      return res.status(400).json({
+        success: false,
+        error: 'signalTitle and signalSummary are required',
+      });
+    }
+
+    const { enrichSignalWithPerplexity } = await import('./services/perplexity-service.js');
+    
+    const enrichment = await enrichSignalWithPerplexity({
+      signalTitle: finalSignalTitle,
+      signalSummary: finalSignalSummary,
+      sector,
+      region,
+      userPreferences: user_preferences,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: enrichment,
+    });
+  } catch (error: any) {
+    console.error('[API] Signal enrichment error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// Perplexity health check
+app.get('/api/perplexity/health', async (req, res) => {
+  try {
+    const { checkPerplexityHealth } = await import('./services/perplexity-service.js');
+    const isHealthy = await checkPerplexityHealth();
+    
+    res.json({
+      status: isHealthy ? 'ok' : 'unavailable',
+      configured: !!process.env.PERPLEXITY_API_KEY,
+      message: isHealthy 
+        ? 'Perplexity API is configured and working'
+        : 'Perplexity API is not configured or not responding',
+    });
+  } catch (error: any) {
+    res.status(503).json({
+      status: 'error',
+      configured: !!process.env.PERPLEXITY_API_KEY,
+      error: error.message || 'Perplexity API check failed',
+    });
+  }
+});
+
+// Overview Narrative endpoint
+app.get('/api/overview/narrative', async (req, res) => {
+  try {
+    const { timeframe = '24h' } = req.query;
+    const supabaseUserId = await getSupabaseUserId(req.headers['x-clerk-user-id'] as string || null);
+
+    // Get events for the timeframe
+    const { getNormalizedEvents } = await import('../lib/supabase.js');
+    const dateFrom = new Date();
+    if (timeframe === '24h') dateFrom.setHours(dateFrom.getHours() - 24);
+    else if (timeframe === '7d') dateFrom.setDate(dateFrom.getDate() - 7);
+    else if (timeframe === '30d') dateFrom.setDate(dateFrom.getDate() - 30);
+
+    const events = await getNormalizedEvents({
+      dateFrom: dateFrom.toISOString(),
+      dateTo: new Date().toISOString(),
+      limit: 50,
+    }, supabaseUserId || undefined);
+
+    // Generate narrative
+    const { OverviewNarrativeAgent } = await import('./agents/overview-narrative-agent.js');
+    const agent = new OverviewNarrativeAgent();
+    const narrative = await agent.generateNarrative({
+      events,
+      timeframe: timeframe as '24h' | '7d' | '30d',
+    });
+
+    res.json({
+      success: true,
+      data: narrative,
+    });
+  } catch (error: any) {
+    console.error('[API] Overview narrative error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// Intelligence Clustering endpoint
+app.post('/api/intelligence/cluster', async (req, res) => {
+  try {
+    const { events, maxClusters } = req.body;
+
+    if (!events || !Array.isArray(events)) {
+      return res.status(400).json({
+        success: false,
+        error: 'events array is required',
+      });
+    }
+
+    const { IntelligenceClusterAgent } = await import('./agents/intelligence-cluster-agent.js');
+    const agent = new IntelligenceClusterAgent();
+    const clusters = await agent.clusterEvents({
+      events,
+      maxClusters: maxClusters || 10,
+    });
+
+    res.json({
+      success: true,
+      data: clusters,
+    });
+  } catch (error: any) {
+    console.error('[API] Intelligence clustering error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// Market Disconnect endpoint
+app.post('/api/markets/disconnect', async (req, res) => {
+  try {
+    const { signal, marketData } = req.body;
+
+    if (!signal) {
+      return res.status(400).json({
+        success: false,
+        error: 'signal is required',
+      });
+    }
+
+    const { MarketDisconnectAgent } = await import('./agents/market-disconnect-agent.js');
+    const agent = new MarketDisconnectAgent();
+    const disconnect = await agent.detectDisconnect({
+      signal,
+      marketData: marketData || {},
+    });
+
+    res.json({
+      success: true,
+      data: disconnect,
+    });
+  } catch (error: any) {
+    console.error('[API] Market disconnect error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// Signal Explanation endpoint
+app.post('/api/signals/:id/explain', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { signal, relatedEvents } = req.body;
+
+    if (!signal) {
+      return res.status(400).json({
+        success: false,
+        error: 'signal is required',
+      });
+    }
+
+    const { SignalExplanationAgent } = await import('./agents/signal-explanation-agent.js');
+    const agent = new SignalExplanationAgent();
+    const explanation = await agent.explainSignal({
+      signal,
+      relatedEvents: relatedEvents || [],
+    });
+
+    res.json({
+      success: true,
+      data: explanation,
+    });
+  } catch (error: any) {
+    console.error('[API] Signal explanation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// Intelligent Alert endpoint
+app.post('/api/alerts/generate', async (req, res) => {
+  try {
+    const { signal, event, alertType, previousState, threshold } = req.body;
+
+    if (!alertType) {
+      return res.status(400).json({
+        success: false,
+        error: 'alertType is required',
+      });
+    }
+
+    const { IntelligentAlertAgent } = await import('./agents/intelligent-alert-agent.js');
+    const agent = new IntelligentAlertAgent();
+    const result = await agent.generateAlert({
+      signal,
+      event,
+      alertType,
+      previousState,
+      threshold,
+    });
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('[API] Intelligent alert error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// Impact Exposure endpoint
+app.post('/api/impacts/exposure', async (req, res) => {
+  try {
+    const { signal, relatedEvents } = req.body;
+
+    if (!signal) {
+      return res.status(400).json({
+        success: false,
+        error: 'signal is required',
+      });
+    }
+
+    const { ImpactExposureAgent } = await import('./agents/impact-exposure-agent.js');
+    const agent = new ImpactExposureAgent();
+    const exposures = await agent.mapExposure({
+      signal,
+      relatedEvents: relatedEvents || [],
+    });
+
+    res.json({
+      success: true,
+      data: exposures,
+    });
+  } catch (error: any) {
+    console.error('[API] Impact exposure error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Internal server error',

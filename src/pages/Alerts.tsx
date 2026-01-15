@@ -24,6 +24,7 @@ import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SectionHeader from '../components/ui/SectionHeader';
 import { Bell, AlertTriangle, Clock, ArrowRight, CheckCircle } from 'lucide-react';
+import IntelligentAlertCard from '../components/alerts/IntelligentAlertCard';
 
 function AlertsContent() {
   const { user, isLoaded: userLoaded } = useUser();
@@ -261,85 +262,40 @@ function AlertsContent() {
         ) : (
           <div className="space-y-4">
             {alerts.map((alert) => (
-              <Card 
-                key={alert.id} 
-                className={`p-6 ${
-                  alert.severity === 'critical' 
-                    ? 'border-red-500/20 bg-red-500/5' 
-                    : alert.severity === 'high'
-                    ? 'border-yellow-500/20 bg-yellow-500/5'
-                    : ''
-                }`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className={`p-2 rounded-lg ${
-                        alert.severity === 'critical'
-                          ? 'bg-red-500/20 border border-red-500/30'
-                          : alert.severity === 'high'
-                          ? 'bg-yellow-500/20 border border-yellow-500/30'
-                          : 'bg-orange-500/20 border border-orange-500/30'
-                      }`}>
-                        <AlertTriangle className={`w-5 h-5 ${
-                          alert.severity === 'critical' 
-                            ? 'text-red-400' 
-                            : alert.severity === 'high'
-                            ? 'text-yellow-400'
-                            : 'text-orange-400'
-                        }`} />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant={getSeverityBadgeVariant(alert.severity)}>
-                            {alert.severity}
-                          </Badge>
-                          <Badge variant="neutral">
-                            {alert.impact}% impact
-                          </Badge>
-                          <Badge variant="level">
-                            {alert.confidence}% confidence
-                          </Badge>
-                        </div>
-                        <h3 className="text-lg font-light text-white mb-2">
-                          {alert.title}
-                        </h3>
-                        <p className="text-sm text-slate-300 font-light leading-relaxed mb-2">
-                          {alert.trigger_reason}
-                        </p>
-                        <p className="text-xs text-slate-500 font-light mb-3">
-                          Threshold exceeded: {alert.threshold_exceeded}
-                        </p>
-                        <div className="flex items-center gap-4 text-xs text-slate-500">
-                          <span className="flex items-center gap-1.5">
-                            <Clock className="w-3 h-3" />
-                            {formatTimeAgo(alert.last_updated)}
-                          </span>
-                          {alert.related_event_ids && alert.related_event_ids.length > 0 && (
-                            <button
-                              onClick={() => navigate(`/events-feed?event_ids=${alert.related_event_ids?.join(',')}`)}
-                              className="flex items-center gap-1.5 text-slate-500 hover:text-white transition-colors"
-                            >
-                              View {alert.related_event_ids.length} related event{alert.related_event_ids.length !== 1 ? 's' : ''}
-                              <ArrowRight className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      // Mark as read (would call API in production)
-                      console.log('Mark alert as read:', alert.id);
-                    }}
-                    className="px-4 py-2 text-xs bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors flex items-center gap-1.5"
-                  >
-                    <CheckCircle className="w-3 h-3" />
-                    Mark Read
-                  </button>
+              <div key={alert.id}>
+                <IntelligentAlertCard
+                  alert={alert}
+                  onMarkRead={(alertId) => {
+                    // Mark as read (would call API in production)
+                    console.log('Mark alert as read:', alertId);
+                  }}
+                />
+                {/* Additional actions */}
+                <div className="mt-2 flex items-center gap-4 text-xs text-slate-500">
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-3 h-3" />
+                    {formatTimeAgo(alert.last_updated)}
+                  </span>
+                  {alert.related_event_ids && alert.related_event_ids.length > 0 && (
+                    <button
+                      onClick={() => navigate(`/events-feed?event_ids=${alert.related_event_ids?.join(',')}`)}
+                      className="flex items-center gap-1.5 text-slate-500 hover:text-white transition-colors"
+                    >
+                      View {alert.related_event_ids.length} related event{alert.related_event_ids.length !== 1 ? 's' : ''}
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  )}
+                  {alert.related_signal_ids && alert.related_signal_ids.length > 0 && (
+                    <button
+                      onClick={() => navigate(`/signals/${alert.related_signal_ids[0]}`)}
+                      className="flex items-center gap-1.5 text-slate-500 hover:text-white transition-colors"
+                    >
+                      View Signal
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
-              </Card>
+              </div>
             ))}
           </div>
         )}

@@ -30,9 +30,10 @@ interface ImpactCardGridProps {
   };
   signalId?: string;
   loading: boolean;
+  onImpactsLoaded?: (impacts: Impact[]) => void;
 }
 
-export default function ImpactCardGrid({ filters, signalId, loading }: ImpactCardGridProps) {
+export default function ImpactCardGrid({ filters, signalId, loading, onImpactsLoaded }: ImpactCardGridProps) {
   const [impacts, setImpacts] = useState<Impact[]>([]);
 
   useEffect(() => {
@@ -104,8 +105,14 @@ export default function ImpactCardGrid({ filters, signalId, loading }: ImpactCar
           }
 
           setImpacts(filteredImpacts);
+          if (onImpactsLoaded) {
+            onImpactsLoaded(filteredImpacts);
+          }
         } else {
           setImpacts([]);
+          if (onImpactsLoaded) {
+            onImpactsLoaded([]);
+          }
         }
       } catch (error) {
         console.error('Error loading impacts:', error);

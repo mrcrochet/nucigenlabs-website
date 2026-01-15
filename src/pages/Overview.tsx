@@ -20,6 +20,8 @@ import NarrativeCard from '../components/overview/NarrativeCard';
 import TimelineCard from '../components/overview/TimelineCard';
 import MarketMoversCard from '../components/overview/MarketMoversCard';
 import TopSignalsTable from '../components/overview/TopSignalsTable';
+import TopRisksCard from '../components/overview/TopRisksCard';
+import OpportunitiesCard from '../components/overview/OpportunitiesCard';
 import RecentEventsFeed from '../components/overview/RecentEventsFeed';
 import TriggeredAlertsFeed from '../components/overview/TriggeredAlertsFeed';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -66,13 +68,15 @@ function OverviewContent() {
         <NarrativeCard />
         <TimelineCard />
       </div>
-      <div className="col-span-1 sm:col-span-4">
+      <div className="col-span-1 sm:col-span-4 space-y-6">
         <MarketMoversCard />
+        <TopRisksCard />
+        <OpportunitiesCard />
       </div>
 
-      {/* Row 4: TopSignalsTable */}
+      {/* Row 4: TopSignalsTable (Top 5) */}
       <div className="col-span-1 sm:col-span-12">
-        <TopSignalsTable />
+        <TopSignalsTable limit={5} />
       </div>
 
       {/* Row 5: Left (6) + Right (6) */}

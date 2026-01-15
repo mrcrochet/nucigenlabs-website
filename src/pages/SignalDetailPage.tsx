@@ -23,15 +23,18 @@ import MarketValidationCard from '../components/signals/MarketValidationCard';
 import NextActionsBar from '../components/signals/NextActionsBar';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
-import { getSignalsFromEvents, getNormalizedEventById, getOrCreateSupabaseUserId } from '../lib/supabase';
+import { getSignalsFromEvents, getNormalizedEventById, getOrCreateSupabaseUserId, getUserPreferences } from '../lib/supabase';
 import type { Signal } from '../types/intelligence';
 import SkeletonCard from '../components/ui/SkeletonCard';
+import SignalEnrichment from '../components/signals/SignalEnrichment';
+import SignalExplanation from '../components/signals/SignalExplanation';
 
 function SignalDetailContent() {
   const { id } = useParams<{ id: string }>();
   const { user } = useUser();
   const navigate = useNavigate();
   const [signal, setSignal] = useState<Signal | null>(null);
+  const [preferences, setPreferences] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,6 +55,16 @@ function SignalDetailContent() {
           setError('Signal not found');
         } else {
           setSignal(foundSignal);
+        }
+
+        // Load user preferences for enrichment
+        if (user?.id) {
+          try {
+            const prefs = await getUserPreferences(user.id);
+            setPreferences(prefs);
+          } catch (err) {
+            console.warn('Failed to load user preferences:', err);
+          }
         }
       } catch (err: any) {
         setError(err.message || 'Failed to load signal');
@@ -118,6 +131,16 @@ function SignalDetailContent() {
       <div className="col-span-1 sm:col-span-8 space-y-6">
         <SignalEvidenceGraph signal={signal} />
         <EventStack signal={signal} />
+        {/* Signal Explanation - Why significant, precedents, invalidation */}
+        <SignalExplanation signal={signal} />
+        {/* Perplexity Enrichment */}
+        <SignalEnrichment 
+          signal={signal} 
+          userPreferences={preferences ? {
+            preferred_sectors: preferences.preferred_sectors,
+            preferred_regions: preferences.preferred_regions,
+          } : undefined}
+        />
       </div>
       <div className="col-span-1 sm:col-span-4 space-y-6">
         <SignalMetricsCard signal={signal} />

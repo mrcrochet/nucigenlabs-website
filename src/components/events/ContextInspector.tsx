@@ -16,6 +16,10 @@ import Card from '../ui/Card';
 import SectionHeader from '../ui/SectionHeader';
 import Badge from '../ui/Badge';
 import { ExternalLink, ArrowRight } from 'lucide-react';
+import EventEnrichment from './EventEnrichment';
+import { getNormalizedEvents, getOrCreateSupabaseUserId } from '../../lib/supabase';
+import { useUser } from '@clerk/clerk-react';
+import type { Event } from '../../types/intelligence';
 
 interface ContextData {
   relatedEntities: Array<{ id: string; name: string; type: string }>;
@@ -28,7 +32,9 @@ interface ContextInspectorProps {
 }
 
 export default function ContextInspector({ eventId }: ContextInspectorProps) {
+  const { user } = useUser();
   const [data, setData] = useState<ContextData | null>(null);
+  const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,6 +44,16 @@ export default function ContextInspector({ eventId }: ContextInspectorProps) {
     const loadContext = async () => {
       try {
         setLoading(true);
+        
+        // Load event data for enrichment
+        const userId = user ? await getOrCreateSupabaseUserId(user.id) : undefined;
+        const events = await getNormalizedEvents({ limit: 1 }, userId);
+        const foundEvent = events.find(e => e.id === eventId);
+        if (foundEvent && isActive) {
+          setEvent(foundEvent);
+        }
+
+        // Load context data
         const API_BASE = import.meta.env.DEV ? 'http://localhost:3001' : '/api';
         const response = await fetch(`${API_BASE}/events/${eventId}/context`, {
           signal: controller.signal,
@@ -80,7 +96,7 @@ export default function ContextInspector({ eventId }: ContextInspectorProps) {
       isActive = false;
       controller.abort();
     };
-  }, [eventId]);
+  }, [eventId, user]);
 
   if (loading) {
     return (
@@ -100,6 +116,9 @@ export default function ContextInspector({ eventId }: ContextInspectorProps) {
 
   return (
     <div className="space-y-6">
+      {/* Event Enrichment (Perplexity on-demand) */}
+      {event && <EventEnrichment event={event} />}
+
       {/* Related Entities */}
       {data.relatedEntities.length > 0 && (
         <Card>

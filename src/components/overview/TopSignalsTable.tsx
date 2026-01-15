@@ -14,7 +14,11 @@ import Badge from '../ui/Badge';
 import { getSignalsFromEvents, getOrCreateSupabaseUserId } from '../../lib/supabase';
 import type { Signal } from '../../types/intelligence';
 
-export default function TopSignalsTable() {
+interface TopSignalsTableProps {
+  limit?: number;
+}
+
+export default function TopSignalsTable({ limit = 10 }: TopSignalsTableProps) {
   const { user } = useUser();
   const [signals, setSignals] = useState<Signal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,10 +35,10 @@ export default function TopSignalsTable() {
           userId
         );
         
-        // Sort by strength (impact_score) and take top 10
+        // Sort by strength (impact_score) and take top N
         const topSignals = allSignals
           .sort((a, b) => (b.impact_score || 0) - (a.impact_score || 0))
-          .slice(0, 10);
+          .slice(0, limit);
         
         setSignals(topSignals);
       } catch (error) {

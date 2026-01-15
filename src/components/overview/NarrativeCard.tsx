@@ -15,107 +15,177 @@ import Card from '../ui/Card';
 import SectionHeader from '../ui/SectionHeader';
 
 interface NarrativeData {
-  bullets: string[];
-  linkedEvents: Array<{ id: string; headline: string }>;
-  linkedTickers: Array<{ symbol: string; name: string }>;
-  linkedSignal: { id: string; title: string } | null;
+  narrative: string;
+  what_changed?: string;
+  why_it_matters?: string;
+  what_to_watch_next?: string;
+  key_themes: string[];
+  confidence_level: 'low' | 'medium' | 'high';
 }
 
 export default function NarrativeCard() {
   const [data, setData] = useState<NarrativeData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [timeframe, setTimeframe] = useState<'24h' | '7d' | '30d'>('24h');
 
   useEffect(() => {
-    // TODO: Fetch from GET /overview/narrative?range=24h
-    // Placeholder data
-    setData({
-      bullets: [
-        'Multiple geopolitical events detected in key regions.',
-        'Market volatility increased across commodities sector.',
-        'Supply chain disruptions reported in multiple sectors.',
-      ],
-      linkedEvents: [
-        { id: '1', headline: 'Event 1' },
-        { id: '2', headline: 'Event 2' },
-        { id: '3', headline: 'Event 3' },
-      ],
-      linkedTickers: [
-        { symbol: 'AAPL', name: 'Apple Inc.' },
-        { symbol: 'MSFT', name: 'Microsoft Corp.' },
-      ],
-      linkedSignal: { id: '1', title: 'Signal Title' },
-    });
-    setLoading(false);
-  }, []);
+    async function fetchNarrative() {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await fetch(`/api/overview/narrative?timeframe=${timeframe}`, {
+          headers: {
+            'x-clerk-user-id': (window as any).Clerk?.user?.id || '',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch narrative');
+        }
+
+        const result = await response.json();
+        if (result.success && result.data) {
+          setData(result.data);
+        } else {
+          throw new Error(result.error || 'No narrative data');
+        }
+      } catch (err: any) {
+        console.error('[NarrativeCard] Error:', err);
+        setError(err.message || 'Failed to load narrative');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchNarrative();
+  }, [timeframe]);
 
   if (loading) {
     return (
       <Card>
-        <div className="h-48 animate-pulse bg-background-glass-subtle rounded-lg" />
+        <SectionHeader title="Today's Narrative" />
+        <div className="h-48 animate-pulse bg-background-glass-subtle rounded-lg mt-4" />
       </Card>
     );
   }
 
-  if (!data) {
+  if (error || !data) {
     return (
       <Card>
-        <div className="text-text-secondary text-sm">No narrative available</div>
+        <SectionHeader title="Today's Narrative" />
+        <div className="text-text-secondary text-sm mt-4">
+          {error || 'No narrative available'}
+        </div>
       </Card>
     );
   }
+
+  const confidenceColor = {
+    low: 'text-yellow-500',
+    medium: 'text-blue-500',
+    high: 'text-green-500',
+  }[data.confidence_level];
 
   return (
     <Card>
-      <SectionHeader title="Today's Narrative" />
-      
-      <div className="space-y-3 mt-4">
-        {data.bullets.map((bullet, index) => (
-          <div key={index} className="flex items-start gap-2">
-            <span className="text-text-secondary mt-1">•</span>
-            <p className="text-sm text-text-primary flex-1">{bullet}</p>
-          </div>
-        ))}
+      <div className="flex items-center justify-between mb-4">
+        <SectionHeader title="Today's Narrative" />
+        <div className="flex gap-2">
+          <button
+            onClick={() => setTimeframe('24h')}
+            className={`px-3 py-1 text-xs rounded ${
+              timeframe === '24h'
+                ? 'bg-primary-red/20 text-primary-red'
+                : 'bg-background-glass-subtle text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            24h
+          </button>
+          <button
+            onClick={() => setTimeframe('7d')}
+            className={`px-3 py-1 text-xs rounded ${
+              timeframe === '7d'
+                ? 'bg-primary-red/20 text-primary-red'
+                : 'bg-background-glass-subtle text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            7d
+          </button>
+          <button
+            onClick={() => setTimeframe('30d')}
+            className={`px-3 py-1 text-xs rounded ${
+              timeframe === '30d'
+                ? 'bg-primary-red/20 text-primary-red'
+                : 'bg-background-glass-subtle text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            30d
+          </button>
+        </div>
       </div>
+      
+      <div className="space-y-4 mt-4">
+        {/* Executive Narrative Format */}
+        {data.what_changed || data.why_it_matters || data.what_to_watch_next ? (
+          <div className="space-y-4">
+            {data.what_changed && (
+              <div>
+                <h4 className="text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wider">
+                  What Changed
+                </h4>
+                <p className="text-sm text-text-primary leading-relaxed">
+                  {data.what_changed}
+                </p>
+              </div>
+            )}
+            {data.why_it_matters && (
+              <div>
+                <h4 className="text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wider">
+                  Why It Matters
+                </h4>
+                <p className="text-sm text-text-primary leading-relaxed">
+                  {data.why_it_matters}
+                </p>
+              </div>
+            )}
+            {data.what_to_watch_next && (
+              <div>
+                <h4 className="text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wider">
+                  What to Watch Next
+                </h4>
+                <p className="text-sm text-text-primary leading-relaxed">
+                  {data.what_to_watch_next}
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Fallback to full narrative */
+          <p className="text-sm text-text-primary leading-relaxed whitespace-pre-line">
+            {data.narrative}
+          </p>
+        )}
 
-      <div className="mt-6 pt-6 border-t border-borders-subtle">
-        <div className="flex flex-wrap gap-4 text-sm">
-          <div>
-            <span className="text-text-secondary mr-2">Events:</span>
-            {data.linkedEvents.map((event, idx) => (
-              <Link
-                key={event.id}
-                to={`/events/${event.id}`}
-                className="text-primary-red hover:text-primary-redHover mr-2"
+        {data.key_themes && data.key_themes.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-4 border-t border-borders-subtle">
+            {data.key_themes.map((theme, index) => (
+              <span
+                key={index}
+                className="px-2 py-1 text-xs bg-background-glass-subtle rounded text-text-secondary"
               >
-                {event.headline}
-                {idx < data.linkedEvents.length - 1 && ','}
-              </Link>
+                {theme}
+              </span>
             ))}
           </div>
-          <div>
-            <span className="text-text-secondary mr-2">Tickers:</span>
-            {data.linkedTickers.map((ticker, idx) => (
-              <Link
-                key={ticker.symbol}
-                to={`/markets/${ticker.symbol}`}
-                className="text-primary-red hover:text-primary-redHover mr-2"
-              >
-                {ticker.symbol}
-                {idx < data.linkedTickers.length - 1 && ','}
-              </Link>
-            ))}
-          </div>
-          {data.linkedSignal && (
-            <div>
-              <span className="text-text-secondary mr-2">Signal:</span>
-              <Link
-                to={`/signals/${data.linkedSignal.id}`}
-                className="text-primary-red hover:text-primary-redHover"
-              >
-                {data.linkedSignal.title}
-              </Link>
-            </div>
-          )}
+        )}
+
+        <div className="flex items-center gap-2 pt-2 text-xs text-text-secondary">
+          <span>Confidence:</span>
+          <span className={confidenceColor}>
+            {data.confidence_level.toUpperCase()}
+          </span>
         </div>
       </div>
     </Card>

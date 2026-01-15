@@ -29,11 +29,21 @@ export default function SignalEvidenceGraph({ signal }: SignalEvidenceGraphProps
 
       try {
         const loadedEvents = await Promise.all(
-          signal.related_event_ids.map(id => getNormalizedEventById(id))
+          signal.related_event_ids.map(async (id) => {
+            try {
+              return await getNormalizedEventById(id);
+            } catch (err) {
+              console.warn(`[SignalEvidenceGraph] Failed to load event ${id}:`, err);
+              return null;
+            }
+          })
         );
-        setEvents(loadedEvents);
+        // Filter out null values (failed loads)
+        const validEvents = loadedEvents.filter((e): e is Event => e !== null);
+        setEvents(validEvents);
       } catch (error) {
-        console.error('Error loading events for evidence graph:', error);
+        console.error('[SignalEvidenceGraph] Error loading events:', error);
+        setEvents([]);
       } finally {
         setLoading(false);
       }
@@ -83,7 +93,16 @@ export default function SignalEvidenceGraph({ signal }: SignalEvidenceGraphProps
 
           {events.length === 0 && (
             <div className="text-sm text-text-secondary text-center py-8">
-              No related events found
+              {signal.related_event_ids && signal.related_event_ids.length > 0 ? (
+                <div>
+                  <p className="mb-2">Unable to load related events</p>
+                  <p className="text-xs text-text-tertiary">
+                    {signal.related_event_ids.length} event{signal.related_event_ids.length > 1 ? 's' : ''} referenced but not found in database
+                  </p>
+                </div>
+              ) : (
+                <p>No events linked to this signal</p>
+              )}
             </div>
           )}
         </div>

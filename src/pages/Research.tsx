@@ -26,6 +26,7 @@ import Badge from '../components/ui/Badge';
 import SectionHeader from '../components/ui/SectionHeader';
 import Tooltip from '../components/ui/Tooltip';
 import { BookOpen, Clock, ArrowRight, TrendingUp, Search, Sparkles, Loader2, ExternalLink } from 'lucide-react';
+import ResearchTemplates from '../components/research/ResearchTemplates';
 
 function ResearchContent() {
   const { user, isLoaded: userLoaded } = useUser();
@@ -246,6 +247,23 @@ function ResearchContent() {
             subtitle={`Thematic analysis · ${analyses.length} analysis${analyses.length !== 1 ? 'es' : ''} available`}
           />
         </header>
+          {/* Research Templates */}
+          <div className="mb-8">
+            <ResearchTemplates
+              onSelectTemplate={(query) => {
+                setDeepResearchQuery(query);
+                // Auto-focus the search input
+                setTimeout(() => {
+                  const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+                  if (input) {
+                    input.focus();
+                    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }
+                }, 100);
+              }}
+            />
+          </div>
+
           {/* Deep Research Search */}
           <div className="mb-8">
             <Card className="p-6 bg-gradient-to-br from-purple-500/10 to-blue-500/10 border-purple-500/20">

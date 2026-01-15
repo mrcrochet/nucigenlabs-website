@@ -14,6 +14,7 @@ import { useSearchParams } from 'react-router-dom';
 import AppShell from '../components/layout/AppShell';
 import ImpactFilters from '../components/impacts/ImpactFilters';
 import ImpactCardGrid from '../components/impacts/ImpactCardGrid';
+import ImpactMappingMatrix from '../components/impacts/ImpactMappingMatrix';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 
@@ -29,6 +30,7 @@ function ImpactsPageContent() {
     sector: '',
     region: '',
   });
+  const [impacts, setImpacts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -51,12 +53,20 @@ function ImpactsPageContent() {
         />
       </div>
 
+      {/* Impact Mapping Matrix */}
+      {impacts.length > 0 && (
+        <div className="col-span-1 sm:col-span-12">
+          <ImpactMappingMatrix impacts={impacts} />
+        </div>
+      )}
+
       {/* ImpactCardGrid */}
       <div className="col-span-1 sm:col-span-12">
         <ImpactCardGrid
           filters={filters}
           signalId={signalId || undefined}
           loading={loading}
+          onImpactsLoaded={setImpacts}
         />
       </div>
     </AppShell>
