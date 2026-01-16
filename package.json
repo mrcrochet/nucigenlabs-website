@@ -45,6 +45,8 @@
     "phase8:auto-learning:continuous": "npx tsx src/server/workers/phase8-auto-learning-orchestrator.ts continuous",
     "api:server": "npx tsx src/server/api-server.ts",
     "live:search": "npx tsx src/server/services/live-search-api.ts",
+    "discover:check": "npx tsx src/server/scripts/check-discover-setup.ts",
+    "discover:collect": "npx tsx src/server/scripts/collect-discover-items.ts",
     "test": "npx --yes vitest run",
     "test:watch": "npx --yes vitest",
     "test:ui": "npx --yes vitest --ui",

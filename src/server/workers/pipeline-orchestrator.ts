@@ -17,6 +17,8 @@ import { trainRelevanceModel } from '../ml/relevance-predictor.js';
 import { trainQueryOptimizerModel } from '../ml/query-optimizer.js';
 import { autoTuneComponent } from '../optimization/parameter-tuner.js';
 import { analyzeMetrics } from '../optimization/metrics-analyzer.js';
+import { collectDiscoverItems } from './discover-collector.js';
+import { enrichCriticalEvents, enrichStrategicEvents } from './discover-enricher.js';
 
 interface OrchestratorConfig {
   collectionInterval: number; // milliseconds
@@ -60,6 +62,16 @@ async function runCycle(config: OrchestratorConfig) {
       // Don't fail the whole cycle if personalized collection fails
     }
 
+    // Step 1C: Collect Discover items from EventRegistry
+    console.log('\n[Orchestrator] Step 1C: Collecting Discover items from EventRegistry...');
+    try {
+      const discoverResult = await collectDiscoverItems(['all', 'tech', 'finance', 'geopolitics', 'energy', 'supply-chain']);
+      console.log(`[Orchestrator] Discover: ${discoverResult.collected} collected, ${discoverResult.inserted} inserted, ${discoverResult.skipped} skipped`);
+    } catch (error: any) {
+      console.warn('[Orchestrator] Discover collection failed:', error.message);
+      // Don't fail the whole cycle if Discover collection fails
+    }
+
     // Step 2: Process pending events
     console.log('\n[Orchestrator] Step 2: Processing pending events...');
     const processingResult = await processPendingEvents(config.processingBatchSize);
@@ -80,6 +92,21 @@ async function runCycle(config: OrchestratorConfig) {
     } catch (error: any) {
       console.warn('[Orchestrator] Firecrawl enrichment failed:', error.message);
       // Don't fail the whole cycle if Firecrawl enrichment fails
+    }
+
+    // Step 2C: Enrich Discover items with Perplexity (batch, not in user request flow)
+    console.log('\n[Orchestrator] Step 2C: Enriching Discover items with Perplexity...');
+    try {
+      // Enrich critical events (Tier 1) - more frequent
+      const criticalResult = await enrichCriticalEvents();
+      console.log(`[Orchestrator] Discover Critical: ${criticalResult.enriched} enriched, ${criticalResult.errors} errors`);
+      
+      // Enrich strategic events (Tier 2) - less frequent
+      const strategicResult = await enrichStrategicEvents();
+      console.log(`[Orchestrator] Discover Strategic: ${strategicResult.enriched} enriched, ${strategicResult.errors} errors`);
+    } catch (error: any) {
+      console.warn('[Orchestrator] Discover enrichment failed:', error.message);
+      // Don't fail the whole cycle if Discover enrichment fails
     }
 
     // Step 3: Generate alerts for new events

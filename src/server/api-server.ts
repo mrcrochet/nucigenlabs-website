@@ -53,6 +53,7 @@ app.get('/health', (req, res) => {
   const twelvedataConfigured = !!process.env.TWELVEDATA_API_KEY;
   const supabaseConfigured = !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
   const perplexityConfigured = !!process.env.PERPLEXITY_API_KEY;
+  const eventregistryConfigured = !!process.env.EVENTREGISTRY_API_KEY;
   
   res.json({ 
     status: 'ok',
@@ -60,6 +61,7 @@ app.get('/health', (req, res) => {
       twelvedata: twelvedataConfigured ? 'configured' : 'missing',
       supabase: supabaseConfigured ? 'configured' : 'missing',
       perplexity: perplexityConfigured ? 'configured' : 'missing',
+      eventregistry: eventregistryConfigured ? 'configured' : 'missing',
     },
     timestamp: new Date().toISOString(),
   });
@@ -2692,20 +2694,27 @@ const discoverHandler = async (req: any, res: any) => {
 
     const { fetchDiscoverItems, calculatePersonalizationScore } = await import('./services/discover-service.js');
     
-            // Fetch items using 100% Perplexity (simplified, no Supabase needed)
+            // Fetch items from events table (read-only, no Perplexity calls)
             let items: any[] = [];
             try {
               items = await fetchDiscoverItems(
                 category,
                 { offset, limit },
                 userId,
-                searchQuery
+                searchQuery,
+                timeRange,
+                sortBy
               );
       console.log('[API] Discover fetched items:', items.length);
     } catch (fetchError: any) {
       console.error('[API] Discover fetch error:', fetchError);
-      // Return empty array instead of failing completely
-      items = [];
+      console.error('[API] Discover fetch error stack:', fetchError.stack);
+      // Return error message to help diagnose
+      return res.status(500).json({
+        success: false,
+        error: fetchError.message || 'Failed to fetch discover items',
+        details: process.env.NODE_ENV === 'development' ? fetchError.stack : undefined,
+      });
     }
 
     // Get user preferences for personalization
@@ -2738,54 +2747,29 @@ const discoverHandler = async (req: any, res: any) => {
       }
     });
 
-    // Sort items
+    // Sort items (already sorted by DB query, but apply personalization boost)
     try {
       items.sort((a, b) => {
-        if (sortBy === 'relevance') {
-          return (b.personalization_score || b.metadata.relevance_score || 0) - 
-                 (a.personalization_score || a.metadata.relevance_score || 0);
-        } else if (sortBy === 'recent') {
-          return new Date(b.metadata.published_at || 0).getTime() - 
-                 new Date(a.metadata.published_at || 0).getTime();
-        } else if (sortBy === 'trending') {
-          return (b.engagement?.views || 0) - (a.engagement?.views || 0);
-        }
-        return 0;
+        // Personalization score takes precedence if available
+        const scoreA = a.personalization_score || a.metadata.relevance_score || 0;
+        const scoreB = b.personalization_score || b.metadata.relevance_score || 0;
+        return scoreB - scoreA;
       });
     } catch (sortError: any) {
       console.warn('[Discover] Error sorting items:', sortError?.message || sortError);
     }
 
-    // Apply time range filter
-    let filteredItems = items;
-    if (timeRange !== 'all') {
-      try {
-        const daysAgo = timeRange === '24h' ? 1 : timeRange === '7d' ? 7 : 30;
-        const cutoffDate = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000);
-        filteredItems = items.filter(item => {
-          try {
-            const itemDate = new Date(item.metadata?.published_at || 0);
-            return itemDate >= cutoffDate;
-          } catch {
-            return true; // Include items with invalid dates
-          }
-        });
-      } catch (filterError: any) {
-        console.warn('[Discover] Error filtering by time range:', filterError?.message || filterError);
-      }
-    }
+    // Items are already filtered and paginated by DB query
+    const paginatedItems = items;
+    const hasMore = items.length === limit; // If we got full limit, there might be more
 
-    // Paginate
-    const paginatedItems = filteredItems.slice(offset, offset + limit);
-    const hasMore = filteredItems.length > offset + limit;
-
-    console.log('[API] Discover response:', { items: paginatedItems.length, total: filteredItems.length, hasMore });
+    console.log('[API] Discover response:', { items: paginatedItems.length, total: items.length, hasMore });
 
     res.json({
       success: true,
       items: paginatedItems,
       hasMore,
-      total: filteredItems.length,
+      total: items.length,
     });
   } catch (error: any) {
     console.error('[API] Discover error:', error);
@@ -2823,6 +2807,126 @@ app.get('/api/trending-companies', async (req, res) => {
   } catch (error: any) {
     console.error('[API] Trending companies error:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// EventRegistry API endpoints
+// GET /api/eventregistry/search-articles - Search articles
+app.get('/api/eventregistry/search-articles', async (req, res) => {
+  try {
+    const { searchArticles } = await import('./services/eventregistry-service.js');
+    const {
+      keywords,
+      category,
+      lang,
+      dateStart,
+      dateEnd,
+      sortBy,
+      count = 20,
+      page = 1,
+    } = req.query;
+
+    const options: any = {};
+    if (keywords) options.keywords = String(keywords);
+    if (category) options.categoryUri = String(category);
+    if (lang) options.lang = String(lang);
+    if (dateStart) options.dateStart = String(dateStart);
+    if (dateEnd) options.dateEnd = String(dateEnd);
+    if (sortBy) options.sortBy = String(sortBy) as any;
+    options.articlesCount = parseInt(String(count)) || 20;
+    options.articlesPage = parseInt(String(page)) || 1;
+
+    const result = await searchArticles(options);
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error('[API] EventRegistry search articles error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/eventregistry/search-events - Search events
+app.get('/api/eventregistry/search-events', async (req, res) => {
+  try {
+    const { searchEvents } = await import('./services/eventregistry-service.js');
+    const {
+      keywords,
+      category,
+      lang,
+      dateStart,
+      dateEnd,
+      sortBy,
+      count = 20,
+      page = 1,
+    } = req.query;
+
+    const options: any = {};
+    if (keywords) options.keywords = String(keywords);
+    if (category) options.categoryUri = String(category);
+    if (lang) options.lang = String(lang);
+    if (dateStart) options.dateStart = String(dateStart);
+    if (dateEnd) options.dateEnd = String(dateEnd);
+    if (sortBy) options.sortBy = String(sortBy) as any;
+    options.eventsCount = parseInt(String(count)) || 20;
+    options.eventsPage = parseInt(String(page)) || 1;
+
+    const result = await searchEvents(options);
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error('[API] EventRegistry search events error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/eventregistry/trending - Get trending concepts
+app.get('/api/eventregistry/trending', async (req, res) => {
+  try {
+    const { getTrendingConcepts } = await import('./services/eventregistry-service.js');
+    const {
+      source = 'news',
+      lang = 'eng',
+      dateStart,
+      dateEnd,
+      conceptType,
+      count = 20,
+    } = req.query;
+
+    const options: any = {
+      source: String(source) as any,
+      lang: String(lang),
+      count: parseInt(String(count)) || 20,
+    };
+    if (dateStart) options.dateStart = String(dateStart);
+    if (dateEnd) options.dateEnd = String(dateEnd);
+    if (conceptType) options.conceptType = String(conceptType) as any;
+
+    const result = await getTrendingConcepts(options);
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error('[API] EventRegistry trending concepts error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/eventregistry/health - Health check
+app.get('/api/eventregistry/health', async (req, res) => {
+  try {
+    const { checkEventRegistryHealth } = await import('./services/eventregistry-service.js');
+    const isHealthy = await checkEventRegistryHealth();
+    res.json({
+      success: true,
+      healthy: isHealthy,
+      configured: !!process.env.EVENTREGISTRY_API_KEY,
+      message: isHealthy
+        ? 'EventRegistry API is configured and working'
+        : 'EventRegistry API is not configured or not responding',
+    });
+  } catch (error: any) {
+    res.json({
+      success: false,
+      healthy: false,
+      configured: !!process.env.EVENTREGISTRY_API_KEY,
+      error: error.message || 'EventRegistry API check failed',
+    });
   }
 });
 
@@ -3010,6 +3114,9 @@ const server = app.listen(PORT, () => {
   console.log(`   Impacts List: GET http://localhost:${PORT}/api/impacts`);
   console.log(`   Impact Detail: GET http://localhost:${PORT}/api/impacts/:id`);
   console.log(`   Discover Feed: GET http://localhost:${PORT}/api/discover`);
+  console.log(`   EventRegistry Search Articles: GET http://localhost:${PORT}/api/eventregistry/search-articles`);
+  console.log(`   EventRegistry Search Events: GET http://localhost:${PORT}/api/eventregistry/search-events`);
+  console.log(`   EventRegistry Trending: GET http://localhost:${PORT}/api/eventregistry/trending`);
   console.log(`\n   Server is ready to accept requests. Press Ctrl+C to stop.\n`);
 });
 

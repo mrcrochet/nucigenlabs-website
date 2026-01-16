@@ -1,25 +1,46 @@
 /**
- * Discover Service - 100% Perplexity Powered (OPTIMIZED)
+ * Discover Service - Database Read-Only
  * 
- * Inspired by Perplexity's Discover page
- * Uses Perplexity API to generate curated content:
- * - Trending topics
- * - News articles with analysis
- * - Insights and analysis
- * - All with citations and sources
+ * Strategy:
+ * - events table is the single source of truth
+ * - Discover = projection/state of events with discover_* columns
+ * - No Perplexity calls in user request flow (batch enrichment only)
+ * - Read-only: fetches from events table with discover_* columns
  * 
- * OPTIMIZATIONS:
- * - Aggressive caching (1h for topics/insights, 30min for news)
- * - Use 'sonar' instead of 'sonar-pro' (3-5x cheaper)
- * - Reduced max_tokens (800 instead of 2000)
- * - Disabled return_images (only for top items)
- * - Impact generation only for top 3 items
- * - Consolidated API calls where possible
+ * Data flow:
+ * 1. discover-collector.ts: EventRegistry → events (with discover_* columns)
+ * 2. discover-enricher.ts: Batch Perplexity enrichment → events.discover_why_it_matters
+ * 3. discover-service.ts: Read from events → return DiscoverItem[]
  */
 
-import { chatCompletions } from './perplexity-service.js';
-import { generateCacheKey, getCacheEntry, setCacheEntry } from './cache-service.js';
-import type { Event, Signal } from '../../types/intelligence.js';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load environment variables
+dotenv.config({ path: join(__dirname, '../../../.env') });
+dotenv.config({ path: join(__dirname, '../../../../.env') });
+dotenv.config();
+
+// Use service_role key for server-side reads (bypasses RLS)
+// This ensures we can read all discover data regardless of RLS policies
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Fallback to anon key if service_role not available (for client-side compatibility)
+const supabaseKey = supabaseServiceKey || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('[Discover Service] Supabase not configured. Using placeholder client.');
+}
+
+const supabase = supabaseUrl && supabaseKey
+  ? createClient(supabaseUrl, supabaseKey)
+  : createClient('https://placeholder.supabase.co', 'placeholder-key');
 
 export interface DiscoverItem {
   id: string;
@@ -54,102 +75,178 @@ interface PaginationOptions {
 }
 
 /**
- * Generate Discover content using Perplexity (OPTIMIZED with caching)
- * Similar to Perplexity's own Discover page
+ * Fetch Discover items from events table (READ-ONLY)
+ * 
+ * No Perplexity calls here - all enrichment is done by batch jobs
  */
 export async function fetchDiscoverItems(
   category: string,
   options: PaginationOptions,
   userId?: string,
-  searchQuery?: string
+  searchQuery?: string,
+  timeRange?: string,
+  sortBy?: string
 ): Promise<DiscoverItem[]> {
   try {
-    // If search query provided, use it directly (no cache for search)
-    if (searchQuery) {
-      return await generateSearchResults(searchQuery, options);
-    }
-
-    // Map category to Perplexity query
-    const categoryQueries: Record<string, string> = {
-      all: 'geopolitics, finance, technology, energy, supply chain',
-      tech: 'technology, AI, semiconductors, software',
-      finance: 'finance, markets, banking, monetary policy',
-      geopolitics: 'geopolitics, international relations, conflicts, diplomacy',
-      energy: 'energy, oil, gas, renewables, commodities',
-      'supply-chain': 'supply chain, logistics, manufacturing, trade',
-    };
-
-    const queryCategory = categoryQueries[category] || category;
+    // Build query: select events with discover_* columns
+    let query = supabase
+      .from('events')
+      .select('*');
     
-    // Check cache first
-    const cacheKey = generateCacheKey('perplexity', 'discover', {
-      category,
-      queryCategory,
-      limit: options.limit,
-      offset: options.offset,
-    });
-
-    const cached = await getCacheEntry<DiscoverItem[]>(cacheKey, {
-      apiType: 'perplexity', // Using perplexity type for discover cache
-      endpoint: 'discover',
-      ttlSeconds: category === 'all' ? 3600 : 1800, // 1h for 'all', 30min for specific categories
-    });
-
-    if (cached && cached.cached) {
-      console.log(`[Discover] Cache hit for category: ${category}`);
-      return cached.data;
+    // Filter by discover columns (will fail if migration not applied)
+    query = query.not('discover_score', 'is', null);
+    query = query.not('discover_type', 'is', null);
+    
+    // Category filter
+    if (category && category !== 'all') {
+      query = query.eq('discover_category', category);
     }
-
-    // Generate multiple types of content in parallel (with optimizations)
-    const [topicsResult, newsResult, insightsResult] = await Promise.allSettled([
-      // 1. Trending Topics (like Perplexity Discover)
-      generateTrendingTopics(queryCategory, options),
+    
+    // Search query
+    if (searchQuery) {
+      query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+    }
+    
+    // Time range filter
+    if (timeRange && timeRange !== 'all') {
+      const now = new Date();
+      let dateStart: Date;
       
-      // 2. News Articles with Analysis
-      generateNewsWithAnalysis(queryCategory, options),
-      
-      // 3. Insights and Analysis
-      generateInsights(queryCategory, options),
-    ]);
-
-    // Extract successful results
-    const topics = topicsResult.status === 'fulfilled' ? topicsResult.value : [];
-    const news = newsResult.status === 'fulfilled' ? newsResult.value : [];
-    const insights = insightsResult.status === 'fulfilled' ? insightsResult.value : [];
-
-    // Merge all items
-    const allItems = [...topics, ...news, ...insights];
-
-    // Remove duplicates based on title similarity
-    const uniqueItems = removeDuplicates(allItems);
-
-    // Sort by relevance and limit
-    uniqueItems.sort((a, b) => (b.metadata.relevance_score || 0) - (a.metadata.relevance_score || 0));
-
-    // Enrich items with tier, consensus, and impact (ONLY top 3 get impact)
-    const enrichedItems = await Promise.all(
-      uniqueItems.slice(0, options.limit).map((item, idx) => 
-        enrichItem(item, idx < 3) // Only top 3 get impact generation
-      )
-    );
-
-    // Cache the results
-    await setCacheEntry(
-      cacheKey,
-      enrichedItems,
-      { category, queryCategory, generatedAt: new Date().toISOString() },
-      {
-        apiType: 'perplexity',
-        endpoint: 'discover',
-        ttlSeconds: category === 'all' ? 3600 : 1800,
+      switch (timeRange) {
+        case 'now':
+          dateStart = new Date(now.getTime() - 48 * 60 * 60 * 1000); // 48h
+          break;
+        case '24h':
+          dateStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          break;
+        case '7d':
+          dateStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case '30d':
+          dateStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case 'structural':
+          // Structural = older than 30 days but high score
+          query = query.lt('published_at', new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString());
+          query = query.gte('discover_score', 70);
+          break;
+        default:
+          dateStart = new Date(0); // All time
       }
-    );
-
-    return enrichedItems;
+      
+      if (timeRange !== 'structural') {
+        query = query.gte('published_at', dateStart.toISOString());
+      }
+    }
+    
+    // Sort
+    if (sortBy === 'recent') {
+      query = query.order('published_at', { ascending: false });
+    } else if (sortBy === 'trending') {
+      // Trending = high score + recent
+      query = query.order('discover_score', { ascending: false });
+      query = query.order('published_at', { ascending: false });
+    } else {
+      // Default: relevance (by score)
+      query = query.order('discover_score', { ascending: false });
+    }
+    
+    // Pagination
+    query = query.range(options.offset, options.offset + options.limit - 1);
+    
+    const { data: events, error } = await query;
+    
+    if (error) {
+      // Check if error is due to missing columns
+      const errorMessage = error.message || '';
+      const errorCode = error.code || '';
+      
+      if (errorMessage.includes('discover_') || errorMessage.includes('column') || errorCode === '42703' || errorMessage.includes('does not exist')) {
+        const helpfulMessage = 'Discover columns not found. Please apply migration: supabase/migrations/20260110000000_add_discover_columns_to_events.sql';
+        console.warn(`[Discover] ${helpfulMessage}`);
+        throw new Error(helpfulMessage);
+      }
+      
+      console.error('[Discover] DB error:', error);
+      console.error('[Discover] Error details:', { message: error.message, code: error.code, details: error.details, hint: error.hint });
+      throw new Error(`Database query error: ${error.message || 'Unknown error'}`);
+    }
+    
+    if (!events || events.length === 0) {
+      console.log('[Discover] No events found with Discover data.');
+      console.log('[Discover] Debug info:', {
+        category,
+        timeRange,
+        sortBy,
+        offset: options.offset,
+        limit: options.limit,
+        searchQuery: searchQuery || 'none',
+      });
+      // Try a simple query to see if any discover data exists at all
+      const { count } = await supabase
+        .from('events')
+        .select('*', { count: 'exact', head: true })
+        .not('discover_score', 'is', null);
+      console.log('[Discover] Total events with discover_score:', count);
+      return [];
+    }
+    
+    // Map events to DiscoverItem format
+    return events.map(event => mapEventToDiscoverItem(event));
   } catch (error: any) {
     console.error('[Discover] Error in fetchDiscoverItems:', error);
-    return [];
+    console.error('[Discover] Error stack:', error.stack);
+    throw error; // Re-throw to let API handler catch it
   }
+}
+
+/**
+ * Map event from DB to DiscoverItem
+ */
+function mapEventToDiscoverItem(event: any): DiscoverItem {
+  // Map discover_type to DiscoverItem type
+  let type: 'article' | 'topic' | 'insight' | 'trend' = 'article';
+  if (event.discover_type === 'event') {
+    type = 'topic'; // Events become topics in Discover
+  } else if (event.discover_type === 'trend') {
+    type = 'trend';
+  } else {
+    type = 'article';
+  }
+  
+  // Map discover_sources to sources array
+  const sources = (event.discover_sources || []).map((s: any) => ({
+    name: s.name || 'Unknown',
+    url: s.url || '',
+    date: s.date || event.published_at,
+  }));
+  
+  return {
+    id: event.id,
+    type,
+    title: event.title,
+    summary: event.description || event.content?.substring(0, 300) || '',
+    thumbnail: event.discover_thumbnail,
+    sources,
+    category: event.discover_category || 'all',
+    tags: event.discover_tags || [],
+    engagement: {
+      views: 0,
+      saves: 0,
+      questions: 0,
+    },
+    metadata: {
+      published_at: event.published_at,
+      updated_at: event.discover_enriched_at || event.published_at,
+      relevance_score: event.discover_score || 50,
+    },
+    // Tier-based styling
+    tier: event.discover_tier || 'strategic',
+    // Consensus indicator
+    consensus: event.discover_consensus || 'fragmented',
+    // Why it matters (from Perplexity batch enrichment)
+    impact: event.discover_why_it_matters || undefined,
+  };
 }
 
 /**

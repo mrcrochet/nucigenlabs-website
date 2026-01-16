@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS public.api_cache (
     cache_key TEXT NOT NULL UNIQUE,
     
     -- API identification
-    api_type TEXT NOT NULL CHECK (api_type IN ('openai', 'tavily', 'firecrawl', 'perplexity')),
+    api_type TEXT NOT NULL CHECK (api_type IN ('openai', 'tavily', 'firecrawl', 'perplexity', 'eventregistry')),
     api_endpoint TEXT NOT NULL, -- e.g., 'extractEvent', 'search', 'scrapeOfficial'
     
     -- Request identification
