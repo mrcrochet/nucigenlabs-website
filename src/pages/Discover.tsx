@@ -38,7 +38,7 @@ function DiscoverContent() {
   const [selectedTab, setSelectedTab] = useState<string>('for-you');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filters, setFilters] = useState({
-    timeRange: '7d' as 'now' | '24h' | '7d' | '30d' | 'structural' | 'all',
+    timeRange: 'all' as 'now' | '24h' | '7d' | '30d' | 'structural' | 'all',
     sortBy: 'relevance' as 'relevance' | 'recent' | 'trending',
     category: 'all' as string,
   });

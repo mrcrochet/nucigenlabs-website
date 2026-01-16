@@ -88,6 +88,15 @@ export async function fetchDiscoverItems(
   sortBy?: string
 ): Promise<DiscoverItem[]> {
   try {
+    console.log('[Discover Service] Fetching items with filters:', {
+      category,
+      offset: options.offset,
+      limit: options.limit,
+      searchQuery: searchQuery || 'none',
+      timeRange: timeRange || 'all',
+      sortBy: sortBy || 'relevance',
+    });
+    
     // Build query: select events with discover_* columns
     let query = supabase
       .from('events')
@@ -97,64 +106,93 @@ export async function fetchDiscoverItems(
     query = query.not('discover_score', 'is', null);
     query = query.not('discover_type', 'is', null);
     
+    console.log('[Discover Service] Base query filters applied (discover_score, discover_type not null)');
+    
     // Category filter
     if (category && category !== 'all') {
       query = query.eq('discover_category', category);
+      console.log('[Discover Service] Category filter applied:', category);
     }
     
-    // Search query
-    if (searchQuery) {
-      query = query.or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`);
+    // Search query - use correct Supabase syntax for OR queries
+    if (searchQuery && searchQuery.trim()) {
+      // Escape special characters and use proper ilike syntax
+      const escapedQuery = searchQuery.trim().replace(/%/g, '\\%').replace(/_/g, '\\_');
+      // Supabase .or() syntax: "field1.ilike.value,field2.ilike.value"
+      // Note: Supabase requires the format "field.operator.value" separated by commas
+      try {
+        query = query.or(`title.ilike.%${escapedQuery}%,description.ilike.%${escapedQuery}%,content.ilike.%${escapedQuery}%`);
+        console.log('[Discover Service] Search filter applied:', escapedQuery);
+      } catch (searchError: any) {
+        console.warn('[Discover Service] Search filter error, trying alternative approach:', searchError?.message);
+        // Fallback: use a simpler search on title only
+        query = query.ilike('title', `%${escapedQuery}%`);
+        console.log('[Discover Service] Using fallback search (title only)');
+      }
     }
     
     // Time range filter
     if (timeRange && timeRange !== 'all') {
       const now = new Date();
-      let dateStart: Date;
+      let dateStart: Date | null = null;
       
       switch (timeRange) {
         case 'now':
           dateStart = new Date(now.getTime() - 48 * 60 * 60 * 1000); // 48h
+          console.log('[Discover Service] Time filter: now (48h)');
           break;
         case '24h':
           dateStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          console.log('[Discover Service] Time filter: 24h');
           break;
         case '7d':
           dateStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          console.log('[Discover Service] Time filter: 7d');
           break;
         case '30d':
           dateStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          console.log('[Discover Service] Time filter: 30d');
           break;
         case 'structural':
           // Structural = older than 30 days but high score
-          query = query.lt('published_at', new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString());
+          const structuralDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          query = query.lt('published_at', structuralDate.toISOString());
           query = query.gte('discover_score', 70);
+          console.log('[Discover Service] Time filter: structural (older than 30d, score >= 70)');
           break;
         default:
-          dateStart = new Date(0); // All time
+          dateStart = null;
       }
       
-      if (timeRange !== 'structural') {
+      if (dateStart && timeRange !== 'structural') {
         query = query.gte('published_at', dateStart.toISOString());
+        console.log('[Discover Service] Published_at filter:', dateStart.toISOString());
       }
+    } else {
+      console.log('[Discover Service] No time filter (all time)');
     }
     
     // Sort
     if (sortBy === 'recent') {
       query = query.order('published_at', { ascending: false });
+      console.log('[Discover Service] Sort: recent (published_at DESC)');
     } else if (sortBy === 'trending') {
       // Trending = high score + recent
       query = query.order('discover_score', { ascending: false });
       query = query.order('published_at', { ascending: false });
+      console.log('[Discover Service] Sort: trending (discover_score DESC, published_at DESC)');
     } else {
       // Default: relevance (by score)
       query = query.order('discover_score', { ascending: false });
+      console.log('[Discover Service] Sort: relevance (discover_score DESC)');
     }
     
     // Pagination
     query = query.range(options.offset, options.offset + options.limit - 1);
+    console.log('[Discover Service] Pagination:', { offset: options.offset, limit: options.limit });
     
     const { data: events, error } = await query;
+    console.log('[Discover Service] Query executed. Results:', events?.length || 0, 'events');
     
     if (error) {
       // Check if error is due to missing columns
@@ -173,8 +211,8 @@ export async function fetchDiscoverItems(
     }
     
     if (!events || events.length === 0) {
-      console.log('[Discover] No events found with Discover data.');
-      console.log('[Discover] Debug info:', {
+      console.log('[Discover Service] No events found with current filters.');
+      console.log('[Discover Service] Applied filters:', {
         category,
         timeRange,
         sortBy,
@@ -182,12 +220,41 @@ export async function fetchDiscoverItems(
         limit: options.limit,
         searchQuery: searchQuery || 'none',
       });
-      // Try a simple query to see if any discover data exists at all
+      
+      // Fallback: Try a simpler query to check if data exists at all
+      // This helps diagnose if filters are too restrictive or if there's no data at all
+      console.log('[Discover Service] Attempting fallback query (no filters except discover_score)...');
+      const { data: fallbackEvents, error: fallbackError } = await supabase
+        .from('events')
+        .select('*')
+        .not('discover_score', 'is', null)
+        .not('discover_type', 'is', null)
+        .order('discover_score', { ascending: false })
+        .limit(options.limit)
+        .range(options.offset, options.offset + options.limit - 1);
+      
+      if (fallbackError) {
+        console.error('[Discover Service] Fallback query error:', fallbackError);
+        console.error('[Discover Service] This suggests a database connection or schema issue.');
+      } else {
+        console.log('[Discover Service] Fallback query found:', fallbackEvents?.length || 0, 'events');
+        // If fallback found results, it means filters were too restrictive
+        if (fallbackEvents && fallbackEvents.length > 0) {
+          console.log('[Discover Service] Filters were too restrictive. Returning fallback results.');
+          console.log('[Discover Service] Consider adjusting filters: category, timeRange, or searchQuery');
+          return fallbackEvents.map(event => mapEventToDiscoverItem(event));
+        } else {
+          console.log('[Discover Service] No data found even without filters. Database may be empty.');
+        }
+      }
+      
+      // Check total count of discover items
       const { count } = await supabase
         .from('events')
         .select('*', { count: 'exact', head: true })
         .not('discover_score', 'is', null);
-      console.log('[Discover] Total events with discover_score:', count);
+      console.log('[Discover Service] Total events with discover_score in DB:', count || 0);
+      
       return [];
     }
     

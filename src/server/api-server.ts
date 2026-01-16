@@ -2686,11 +2686,11 @@ const discoverHandler = async (req: any, res: any) => {
             const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
             const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 12;
             const sortBy = (req.query.sortBy as string) || 'relevance';
-            const timeRange = (req.query.timeRange as string) || '7d';
+            const timeRange = (req.query.timeRange as string) || 'all'; // Changed default from '7d' to 'all'
             const searchQuery = (req.query.search as string) || undefined;
             const userId = (req.query.userId as string) || undefined;
 
-    console.log('[API] Discover request:', { category, offset, limit, sortBy, timeRange, userId: userId ? 'present' : 'none' });
+    console.log('[API] Discover request:', { category, offset, limit, sortBy, timeRange, searchQuery: searchQuery ? 'present' : 'none', userId: userId ? 'present' : 'none' });
 
     const { fetchDiscoverItems, calculatePersonalizationScore } = await import('./services/discover-service.js');
     
