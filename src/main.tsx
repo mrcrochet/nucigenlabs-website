@@ -1,9 +1,11 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { initSentry } from './lib/sentry';
 import ClerkWrapper from './components/ClerkWrapper';
 import ClerkErrorBoundary from './components/ClerkErrorBoundary';
 import App from './App.tsx';
+import { queryClient } from './lib/react-query';
 import './index.css';
 
 // Initialize Sentry as early as possible
@@ -19,10 +21,12 @@ if (!clerkPublishableKey) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ClerkErrorBoundary>
-      <ClerkWrapper>
-        <App />
-      </ClerkWrapper>
-    </ClerkErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ClerkErrorBoundary>
+        <ClerkWrapper>
+          <App />
+        </ClerkWrapper>
+      </ClerkErrorBoundary>
+    </QueryClientProvider>
   </StrictMode>
 );

@@ -1,113 +1,182 @@
 /**
- * Analytics Utility
+ * Analytics Service
  * 
- * Centralized user action tracking for analytics
- * 
- * Note: recordUserAction is server-side only, so we'll create a client-side wrapper
- * that calls an API endpoint or stores actions locally
+ * Wrapper for analytics events tracking
+ * Supports multiple providers (Sentry, custom, etc.)
  */
 
-interface AnalyticsEvent {
-  action_type: 'click' | 'view' | 'read' | 'share' | 'bookmark' | 'ignore' | 'feedback_positive' | 'feedback_negative' | 'alert_created' | 'export' | 'deep_dive';
-  event_id?: string;
-  recommendation_id?: string;
-  page_url?: string;
-  referrer?: string;
-  time_spent_seconds?: number;
-  scroll_depth?: number;
-  feed_position?: number;
-  feed_type?: string;
-  recommendation_priority?: string;
+export type AnalyticsEvent = 
+  | 'page_view'
+  | 'item_view'
+  | 'item_save'
+  | 'item_share'
+  | 'filter_change'
+  | 'search_query'
+  | 'scroll_depth'
+  | 'time_on_page'
+  | 'view_mode_change'
+  | 'advanced_filter_apply';
+
+/**
+ * Track view mode change
+ */
+export function trackViewModeChange(mode: 'grid' | 'list', properties?: AnalyticsProperties): void {
+  trackEvent('view_mode_change', {
+    mode,
+    ...properties,
+  });
 }
 
-class Analytics {
-  private sessionId: string;
-  private startTime: number = Date.now();
+export interface AnalyticsProperties {
+  [key: string]: string | number | boolean | undefined;
+}
 
-  constructor() {
-    // Generate session ID
-    this.sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+/**
+ * Track an analytics event
+ */
+export function trackEvent(
+  event: AnalyticsEvent,
+  properties?: AnalyticsProperties
+): void {
+  // Track in Sentry if available
+  if (typeof window !== 'undefined' && (window as any).Sentry) {
+    (window as any).Sentry.addBreadcrumb({
+      category: 'analytics',
+      message: event,
+      level: 'info',
+      data: properties,
+    });
   }
 
-  /**
-   * Track a user action
-   */
-  async track(event: AnalyticsEvent, userId?: string): Promise<void> {
-    if (!userId || typeof window === 'undefined') {
-      return;
-    }
+  // Track in console for development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Analytics]', event, properties);
+  }
 
+  // Track in custom analytics service (if configured)
+  if (typeof window !== 'undefined' && (window as any).analytics) {
     try {
-      // Call API endpoint to track action (server-side will handle database insert)
-      const apiUrl = '/api/track-action';
-      await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          eventId: event.event_id,
-          recommendationId: event.recommendation_id,
-          actionType: event.action_type,
-          sessionId: this.sessionId,
-          pageUrl: event.page_url || window.location.href,
-          referrer: event.referrer || document.referrer,
-          timeSpentSeconds: event.time_spent_seconds,
-          scrollDepth: event.scroll_depth,
-          feedPosition: event.feed_position,
-          feedType: event.feed_type,
-          recommendationPriority: event.recommendation_priority,
-        }),
-      }).catch(() => {
-        // Silently fail - analytics should never break the app
-      });
-    } catch (error) {
-      // Silently fail - analytics should never break the app
+      (window as any).analytics.track(event, properties);
+    } catch (err) {
+      console.warn('[Analytics] Failed to track event:', err);
     }
   }
 
-  /**
-   * Track page view
-   */
-  trackPageView(pageName: string, userId?: string): void {
-    this.track({
-      action_type: 'view',
-      page_url: typeof window !== 'undefined' ? window.location.href : undefined,
-    }, userId);
-  }
-
-  /**
-   * Track click on event
-   */
-  trackEventClick(eventId: string, position?: number, userId?: string): void {
-    this.track({
-      action_type: 'click',
-      event_id: eventId,
-      feed_position: position,
-      feed_type: 'intelligence',
-    }, userId);
-  }
-
-  /**
-   * Track feedback
-   */
-  trackFeedback(eventId: string, isPositive: boolean, userId?: string): void {
-    this.track({
-      action_type: isPositive ? 'feedback_positive' : 'feedback_negative',
-      event_id: eventId,
-    }, userId);
-  }
-
-  /**
-   * Track time spent on page
-   */
-  trackTimeSpent(seconds: number, scrollDepth: number, userId?: string): void {
-    this.track({
-      action_type: 'read',
-      time_spent_seconds: seconds,
-      scroll_depth: scrollDepth,
-    }, userId);
+  // Send to backend analytics endpoint (optional)
+  if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+    fetch('/api/analytics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, properties, timestamp: new Date().toISOString() }),
+    }).catch(err => {
+      // Silently fail - analytics should not break the app
+      console.warn('[Analytics] Failed to send event:', err);
+    });
   }
 }
 
-// Singleton instance
-export const analytics = new Analytics();
+/**
+ * Track page view
+ */
+export function trackPageView(page: string, properties?: AnalyticsProperties): void {
+  trackEvent('page_view', {
+    page,
+    ...properties,
+  });
+}
+
+/**
+ * Track item view
+ */
+export function trackItemView(itemId: string, properties?: AnalyticsProperties): void {
+  trackEvent('item_view', {
+    item_id: itemId,
+    ...properties,
+  });
+}
+
+/**
+ * Track item save
+ */
+export function trackItemSave(itemId: string, properties?: AnalyticsProperties): void {
+  trackEvent('item_save', {
+    item_id: itemId,
+    ...properties,
+  });
+}
+
+/**
+ * Track item share
+ */
+export function trackItemShare(itemId: string, platform: string, properties?: AnalyticsProperties): void {
+  trackEvent('item_share', {
+    item_id: itemId,
+    platform,
+    ...properties,
+  });
+}
+
+/**
+ * Track filter change
+ */
+export function trackFilterChange(filterType: string, value: string, properties?: AnalyticsProperties): void {
+  trackEvent('filter_change', {
+    filter_type: filterType,
+    filter_value: value,
+    ...properties,
+  });
+}
+
+/**
+ * Track search query
+ */
+export function trackSearchQuery(query: string, resultCount?: number, properties?: AnalyticsProperties): void {
+  trackEvent('search_query', {
+    query,
+    result_count: resultCount,
+    ...properties,
+  });
+}
+
+/**
+ * Track scroll depth
+ */
+export function trackScrollDepth(depth: number, properties?: AnalyticsProperties): void {
+  trackEvent('scroll_depth', {
+    depth,
+    ...properties,
+  });
+}
+
+/**
+ * Track time on page
+ */
+export function trackTimeOnPage(seconds: number, properties?: AnalyticsProperties): void {
+  trackEvent('time_on_page', {
+    seconds,
+    ...properties,
+  });
+}
+
+/**
+ * Analytics object for backward compatibility
+ */
+export const analytics = {
+  trackEventClick: (itemId: string, index?: number, userId?: string) => {
+    trackEvent('item_view', {
+      item_id: itemId,
+      index,
+      user_id: userId,
+    });
+  },
+  track: trackEvent,
+  trackPageView,
+  trackItemView,
+  trackItemSave,
+  trackItemShare,
+  trackFilterChange,
+  trackSearchQuery,
+  trackScrollDepth,
+  trackTimeOnPage,
+  trackViewModeChange,
+};

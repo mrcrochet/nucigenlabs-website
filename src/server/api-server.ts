@@ -2950,6 +2950,15 @@ app.post('/api/discover/:id/save', async (req, res) => {
       });
     }
 
+    // Track engagement
+    try {
+      const { trackEngagement } = await import('./services/engagement-service.js');
+      await trackEngagement(userId, id, 'save');
+    } catch (trackError: any) {
+      console.warn('[API] Failed to track save engagement:', trackError);
+      // Don't fail the request if tracking fails
+    }
+
     // For now, just return success (library feature to be implemented)
     res.json({
       success: true,
@@ -2957,6 +2966,100 @@ app.post('/api/discover/:id/save', async (req, res) => {
     });
   } catch (error: any) {
     console.error('[API] Save item error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// POST /api/discover/:id/engage - Track engagement (view, click, share, read_time)
+app.post('/api/discover/:id/engage', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { userId, type, metadata } = req.body;
+
+    if (!userId || !type) {
+      return res.status(400).json({
+        success: false,
+        error: 'userId and type are required',
+      });
+    }
+
+    const validTypes = ['view', 'save', 'click', 'share', 'read_time'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid engagement type. Must be one of: ${validTypes.join(', ')}`,
+      });
+    }
+
+    const { trackEngagement } = await import('./services/engagement-service.js');
+    const result = await trackEngagement(userId, id, type, metadata);
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error || 'Failed to track engagement',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Engagement tracked',
+    });
+  } catch (error: any) {
+    console.error('[API] Track engagement error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/discover/:id/stats - Get engagement stats for an item
+app.get('/api/discover/:id/stats', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { getEventEngagementStats } = await import('./services/engagement-service.js');
+    const stats = await getEventEngagementStats(id);
+
+    if (!stats) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to get engagement stats',
+      });
+    }
+
+    res.json({
+      success: true,
+      stats,
+    });
+  } catch (error: any) {
+    console.error('[API] Get engagement stats error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// POST /api/analytics - Track analytics events
+app.post('/api/analytics', async (req, res) => {
+  try {
+    const { event, properties, timestamp } = req.body;
+
+    // Log analytics event (in production, send to analytics service)
+    console.log('[Analytics]', event, properties);
+
+    // Store in database if needed (optional)
+    // For now, just acknowledge receipt
+    res.json({
+      success: true,
+      message: 'Event tracked',
+    });
+  } catch (error: any) {
+    console.error('[API] Analytics error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Internal server error',

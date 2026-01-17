@@ -4,6 +4,7 @@ import PremiumNavigation from './components/PremiumNavigation';
 import AnimatedBackground from './components/AnimatedBackground';
 import Toast from './components/Toast';
 import { useToast } from './hooks/useToast';
+import { Toaster } from './components/ui/Toaster';
 import ExitIntentModal from './components/ExitIntentModal';
 import StickyCTA from './components/StickyCTA';
 import { useExitIntent } from './hooks/useExitIntent';
@@ -157,6 +158,8 @@ function App() {
         isOpen={showExitModal}
         onClose={() => setShowExitModal(false)}
       />
+
+      <Toaster />
 
       <Suspense fallback={<PageLoader />}>
       <Routes>

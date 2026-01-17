@@ -79,13 +79,24 @@ interface PaginationOptions {
  * 
  * No Perplexity calls here - all enrichment is done by batch jobs
  */
+export interface AdvancedFilters {
+  tags?: string[];
+  consensus?: ('high' | 'fragmented' | 'disputed')[];
+  tier?: ('critical' | 'strategic' | 'background')[];
+  minSources?: number;
+  maxSources?: number;
+  minScore?: number;
+  maxScore?: number;
+}
+
 export async function fetchDiscoverItems(
   category: string,
   options: PaginationOptions,
   userId?: string,
   searchQuery?: string,
   timeRange?: string,
-  sortBy?: string
+  sortBy?: string,
+  advancedFilters?: AdvancedFilters
 ): Promise<DiscoverItem[]> {
   try {
     console.log('[Discover Service] Fetching items with filters:', {
@@ -170,6 +181,47 @@ export async function fetchDiscoverItems(
       }
     } else {
       console.log('[Discover Service] No time filter (all time)');
+    }
+
+    // Advanced filters
+    if (advancedFilters) {
+      // Tags filter
+      if (advancedFilters.tags && advancedFilters.tags.length > 0) {
+        query = query.contains('discover_tags', advancedFilters.tags);
+        console.log('[Discover Service] Tags filter applied:', advancedFilters.tags);
+      }
+
+      // Consensus filter
+      if (advancedFilters.consensus && advancedFilters.consensus.length > 0) {
+        query = query.in('discover_consensus', advancedFilters.consensus);
+        console.log('[Discover Service] Consensus filter applied:', advancedFilters.consensus);
+      }
+
+      // Tier filter
+      if (advancedFilters.tier && advancedFilters.tier.length > 0) {
+        query = query.in('discover_tier', advancedFilters.tier);
+        console.log('[Discover Service] Tier filter applied:', advancedFilters.tier);
+      }
+
+      // Sources count filter
+      if (advancedFilters.minSources !== undefined) {
+        // We need to filter by array length - this requires a computed column or post-processing
+        // For now, we'll filter in post-processing
+        console.log('[Discover Service] Min sources filter (will apply in post-processing):', advancedFilters.minSources);
+      }
+      if (advancedFilters.maxSources !== undefined) {
+        console.log('[Discover Service] Max sources filter (will apply in post-processing):', advancedFilters.maxSources);
+      }
+
+      // Score filter
+      if (advancedFilters.minScore !== undefined) {
+        query = query.gte('discover_score', advancedFilters.minScore);
+        console.log('[Discover Service] Min score filter applied:', advancedFilters.minScore);
+      }
+      if (advancedFilters.maxScore !== undefined) {
+        query = query.lte('discover_score', advancedFilters.maxScore);
+        console.log('[Discover Service] Max score filter applied:', advancedFilters.maxScore);
+      }
     }
     
     // Sort
@@ -259,7 +311,26 @@ export async function fetchDiscoverItems(
     }
     
     // Map events to DiscoverItem format
-    return events.map(event => mapEventToDiscoverItem(event));
+    let mappedItems = events.map(event => mapEventToDiscoverItem(event));
+
+    // Apply post-processing filters (sources count - requires array length check)
+    if (advancedFilters) {
+      if (advancedFilters.minSources !== undefined || advancedFilters.maxSources !== undefined) {
+        mappedItems = mappedItems.filter(item => {
+          const sourceCount = item.sources.length;
+          if (advancedFilters.minSources !== undefined && sourceCount < advancedFilters.minSources) {
+            return false;
+          }
+          if (advancedFilters.maxSources !== undefined && sourceCount > advancedFilters.maxSources) {
+            return false;
+          }
+          return true;
+        });
+        console.log('[Discover Service] Sources count filter applied in post-processing');
+      }
+    }
+
+    return mappedItems;
   } catch (error: any) {
     console.error('[Discover] Error in fetchDiscoverItems:', error);
     console.error('[Discover] Error stack:', error.stack);

@@ -9,6 +9,7 @@ import Card from '../ui/Card';
 import Badge from '../ui/Badge';
 import { Bookmark, ExternalLink, TrendingUp, Eye, HelpCircle, Clock, Flame, AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 import SourceIcon from './SourceIcon';
+import ShareMenu from './ShareMenu';
 
 export interface DiscoverItem {
   id: string;
@@ -45,9 +46,10 @@ interface DiscoverCardProps {
   item: DiscoverItem;
   onSave?: (itemId: string) => Promise<void>;
   onView?: (itemId: string) => void;
+  onShare?: (itemId: string, platform: string) => void;
 }
 
-export default function DiscoverCard({ item, onSave, onView }: DiscoverCardProps) {
+export default function DiscoverCard({ item, onSave, onView, onShare }: DiscoverCardProps) {
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -162,15 +164,24 @@ export default function DiscoverCard({ item, onSave, onView }: DiscoverCardProps
     >
       {/* Thumbnail Image (hide for background tier) */}
       {item.thumbnail && tier !== 'background' && (
-        <div className={`mb-4 overflow-hidden rounded-lg ${tier === 'critical' ? '-mx-6 -mt-6' : '-mx-6 -mt-6'}`}>
+        <div className={`mb-4 overflow-hidden rounded-lg ${tier === 'critical' ? '-mx-6 -mt-6' : '-mx-6 -mt-6'} relative`}>
+          {/* Placeholder gradient while loading */}
+          <div className={`absolute inset-0 bg-gradient-to-br from-slate-800/50 to-slate-900/50 animate-pulse ${tier === 'critical' ? 'h-64' : 'h-48'}`} />
           <img
             src={item.thumbnail}
             alt={item.title}
-            className={`w-full object-cover ${tier === 'critical' ? 'h-64' : 'h-48'}`}
+            loading="lazy"
+            decoding="async"
+            className={`w-full object-cover relative z-10 ${tier === 'critical' ? 'h-64' : 'h-48'} transition-opacity duration-300`}
+            onLoad={(e) => {
+              // Fade in when loaded
+              (e.target as HTMLImageElement).style.opacity = '1';
+            }}
             onError={(e) => {
               // Hide image if it fails to load
               (e.target as HTMLImageElement).style.display = 'none';
             }}
+            style={{ opacity: 0 }}
           />
         </div>
       )}
@@ -347,18 +358,33 @@ export default function DiscoverCard({ item, onSave, onView }: DiscoverCardProps
             </div>
           )}
         </div>
-        <button
-          onClick={handleSave}
-          disabled={isSaving || !onSave}
-          className={`p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-            isSaved
-              ? 'bg-[#E1463E]/20 text-[#E1463E]'
-              : 'bg-white/5 text-slate-500 hover:text-white hover:bg-white/10'
-          }`}
-          title={isSaved ? 'Saved' : 'Track this topic'}
-        >
-          <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
-        </button>
+        <div className="flex items-center gap-2">
+          <ShareMenu
+            item={{
+              id: item.id,
+              title: item.title,
+              summary: item.summary,
+              url: item.sources[0]?.url,
+            }}
+            onShare={(platform) => {
+              if (onShare) {
+                onShare(item.id, platform);
+              }
+            }}
+          />
+          <button
+            onClick={handleSave}
+            disabled={isSaving || !onSave}
+            className={`p-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+              isSaved
+                ? 'bg-[#E1463E]/20 text-[#E1463E]'
+                : 'bg-white/5 text-slate-500 hover:text-white hover:bg-white/10'
+            }`}
+            title={isSaved ? 'Saved' : 'Track this topic'}
+          >
+            <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
+          </button>
+        </div>
       </div>
     </Card>
   );

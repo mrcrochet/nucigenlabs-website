@@ -9,12 +9,17 @@ import { useEffect } from 'react';
 import { X, ExternalLink, Bookmark, Clock, TrendingUp, HelpCircle } from 'lucide-react';
 import type { DiscoverItem } from './DiscoverCard';
 import SourceIcon from './SourceIcon';
+import RelatedItems from './RelatedItems';
+import ReadingProgress from './ReadingProgress';
 
 interface DiscoverDetailModalProps {
   item: DiscoverItem | null;
   isOpen: boolean;
   onClose: () => void;
   onSave?: (itemId: string) => Promise<void>;
+  allItems?: DiscoverItem[];
+  onItemClick?: (item: DiscoverItem) => void;
+  userId?: string;
 }
 
 export default function DiscoverDetailModal({
@@ -22,6 +27,9 @@ export default function DiscoverDetailModal({
   isOpen,
   onClose,
   onSave,
+  allItems = [],
+  onItemClick,
+  userId,
 }: DiscoverDetailModalProps) {
   // Close on Escape key
   useEffect(() => {
@@ -129,7 +137,16 @@ export default function DiscoverDetailModal({
         </div>
 
         {/* Content - Scrollable */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6" data-reading-container>
+          {/* Reading Progress */}
+          {userId && (
+            <ReadingProgress
+              itemId={item.id}
+              content={item.summary}
+              userId={userId}
+            />
+          )}
+
           {/* Summary */}
           <div>
             <p className="text-base text-slate-300 font-light leading-relaxed whitespace-pre-wrap">
@@ -204,6 +221,15 @@ export default function DiscoverDetailModal({
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Related Items */}
+          {allItems.length > 0 && (
+            <RelatedItems
+              currentItem={item}
+              allItems={allItems}
+              onItemClick={onItemClick}
+            />
           )}
         </div>
 
