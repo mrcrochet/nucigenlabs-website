@@ -28,18 +28,13 @@ export default function ResultsPanel({
   const [activeBucket, setActiveBucket] = useState<'events' | 'actors' | 'assets' | 'sources'>('events');
 
   const getActiveResults = () => {
-    switch (activeBucket) {
-      case 'events':
-        return buckets.events;
-      case 'actors':
-        return [];
-      case 'assets':
-        return [];
-      case 'sources':
-        return [];
-      default:
-        return results;
+    // For now, show all results by default (Perplexity style)
+    // Buckets can be used for filtering later
+    if (activeBucket === 'events' && buckets.events.length > 0) {
+      return buckets.events;
     }
+    // Fallback to all results if bucket is empty
+    return results;
   };
 
   if (isLoading) {
@@ -81,8 +76,8 @@ export default function ResultsPanel({
         }}
       />
 
-      {/* Results List */}
-      <div className="space-y-3">
+      {/* Results List - Perplexity Style */}
+      <div className="space-y-4">
         {activeResults.length === 0 ? (
           <p className="text-text-secondary text-center py-8">No items in this bucket.</p>
         ) : (

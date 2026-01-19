@@ -14,7 +14,7 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
+        // Don't rewrite - preserve /api in the path so it matches API server routes
         configure: (proxy, _options) => {
           proxy.on('error', (err, _req, res) => {
             console.log('Proxy error:', err);

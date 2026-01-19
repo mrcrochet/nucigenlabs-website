@@ -3191,7 +3191,7 @@ app.get('/api/impacts/:id', async (req, res) => {
   }
 });
 
-// POST /api/search - Advanced search with knowledge graph
+// POST /api/search - Advanced search with knowledge graph (legacy, kept for compatibility)
 app.post('/api/search', async (req, res) => {
   try {
     const { query, mode = 'standard', filters = {} } = req.body;
@@ -3221,6 +3221,366 @@ app.post('/api/search', async (req, res) => {
   }
 });
 
+// POST /api/search/session - Create new search session
+app.post('/api/search/session', async (req, res) => {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3225',message:'Endpoint entry',data:{body:req.body,headers:Object.keys(req.headers),hasSupabase:!!supabase},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C'})}).catch(()=>{});
+  // #endregion
+
+  try {
+    const { query, inputType = 'text' } = req.body;
+    // Extract Clerk user ID from headers (set by frontend)
+    const clerkUserId = req.headers['x-clerk-user-id'] as string || null;
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3230',message:'Before userId extraction',data:{query,inputType,clerkUserId,hasSupabase:!!supabase},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C,D'})}).catch(()=>{});
+    // #endregion
+
+    let userId = null;
+    if (clerkUserId && supabase) {
+      try {
+        userId = await getSupabaseUserId(clerkUserId, supabase);
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3236',message:'After userId extraction',data:{userId,clerkUserId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
+      } catch (userIdError: any) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3240',message:'UserId extraction error',data:{error:userIdError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
+        // Continue without userId if extraction fails
+      }
+    }
+
+    if (!query || typeof query !== 'string' || !query.trim()) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3248',message:'Query validation failed',data:{query,queryType:typeof query},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+      return res.status(400).json({
+        success: false,
+        error: 'Query is required',
+      });
+    }
+
+    console.log(`[API] Creating search session: "${query}" (type: ${inputType})`);
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3256',message:'Before search execution',data:{query,inputType,sessionId:`session-${Date.now()}-${Math.random().toString(36).substring(7)}`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+
+    // Generate session ID
+    const sessionId = `session-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+    let searchResult;
+    
+    if (inputType === 'url') {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3262',message:'URL processing branch',data:{query:query.trim(),queryLength:query.trim().length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+
+      // Validate and clean URL
+      let cleanUrl = query.trim();
+      try {
+        // Try to parse as URL to validate
+        const testUrl = new URL(cleanUrl);
+        cleanUrl = testUrl.href; // Normalize URL
+      } catch (urlError: any) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3268',message:'Invalid URL format',data:{query:cleanUrl,error:urlError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        throw new Error(`Invalid URL format: ${urlError.message}`);
+      }
+
+      try {
+        // Process URL: Tavily context + Firecrawl extraction
+        const { processLink } = await import('./services/link-intelligence.js');
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3277',message:'Before processLink',data:{cleanUrl,urlLength:cleanUrl.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        const linkResult = await processLink(cleanUrl, undefined, { permissive: true });
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3271',message:'After processLink',data:{hasResult:!!linkResult.result,hasGraph:!!linkResult.graph,fallbackUsed:linkResult.fallbackUsed},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        
+        // Also search Tavily for context around the URL
+        const { searchTavily } = await import('./services/tavily-unified-service.js');
+        const domain = new URL(cleanUrl).hostname;
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3276',message:'Before searchTavily',data:{domain},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        const tavilyContext = await searchTavily(domain, 'news', {
+          searchDepth: 'advanced',
+          maxResults: 10,
+          includeRawContent: true,
+        });
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3283',message:'After searchTavily',data:{articlesCount:tavilyContext.articles?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+
+      // Combine results
+      searchResult = {
+        results: [
+          linkResult.result,
+          ...tavilyContext.articles.map((article: any, idx: number) => ({
+            id: `context-${idx}`,
+            type: 'article' as const,
+            title: article.title || '',
+            summary: article.content?.substring(0, 200) || '',
+            url: article.url || '',
+            source: article.author || new URL(article.url || '').hostname,
+            publishedAt: article.publishedDate || new Date().toISOString(),
+            relevanceScore: article.score || 0.5,
+            sourceScore: 0.7,
+            entities: [],
+            tags: [],
+            content: article.content,
+          })),
+        ],
+        buckets: {
+          events: [],
+          actors: linkResult.entities.filter((e: any) => e.type === 'company' || e.type === 'organization'),
+          assets: linkResult.entities.filter((e: any) => e.type === 'commodity'),
+          sources: [{ id: domain, name: domain }],
+        },
+        graph: linkResult.graph,
+        meta: {
+          fromCache: false,
+          latencyMs: 0,
+          mode: 'deep' as const,
+          firecrawlUsed: !linkResult.fallbackUsed,
+        },
+      };
+      } catch (urlError: any) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3288',message:'URL processing error',data:{errorName:urlError?.name,errorMessage:urlError?.message,errorStack:urlError?.stack?.substring(0,500),errorCode:urlError?.code,errorType:urlError?.errorType},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        console.error('[API] URL processing error:', urlError);
+        throw urlError;
+      }
+    } else {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3294',message:'Text search branch',data:{query:query.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
+
+      try {
+        // Text search: use search orchestrator
+        const { search } = await import('./services/search-orchestrator.js');
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3298',message:'Before search orchestrator',data:{query:query.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        searchResult = await search(query.trim(), 'standard', {});
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3301',message:'After search orchestrator',data:{resultsCount:searchResult?.results?.length||0,hasGraph:!!searchResult?.graph},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+      } catch (textError: any) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3305',message:'Text search error',data:{error:textError?.message,stack:textError?.stack?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        throw textError;
+      }
+    }
+
+    // Store session (in-memory for now, can be moved to DB later)
+    // TODO: Store in database for persistence
+    const session = {
+      id: sessionId,
+      query: query.trim(),
+      inputType,
+      results: searchResult.results,
+      buckets: searchResult.buckets,
+      graph: searchResult.graph,
+      meta: searchResult.meta,
+      createdAt: new Date().toISOString(),
+      followups: [],
+      userId: userId || null,
+    };
+
+    // In a real implementation, store in database
+    // For now, we'll return it and the frontend will manage state
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3317',message:'Before response',data:{sessionId,resultsCount:session.results?.length||0,hasGraph:!!session.graph},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+
+    res.json({
+      success: true,
+      sessionId,
+      session,
+    });
+
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3325',message:'Response sent',data:{success:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+  } catch (error: any) {
+    // #region agent log
+    const errorDetails = {
+      errorName: error?.name,
+      errorMessage: error?.message,
+      errorStack: error?.stack?.substring(0,500),
+      errorCode: error?.code,
+      errorType: error?.errorType,
+      errorString: String(error),
+      errorKeys: error ? Object.keys(error) : [],
+    };
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3330',message:'Error caught in endpoint',data:errorDetails,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    console.error('[API] Create session error:', error);
+    console.error('[API] Error details:', errorDetails);
+    res.status(500).json({
+      success: false,
+      error: error?.message || error?.error || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/search/session/:id - Get search session
+app.get('/api/search/session/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = getSupabaseUserId(req);
+
+    // TODO: Load from database
+    // For now, return error (session should be managed by frontend state)
+    // In production, store sessions in database
+    
+    res.status(404).json({
+      success: false,
+      error: 'Session not found. Sessions are currently managed client-side.',
+    });
+  } catch (error: any) {
+    console.error('[API] Get session error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// POST /api/search/session/:id/followup - Add followup search to session
+app.post('/api/search/session/:id/followup', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { query } = req.body;
+
+    if (!query || typeof query !== 'string' || !query.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Query is required',
+      });
+    }
+
+    console.log(`[API] Followup search in session ${id}: "${query}"`);
+
+    // Perform search
+    const { search } = await import('./services/search-orchestrator.js');
+    const searchResult = await search(query.trim(), 'standard', {});
+
+    // Generate followup ID
+    const followupId = `followup-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+    res.json({
+      success: true,
+      followupId,
+      results: searchResult.results,
+      graph: searchResult.graph,
+      buckets: searchResult.buckets,
+    });
+  } catch (error: any) {
+    console.error('[API] Followup error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// POST /api/search/session/questions - Generate suggested questions
+app.post('/api/search/session/questions', async (req, res) => {
+  try {
+    const { query, inputType, resultsCount, entities } = req.body;
+
+    // Generate questions using OpenAI
+    const { callOpenAI } = await import('./services/openai-optimizer.js');
+
+    const systemPrompt = `You are an expert at generating insightful follow-up questions for intelligence research.
+Generate 4-6 questions that help users explore deeper into a topic, verify information, find contradictions, assess impacts, make predictions, or identify exposures.
+
+Question types:
+- Similar/Related: Find similar articles or related topics
+- Verify: Confirm information with other sources
+- Contradict: Find misleading or false information
+- Impact: Assess economic or sector impacts
+- Prediction: Predict what might happen next
+- Exposure: Identify which sectors/companies are exposed
+
+Return ONLY a JSON array of question strings.`;
+
+    const userPrompt = `Generate follow-up questions for this search:
+
+Query: ${query}
+Input Type: ${inputType}
+Results Found: ${resultsCount}
+Key Entities: ${entities?.join(', ') || 'None'}
+
+Return 4-6 questions as a JSON array of strings.`;
+
+    try {
+      // Request questions as JSON object with questions array
+      const promptWithFormat = `${userPrompt}
+
+Return the questions in this JSON format:
+{
+  "questions": ["question1", "question2", ...]
+}`;
+
+      const response = await callOpenAI<{ questions: string[] }>(promptWithFormat, systemPrompt, {
+        taskType: 'data-extraction',
+        model: 'gpt-4o-mini',
+        temperature: 0.7,
+        maxTokens: 500,
+      });
+
+      if (response.data && response.data.questions && Array.isArray(response.data.questions)) {
+        res.json({
+          success: true,
+          questions: response.data.questions,
+        });
+      } else {
+        // Fallback to default questions
+        throw new Error('Invalid response format');
+      }
+    } catch (openaiError: any) {
+      console.error('[API] OpenAI question generation error:', openaiError);
+      // Fallback to default questions
+      const defaultQuestions = inputType === 'url'
+        ? [
+            'Find similar articles',
+            'Is this information confirmed by other sources?',
+            'What could be misleading or false here?',
+            'What are the potential economic impacts?',
+            'What could happen next if this escalates?',
+            'Which sectors or companies are exposed?',
+          ]
+        : [
+            `Find more recent updates about ${query}`,
+            `What are the key actors involved in ${query}?`,
+            `What are the potential risks related to ${query}?`,
+            `Which sectors are affected by ${query}?`,
+          ];
+
+      res.json({
+        success: true,
+        questions: defaultQuestions,
+      });
+    }
+  } catch (error: any) {
+    console.error('[API] Generate questions error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
 // POST /api/enrich - Enrich a result or URL
 app.post('/api/enrich', async (req, res) => {
   try {
@@ -3230,6 +3590,8 @@ app.post('/api/enrich', async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Either url or resultId is required',
+        errorType: 'validation',
+        fallbackUsed: false,
       });
     }
 
@@ -3238,16 +3600,65 @@ app.post('/api/enrich', async (req, res) => {
     if (url) {
       // Process pasted link
       const { processLink } = await import('./services/link-intelligence.js');
-      const result = await processLink(url, existingGraph);
+      
+      try {
+        // Use permissive mode for user-pasted URLs (bypasses whitelist)
+        const result = await processLink(url, existingGraph, { permissive: true });
 
-      res.json({
-        success: true,
-        enrichedData: result.result,
-        updatedGraph: result.graph,
-        entities: result.entities,
-        keyFacts: result.keyFacts,
-        summary: result.summary,
-      });
+        res.json({
+          success: true,
+          enrichedData: result.result,
+          updatedGraph: result.graph,
+          entities: result.entities,
+          keyFacts: result.keyFacts,
+          summary: result.summary,
+          fallbackUsed: result.fallbackUsed || false,
+          message: result.fallbackUsed 
+            ? 'URL processed using fallback method (Tavily). Some features may be limited.'
+            : 'URL processed successfully with Firecrawl.',
+        });
+      } catch (linkError: any) {
+        // Handle LinkIntelligenceError
+        if (linkError.errorType) {
+          const errorType = linkError.errorType;
+          const fallbackUsed = linkError.fallbackUsed || false;
+          
+          // Determine HTTP status based on error type
+          let statusCode = 500;
+          if (errorType === 'whitelist') {
+            statusCode = 403; // Forbidden
+          } else if (errorType === 'timeout') {
+            statusCode = 504; // Gateway Timeout
+          } else if (errorType === 'network') {
+            statusCode = 503; // Service Unavailable
+          }
+
+          console.error(`[API] Enrich error (${errorType}):`, linkError.error);
+
+          // Return error with partial data if available
+          if (linkError.partialData) {
+            return res.status(statusCode).json({
+              success: false,
+              error: linkError.error,
+              errorType,
+              fallbackUsed,
+              partialData: linkError.partialData,
+              message: getErrorMessage(errorType, fallbackUsed),
+            });
+          }
+
+          return res.status(statusCode).json({
+            success: false,
+            error: linkError.error,
+            errorType,
+            fallbackUsed,
+            message: getErrorMessage(errorType, fallbackUsed),
+          });
+        }
+
+        // Generic error
+        throw linkError;
+      }
     } else if (resultId && results) {
       // Enrich existing result
       const { enrichResult } = await import('./services/search-orchestrator.js');
@@ -3262,16 +3673,56 @@ app.post('/api/enrich', async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Invalid request: resultId requires results array',
+        errorType: 'validation',
+        fallbackUsed: false,
       });
     }
   } catch (error: any) {
     console.error('[API] Enrich error:', error);
+    
+    // Determine error type from error message
+    let errorType = 'unknown';
+    if (error.message?.includes('whitelist')) {
+      errorType = 'whitelist';
+    } else if (error.message?.includes('timeout')) {
+      errorType = 'timeout';
+    } else if (error.message?.includes('network') || error.message?.includes('rate limit')) {
+      errorType = 'network';
+    } else if (error.message?.includes('not available') || error.message?.includes('unavailable')) {
+      errorType = 'unavailable';
+    }
+
     res.status(500).json({
       success: false,
       error: error.message || 'Internal server error',
+      errorType,
+      fallbackUsed: false,
+      message: getErrorMessage(errorType, false),
     });
   }
 });
+
+/**
+ * Get user-friendly error message
+ */
+function getErrorMessage(errorType: string, fallbackUsed: boolean): string {
+  if (fallbackUsed) {
+    return 'URL processed using fallback method. Some features may be limited.';
+  }
+
+  switch (errorType) {
+    case 'whitelist':
+      return 'URL is not in the whitelist. Trying fallback method...';
+    case 'timeout':
+      return 'Request timed out. Please try again.';
+    case 'network':
+      return 'Network error occurred. Please check your connection and try again.';
+    case 'unavailable':
+      return 'Service is currently unavailable. Please try again later.';
+    default:
+      return 'An error occurred while processing the URL. Please try again.';
+  }
+}
 
 // POST /api/save-search - Save a search query
 app.post('/api/save-search', async (req, res) => {

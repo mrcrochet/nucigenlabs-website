@@ -8,8 +8,8 @@
  * - Link paste detection
  */
 
-import { useState, useCallback, useRef } from 'react';
-import { Search, Zap, Gauge, Layers, Save, Download, Link as LinkIcon } from 'lucide-react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { Search, Zap, Gauge, Layers, Save, Download, Link as LinkIcon, Loader2, Settings } from 'lucide-react';
 import type { SearchMode } from '../../types/search';
 
 interface SearchTopBarProps {
@@ -20,6 +20,7 @@ interface SearchTopBarProps {
   onSearch: (query: string) => void;
   onLinkPaste: (url: string) => void;
   onSaveSearch: () => void;
+  onOpenFilters?: () => void;
 }
 
 export default function SearchTopBar({
@@ -30,45 +31,92 @@ export default function SearchTopBar({
   onSearch,
   onLinkPaste,
   onSaveSearch,
+  onOpenFilters,
 }: SearchTopBarProps) {
   const [isPastingLink, setIsPastingLink] = useState(false);
+  const [isProcessingUrl, setIsProcessingUrl] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const urlDetectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clear timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (urlDetectionTimeoutRef.current) {
+        clearTimeout(urlDetectionTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Robust URL regex pattern
+  const URL_REGEX = /^https?:\/\/.+/i;
+
+  // Check if text is a valid URL
+  const isValidUrl = (text: string): boolean => {
+    if (!text || typeof text !== 'string') return false;
+    
+    // First check with regex for performance
+    if (!URL_REGEX.test(text.trim())) return false;
+    
+    // Then validate with URL constructor for accuracy
+    try {
+      const url = new URL(text.trim());
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
 
   // Detect URL paste
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLInputElement>) => {
-    const pastedText = e.clipboardData.getData('text');
+    const pastedText = e.clipboardData.getData('text').trim();
     
-    // Check if pasted text is a URL
-    try {
-      const url = new URL(pastedText);
-      if (url.protocol === 'http:' || url.protocol === 'https:') {
-        setIsPastingLink(true);
-        onLinkPaste(pastedText);
-        setTimeout(() => setIsPastingLink(false), 2000);
-        e.preventDefault();
+    if (isValidUrl(pastedText)) {
+      e.preventDefault();
+      setIsPastingLink(true);
+      setIsProcessingUrl(true);
+      
+      // Clear input immediately
+      if (inputRef.current) {
+        inputRef.current.value = '';
       }
-    } catch {
-      // Not a URL, continue normally
+      
+      // Trigger link paste
+      onLinkPaste(pastedText);
+      
+      // Reset state after processing (will be reset by parent when done)
+      setTimeout(() => {
+        setIsPastingLink(false);
+        setIsProcessingUrl(false);
+      }, 3000);
     }
   }, [onLinkPaste]);
 
-  // Handle input change - detect URL
+  // Handle input change - detect URL with debouncing
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+    const value = e.currentTarget.value;
     
-    // Check if input is a URL
-    try {
-      const url = new URL(value);
-      if (url.protocol === 'http:' || url.protocol === 'https:') {
+    // Clear previous timeout
+    if (urlDetectionTimeoutRef.current) {
+      clearTimeout(urlDetectionTimeoutRef.current);
+    }
+    
+    // Check if input is a URL (with slight delay to avoid false positives while typing)
+    urlDetectionTimeoutRef.current = setTimeout(() => {
+      if (isValidUrl(value)) {
         setIsPastingLink(true);
+        setIsProcessingUrl(true);
         onLinkPaste(value);
-        setTimeout(() => setIsPastingLink(false), 2000);
+        
+        // Reset state after processing
+        setTimeout(() => {
+          setIsPastingLink(false);
+          setIsProcessingUrl(false);
+        }, 3000);
         return;
       }
-    } catch {
-      // Not a URL, continue normally
-    }
+    }, 500); // 500ms debounce for URL detection
 
+    // Always update query for normal typing
     onQueryChange(value);
   }, [onQueryChange, onLinkPaste]);
 
@@ -97,8 +145,12 @@ export default function SearchTopBar({
           />
           {isPastingLink && (
             <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center gap-2 text-[#E1463E]">
-              <LinkIcon className="w-4 h-4" />
-              <span className="text-sm">Processing...</span>
+              {isProcessingUrl ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <LinkIcon className="w-4 h-4" />
+              )}
+              <span className="text-sm">{isProcessingUrl ? 'Processing...' : 'URL detected'}</span>
             </div>
           )}
         </div>
@@ -145,18 +197,22 @@ export default function SearchTopBar({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2">
+          {onOpenFilters && (
+            <button
+              onClick={onOpenFilters}
+              className="flex items-center gap-2 px-4 py-2 bg-background-glass-subtle hover:bg-background-glass-medium border border-borders-subtle rounded-md text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+              title="Refine search filters"
+            >
+              <Settings className="w-4 h-4" />
+              Refine
+            </button>
+          )}
           <button
             onClick={onSaveSearch}
             className="flex items-center gap-2 px-4 py-2 bg-background-glass-subtle hover:bg-background-glass-medium border border-borders-subtle rounded-md text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
           >
             <Save className="w-4 h-4" />
             Save
-          </button>
-          <button
-            className="flex items-center gap-2 px-4 py-2 bg-background-glass-subtle hover:bg-background-glass-medium border border-borders-subtle rounded-md text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            Export
           </button>
         </div>
       </div>

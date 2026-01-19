@@ -12,10 +12,11 @@ interface SearchStatusBarProps {
     fromCache?: boolean;
     latencyMs?: number;
   };
+  error?: string | null;
 }
 
-export default function SearchStatusBar({ status, meta }: SearchStatusBarProps) {
-  if (status === 'idle') {
+export default function SearchStatusBar({ status, meta, error }: SearchStatusBarProps) {
+  if (status === 'idle' && !error) {
     return null;
   }
 
@@ -29,7 +30,7 @@ export default function SearchStatusBar({ status, meta }: SearchStatusBarProps) 
               <span className="text-sm text-text-secondary">Searching...</span>
             </>
           )}
-          {status === 'success' && (
+          {status === 'success' && !error && (
             <>
               <CheckCircle className="w-4 h-4 text-green-500" />
               <span className="text-sm text-text-secondary">
@@ -37,14 +38,14 @@ export default function SearchStatusBar({ status, meta }: SearchStatusBarProps) 
               </span>
             </>
           )}
-          {status === 'error' && (
+          {(status === 'error' || error) && (
             <>
               <AlertCircle className="w-4 h-4 text-red-500" />
-              <span className="text-sm text-red-400">Search failed</span>
+              <span className="text-sm text-red-400">{error || 'Search failed'}</span>
             </>
           )}
         </div>
-        {meta?.latencyMs && (
+        {meta?.latencyMs && status !== 'error' && !error && (
           <div className="flex items-center gap-2 text-xs text-text-tertiary">
             <Clock className="w-3 h-3" />
             <span>{meta.latencyMs}ms</span>

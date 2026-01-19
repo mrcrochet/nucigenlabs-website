@@ -11,15 +11,17 @@
 
 import { useState, useCallback } from 'react';
 import { useUser } from '@clerk/clerk-react';
+import { toast } from 'sonner';
 import AppShell from '../components/layout/AppShell';
 import SEO from '../components/SEO';
 import ProtectedRoute from '../components/ProtectedRoute';
-import SearchTopBar from '../components/search/SearchTopBar';
-import FiltersSidebar from '../components/search/FiltersSidebar';
+import UnifiedSearchBar from '../components/search/UnifiedSearchBar';
+import FiltersDrawer from '../components/search/FiltersDrawer';
 import ResultsPanel from '../components/search/ResultsPanel';
 import KnowledgeGraph from '../components/search/KnowledgeGraph';
 import ResultDetailsDrawer from '../components/search/ResultDetailsDrawer';
 import SearchStatusBar from '../components/search/SearchStatusBar';
+import InsightPanel from '../components/search/InsightPanel';
 import type { SearchMode, SearchFilters, SearchResult, KnowledgeGraph as KnowledgeGraphType } from '../types/search';
 
 function SearchContent() {
@@ -29,6 +31,9 @@ function SearchContent() {
   const [filters, setFilters] = useState<SearchFilters>({});
   const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [showResults, setShowResults] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [searchResults, setSearchResults] = useState<{
     results: SearchResult[];
     buckets: any;
@@ -68,11 +73,26 @@ function SearchContent() {
           graph: data.graph || { nodes: [], links: [] },
           meta: data.meta || {},
         });
+        setSearchError(null);
+        // Auto-show results if more than 10
+        if ((data.results?.length || 0) > 10) {
+          setShowResults(true);
+        }
+        toast.success('Search completed', {
+          description: `Found ${data.results?.length || 0} results`,
+          duration: 2000,
+        });
       } else {
         throw new Error(data.error || 'Search failed');
       }
     } catch (error: any) {
       console.error('[Search] Error:', error);
+      const errorMessage = error.message || 'Search failed. Please try again.';
+      setSearchError(errorMessage);
+      toast.error('Search failed', {
+        description: errorMessage,
+        duration: 5000,
+      });
     } finally {
       setIsSearching(false);
     }
@@ -87,6 +107,13 @@ function SearchContent() {
   // Handle link paste
   const handleLinkPaste = useCallback(async (url: string) => {
     setIsSearching(true);
+    setSearchError(null);
+    
+    // Show loading toast
+    const loadingToast = toast.loading('Processing URL...', {
+      description: 'Extracting content and building knowledge graph',
+    });
+
     try {
       const response = await fetch('/api/enrich', {
         method: 'POST',
@@ -99,12 +126,101 @@ function SearchContent() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error('Link processing failed');
+      // Check if response has content before parsing JSON
+      let data: any = null;
+      
+      try {
+        const text = await response.text();
+        if (text && text.trim()) {
+          data = JSON.parse(text);
+        } else {
+          throw new Error('Empty response from server');
+        }
+      } catch (parseError: any) {
+        // If JSON parsing fails, create error response
+        const errorMessage = parseError.message?.includes('JSON') 
+          ? 'Invalid response from server. The API may be experiencing issues.'
+          : parseError.message || 'Failed to parse server response';
+        
+        toast.dismiss(loadingToast);
+        setSearchError(errorMessage);
+        
+        toast.error('Failed to process URL', {
+          description: errorMessage,
+          duration: 5000,
+          action: {
+            label: 'Retry',
+            onClick: () => handleLinkPaste(url),
+          },
+        });
+        
+        return;
       }
 
-      const data = await response.json();
-      if (data.success) {
+      if (!response.ok) {
+        // Handle error response
+        const errorMessage = data?.message || data?.error || `Server error: ${response.status} ${response.statusText}`;
+        setSearchError(errorMessage);
+        
+        toast.dismiss(loadingToast);
+        
+        // Show error toast
+        if (data?.partialData) {
+          // Partial success - show warning
+          toast.warning('Partial content extracted', {
+            description: errorMessage,
+            duration: 5000,
+          });
+          
+          // Still add partial data if available
+          if (data.partialData.result) {
+            if (searchResults) {
+              setSearchResults({
+                ...searchResults,
+                results: [...searchResults.results, data.partialData.result],
+                graph: data.partialData.graph || searchResults.graph,
+              });
+            } else {
+              setSearchResults({
+                results: [data.partialData.result],
+                buckets: { events: [], actors: [], assets: [], sources: [] },
+                graph: data.partialData.graph || { nodes: [], links: [] },
+                meta: {},
+              });
+            }
+            setSelectedResultId(data.partialData.result.id);
+          }
+        } else {
+          // Complete failure
+          toast.error('Failed to process URL', {
+            description: errorMessage,
+            duration: 5000,
+            action: {
+              label: 'Retry',
+              onClick: () => handleLinkPaste(url),
+            },
+          });
+        }
+        
+        return;
+      }
+
+      if (data?.success) {
+        toast.dismiss(loadingToast);
+        
+        // Show success toast with fallback info if applicable
+        if (data.fallbackUsed) {
+          toast.success('URL processed (using fallback)', {
+            description: data.message || 'Content extracted using alternative method',
+            duration: 4000,
+          });
+        } else {
+          toast.success('URL processed successfully', {
+            description: 'Content extracted and knowledge graph updated',
+            duration: 3000,
+          });
+        }
+
         // Update graph with new data
         if (searchResults) {
           setSearchResults({
@@ -122,9 +238,46 @@ function SearchContent() {
           });
         }
         setSelectedResultId(data.enrichedData.id);
+        setSearchError(null);
+      } else {
+        // Response OK but success: false
+        const errorMessage = data?.error || data?.message || 'Unknown error occurred';
+        toast.dismiss(loadingToast);
+        setSearchError(errorMessage);
+        
+        toast.error('Failed to process URL', {
+          description: errorMessage,
+          duration: 5000,
+          action: {
+            label: 'Retry',
+            onClick: () => handleLinkPaste(url),
+          },
+        });
       }
     } catch (error: any) {
       console.error('[Search] Link paste error:', error);
+      
+      toast.dismiss(loadingToast);
+      
+      // Better error message handling
+      let errorMessage = 'Network error. Please check your connection and try again.';
+      
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+        errorMessage = 'Cannot connect to API server. Please make sure the API server is running on port 3001.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      setSearchError(errorMessage);
+      
+      toast.error('Failed to process URL', {
+        description: errorMessage,
+        duration: 5000,
+        action: {
+          label: 'Retry',
+          onClick: () => handleLinkPaste(url),
+        },
+      });
     } finally {
       setIsSearching(false);
     }
@@ -173,17 +326,28 @@ function SearchContent() {
 
   const selectedResult = searchResults?.results.find(r => r.id === selectedResultId) || null;
 
+  // Handle node explore (click on graph node = contextual search)
+  const handleNodeExplore = useCallback((_nodeId: string, nodeLabel: string) => {
+    // Build contextual query: original query + clicked node
+    const contextualQuery = query.trim() 
+      ? `${query} ${nodeLabel}`
+      : nodeLabel;
+    
+    setQuery(contextualQuery);
+    performSearch(contextualQuery, mode, filters);
+  }, [query, mode, filters, performSearch]);
+
   return (
     <AppShell>
       <SEO title="Advanced Search | Nucigen Labs" description="Search events, actors, assets, and sources with knowledge graph visualization" />
       
-      {/* Header */}
+      {/* Header with Search Bar */}
       <div className="col-span-1 sm:col-span-12 mb-6">
         <h1 className="text-3xl sm:text-4xl font-light text-text-primary mb-6">Search</h1>
         
         {/* Top Bar */}
         <div className="mb-6">
-          <SearchTopBar
+          <UnifiedSearchBar
             query={query}
             mode={mode}
             onQueryChange={setQuery}
@@ -198,43 +362,71 @@ function SearchContent() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ query, filters, userId: user.id }),
                   });
+                  toast.success('Search saved');
                 } catch (error) {
                   console.error('Failed to save search:', error);
+                  toast.error('Failed to save search');
                 }
               }
             }}
+            onOpenFilters={() => setShowFilters(true)}
+            isLoading={isSearching}
           />
         </div>
       </div>
 
-      {/* Sidebar Filters */}
-      <div className="col-span-1 sm:col-span-3">
-        <FiltersSidebar
-          filters={filters}
-          onFiltersChange={setFilters}
-        />
-      </div>
-
-      {/* Results Panel */}
-      <div className="col-span-1 sm:col-span-6">
-        <ResultsPanel
+      {/* Main Content: Insight Panel (Left) + Graph (Right) */}
+      <div className="col-span-1 sm:col-span-5">
+        <InsightPanel
           results={searchResults?.results || []}
+          graph={searchResults?.graph || { nodes: [], links: [] }}
           buckets={searchResults?.buckets || { events: [], actors: [], assets: [], sources: [] }}
-          isLoading={isSearching}
-          onResultClick={setSelectedResultId}
-          onExploreDeeper={handleExploreDeeper}
+          onViewResults={() => setShowResults(!showResults)}
+          onGenerateImpactBrief={() => {
+            // TODO: Implement impact brief generation
+            toast.info('Impact Brief generation coming soon');
+          }}
         />
       </div>
 
-      {/* Knowledge Graph */}
-      <div className="col-span-1 sm:col-span-3">
+      {/* Knowledge Graph - Central and Large */}
+      <div className="col-span-1 sm:col-span-7">
         <div className="sticky top-24">
           <KnowledgeGraph
             graph={searchResults?.graph || { nodes: [], links: [] }}
             onNodeClick={setSelectedResultId}
+            onNodeExplore={handleNodeExplore}
+            height={600}
           />
         </div>
       </div>
+
+      {/* Results Panel - Conditional, shown below or in drawer */}
+      {showResults && (
+        <div className="col-span-1 sm:col-span-12 mt-6">
+          <ResultsPanel
+            results={searchResults?.results || []}
+            buckets={searchResults?.buckets || { events: [], actors: [], assets: [], sources: [] }}
+            isLoading={isSearching}
+            onResultClick={setSelectedResultId}
+            onExploreDeeper={handleExploreDeeper}
+          />
+        </div>
+      )}
+
+      {/* Filters Drawer */}
+      <FiltersDrawer
+        isOpen={showFilters}
+        onClose={() => setShowFilters(false)}
+        filters={filters}
+        onFiltersChange={(newFilters) => {
+          setFilters(newFilters);
+          // Optionally trigger search with new filters if query exists
+          if (query.trim()) {
+            performSearch(query, mode, newFilters);
+          }
+        }}
+      />
 
       {/* Result Details Drawer */}
       {selectedResult && (
@@ -248,8 +440,9 @@ function SearchContent() {
 
       {/* Status Bar */}
       <SearchStatusBar
-        status={isSearching ? 'loading' : searchResults ? 'success' : 'idle'}
+        status={isSearching ? 'loading' : searchError ? 'error' : searchResults ? 'success' : 'idle'}
         meta={searchResults?.meta}
+        error={searchError}
       />
     </AppShell>
   );
