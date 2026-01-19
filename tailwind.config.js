@@ -26,6 +26,16 @@ export default {
           medium: 'rgba(255, 255, 255, 0.15)',
           strong: 'rgba(255, 255, 255, 0.2)',
         },
+        text: {
+          primary: '#FFFFFF',
+          secondary: 'rgba(148, 163, 184, 1)',
+          tertiary: 'rgba(100, 116, 139, 1)',
+        },
+        borders: {
+          subtle: 'rgba(255, 255, 255, 0.08)',
+          medium: 'rgba(255, 255, 255, 0.15)',
+          strong: 'rgba(255, 255, 255, 0.2)',
+        },
       },
       // Typography
       fontFamily: {

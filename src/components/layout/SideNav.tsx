@@ -15,7 +15,8 @@ import {
   Settings,
   ChevronLeft,
   X,
-  Sparkles
+  Sparkles,
+  Search
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -29,6 +30,7 @@ interface SideNavProps {
 const navItems = [
   { path: '/overview', label: 'Overview', icon: LayoutDashboard },
   { path: '/discover', label: 'Discover', icon: Sparkles },
+  { path: '/search', label: 'Search', icon: Search },
   { path: '/intelligence', label: 'Intelligence', icon: TrendingUp },
   { path: '/events-feed', label: 'Events', icon: Calendar },
   { path: '/signals-feed', label: 'Signals', icon: TrendingUp },

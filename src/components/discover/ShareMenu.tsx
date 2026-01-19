@@ -60,8 +60,8 @@ export default function ShareMenu({ item, onShare }: ShareMenuProps) {
       case 'pdf':
         // Generate PDF (client-side)
         try {
-          const PDF = await loadJsPDF();
-          const doc = new PDF();
+          const { jsPDF } = await import('jspdf');
+          const doc = new jsPDF();
           
           doc.setFontSize(18);
           doc.text(item.title, 10, 20);

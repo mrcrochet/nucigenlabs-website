@@ -9,6 +9,7 @@ import Card from '../ui/Card';
 import Badge from '../ui/Badge';
 import { Bookmark, Eye, Flame, AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 import type { DiscoverItem } from './DiscoverCard';
+import ShareMenu from './ShareMenu';
 
 interface DiscoverListCardProps {
   item: DiscoverItem;

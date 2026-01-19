@@ -1,11 +1,11 @@
 /**
  * Discover Enricher Worker (Batch Job)
  * 
- * Enrichit les events avec Perplexity (batch, pas dans le flow utilisateur)
+ * Enrichit les events avec OpenAI (batch, pas dans le flow utilisateur)
  * 
  * Strategy:
  * - Sélectionne events avec discover_score élevé et discover_why_it_matters NULL
- * - Génère "Why it matters" avec Perplexity (sonar model, pas sonar-pro)
+ * - Génère "Why it matters" avec OpenAI (gpt-4o-mini pour économiser)
  * - Met à jour events.discover_why_it_matters et events.discover_enriched_at
  * - Ne s'exécute PAS dans le flow utilisateur (batch uniquement)
  * 
@@ -15,8 +15,40 @@
  * - Tier 3 (background, score < 70): jamais auto-enrichi
  */
 
-import { chatCompletions } from '../services/perplexity-service.js';
-import { supabase } from '../../lib/supabase.js';
+import OpenAI from 'openai';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Load environment variables
+dotenv.config({ path: join(__dirname, '../../../.env') });
+dotenv.config({ path: join(__dirname, '../../../../.env') });
+dotenv.config();
+
+// Initialize Supabase client (service_role for workers)
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set');
+}
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// Initialize OpenAI client
+const openaiApiKey = process.env.OPENAI_API_KEY;
+let openaiClient: OpenAI | null = null;
+
+if (openaiApiKey) {
+  openaiClient = new OpenAI({ apiKey: openaiApiKey });
+  console.log('[Discover Enricher] OpenAI client initialized');
+} else {
+  console.warn('[Discover Enricher] OPENAI_API_KEY not configured - enrichment will be skipped');
+}
 
 interface EventToEnrich {
   id: string;
@@ -29,26 +61,29 @@ interface EventToEnrich {
 }
 
 /**
- * Generate "Why it matters" statement with Perplexity
+ * Generate "Why it matters" statement with OpenAI
  */
 async function generateWhyItMatters(event: EventToEnrich): Promise<string> {
+  if (!openaiClient) {
+    throw new Error('OpenAI client not initialized');
+  }
+
   const sources = event.discover_sources.slice(0, 5).map(s => s.name).join(', ');
   
-  const response = await chatCompletions({
-    model: 'sonar', // Moins cher que sonar-pro
+  const response = await openaiClient.chat.completions.create({
+    model: 'gpt-4o-mini', // Cost-effective model
     messages: [
       {
         role: 'system',
-        content: 'Generate a single-line "Why it matters" statement (max 100 chars) for decision-makers. Be concise, focus on impact, not description.',
+        content: 'Generate a single-line "Why it matters" statement (max 100 chars) for decision-makers. Be concise, focus on impact, not description. Return only the statement, no quotes, no formatting.',
       },
       {
         role: 'user',
         content: `Title: ${event.title}\nSummary: ${event.description?.substring(0, 300) || ''}\nCategory: ${event.discover_category}\nSources: ${sources}`,
       },
     ],
-    max_tokens: 100, // Short response
-    return_citations: false, // Don't need citations for impact statement
-    return_images: false, // Don't need images
+    temperature: 0.3,
+    max_tokens: 100,
   });
   
   const content = response.choices[0]?.message?.content?.trim() || '';

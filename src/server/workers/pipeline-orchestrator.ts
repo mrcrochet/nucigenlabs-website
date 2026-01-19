@@ -66,7 +66,7 @@ async function runCycle(config: OrchestratorConfig) {
     console.log('\n[Orchestrator] Step 1C: Collecting Discover items from EventRegistry...');
     try {
       const discoverResult = await collectDiscoverItems(['all', 'tech', 'finance', 'geopolitics', 'energy', 'supply-chain']);
-      console.log(`[Orchestrator] Discover: ${discoverResult.collected} collected, ${discoverResult.inserted} inserted, ${discoverResult.skipped} skipped`);
+      console.log(`[Orchestrator] Discover: ${discoverResult.collected} collected, ${discoverResult.inserted} inserted, ${discoverResult.skipped} skipped, ${discoverResult.filtered || 0} filtered`);
     } catch (error: any) {
       console.warn('[Orchestrator] Discover collection failed:', error.message);
       // Don't fail the whole cycle if Discover collection fails

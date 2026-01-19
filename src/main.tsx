@@ -6,10 +6,16 @@ import ClerkWrapper from './components/ClerkWrapper';
 import ClerkErrorBoundary from './components/ClerkErrorBoundary';
 import App from './App.tsx';
 import { queryClient } from './lib/react-query';
+import { registerServiceWorker } from './lib/service-worker';
 import './index.css';
 
 // Initialize Sentry as early as possible
 initSentry();
+
+// Register service worker for offline support (production only)
+if (import.meta.env.PROD) {
+  registerServiceWorker().catch(console.error);
+}
 
 // Warn if key is missing (for development)
 const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;

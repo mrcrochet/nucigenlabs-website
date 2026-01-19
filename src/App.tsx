@@ -53,6 +53,7 @@ const ImpactDetailPage = lazy(() => import('./pages/ImpactDetailPage'));
 const Alerts = lazy(() => import('./pages/Alerts'));
 const Research = lazy(() => import('./pages/Research'));
 const Discover = lazy(() => import('./pages/Discover'));
+const Search = lazy(() => import('./pages/Search'));
 // User / System
 const Profile = lazy(() => import('./pages/Profile'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -210,6 +211,7 @@ function App() {
         <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
         <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} /> {/* App Research - Protected, different from /papers (marketing) */}
         <Route path="/discover" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
+        <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} /> {/* Advanced Search with Knowledge Graph */}
         {/* Recommendations (PHASE 7) */}
         <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
         

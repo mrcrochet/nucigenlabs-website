@@ -36,6 +36,8 @@ export default defineConfig({
     minify: 'esbuild',
     // Target modern browsers for smaller bundles
     target: 'esnext',
+    // Copy service worker to dist
+    copyPublicDir: true,
   },
   // Vitest configuration
   test: {

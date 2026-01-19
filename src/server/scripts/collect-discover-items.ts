@@ -20,6 +20,7 @@ async function main() {
     console.log(`Collected: ${result.collected}`);
     console.log(`Inserted: ${result.inserted}`);
     console.log(`Skipped: ${result.skipped}`);
+    console.log(`Filtered: ${result.filtered || 0}`);
     console.log(`Errors: ${result.errors}`);
     console.log('='.repeat(60) + '\n');
     

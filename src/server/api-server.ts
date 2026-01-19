@@ -3191,12 +3191,163 @@ app.get('/api/impacts/:id', async (req, res) => {
   }
 });
 
+// POST /api/search - Advanced search with knowledge graph
+app.post('/api/search', async (req, res) => {
+  try {
+    const { query, mode = 'standard', filters = {} } = req.body;
+
+    if (!query || typeof query !== 'string' || !query.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Query is required',
+      });
+    }
+
+    console.log(`[API] Search request: "${query}" (mode: ${mode})`);
+
+    const { search } = await import('./services/search-orchestrator.js');
+    const result = await search(query.trim(), mode, filters);
+
+    res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error: any) {
+    console.error('[API] Search error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// POST /api/enrich - Enrich a result or URL
+app.post('/api/enrich', async (req, res) => {
+  try {
+    const { url, resultId, results, existingGraph } = req.body;
+
+    if (!url && !resultId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Either url or resultId is required',
+      });
+    }
+
+    console.log(`[API] Enrich request: ${url ? `url: ${url}` : `resultId: ${resultId}`}`);
+
+    if (url) {
+      // Process pasted link
+      const { processLink } = await import('./services/link-intelligence.js');
+      const result = await processLink(url, existingGraph);
+
+      res.json({
+        success: true,
+        enrichedData: result.result,
+        updatedGraph: result.graph,
+        entities: result.entities,
+        keyFacts: result.keyFacts,
+        summary: result.summary,
+      });
+    } else if (resultId && results) {
+      // Enrich existing result
+      const { enrichResult } = await import('./services/search-orchestrator.js');
+      const result = await enrichResult(resultId, results);
+
+      res.json({
+        success: true,
+        enrichedData: result.enrichedResult,
+        updatedGraph: result.updatedGraph,
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid request: resultId requires results array',
+      });
+    }
+  } catch (error: any) {
+    console.error('[API] Enrich error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// POST /api/save-search - Save a search query
+app.post('/api/save-search', async (req, res) => {
+  try {
+    const { query, filters, userId } = req.body;
+
+    if (!query || typeof query !== 'string' || !query.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Query is required',
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID is required',
+      });
+    }
+
+    console.log(`[API] Save search request: "${query}" (userId: ${userId})`);
+
+    // Check if saved_searches table exists, if not create it
+    if (!supabase) {
+      return res.status(500).json({
+        success: false,
+        error: 'Database not configured',
+      });
+    }
+
+    const { data, error } = await supabase
+      .from('saved_searches')
+      .insert({
+        user_id: userId,
+        query: query.trim(),
+        filters: filters || {},
+      })
+      .select()
+      .single();
+
+    if (error) {
+      // Table might not exist, try to create it
+      if (error.message.includes('relation') && error.message.includes('does not exist')) {
+        console.log('[API] Creating saved_searches table...');
+        // Note: In production, this should be a migration
+        // For now, we'll just return an error asking to create the table
+        return res.status(500).json({
+          success: false,
+          error: 'saved_searches table does not exist. Please run migration.',
+        });
+      }
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      searchId: data.id,
+    });
+  } catch (error: any) {
+    console.error('[API] Save search error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
 const server = app.listen(PORT, () => {
   console.log(`🚀 API Server running on http://localhost:${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/health`);
   console.log(`   Live Search: POST http://localhost:${PORT}/live-search`);
   console.log(`   Deep Research: POST http://localhost:${PORT}/deep-research`);
   console.log(`   Process Event: POST http://localhost:${PORT}/process-event`);
+  console.log(`   Search: POST http://localhost:${PORT}/api/search`);
+  console.log(`   Enrich: POST http://localhost:${PORT}/api/enrich`);
+  console.log(`   Save Search: POST http://localhost:${PORT}/api/save-search`);
   console.log(`   Personalized Collect: POST http://localhost:${PORT}/personalized-collect`);
   console.log(`   Predict Relevance: POST http://localhost:${PORT}/api/predict-relevance`);
   console.log(`   Generate Signals: POST http://localhost:${PORT}/api/signals`);

@@ -32,6 +32,8 @@ import PersonalizationModal from '../components/discover/PersonalizationModal';
 import EmptyState from '../components/discover/EmptyState';
 import ViewModeToggle, { type ViewMode } from '../components/discover/ViewModeToggle';
 import AdvancedFilters, { type AdvancedFilters as AdvancedFiltersType } from '../components/discover/AdvancedFilters';
+import VirtualizedGrid from '../components/discover/VirtualizedGrid';
+import VirtualizedList from '../components/discover/VirtualizedList';
 import { DiscoverErrorBoundary } from '../components/discover/DiscoverErrorBoundary';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import { Loader2, Filter } from 'lucide-react';
@@ -97,6 +99,12 @@ function DiscoverContent() {
     return (saved as ViewMode) || 'grid';
   });
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFiltersType>({});
+  const [useVirtualScrolling, setUseVirtualScrolling] = useState(() => {
+    // Enable virtual scrolling for large lists (100+ items)
+    return localStorage.getItem('discover-virtual-scroll') === 'true';
+  });
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerSize, setContainerSize] = useState({ width: 1200, height: 800 });
   const observerRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const itemsPerPage = 12;
@@ -196,16 +204,21 @@ function DiscoverContent() {
     }
 
     if (!response.ok) {
-      // Try to get error details from response
+      // Read body once and store it
+      const contentType = response.headers.get('content-type');
       let errorMessage = `Failed to fetch discover items: ${response.status} ${response.statusText}`;
+      
       try {
-        const errorData = await response.json();
-        errorMessage = errorData.error || errorData.message || errorMessage;
-        console.error('[Discover] API error response:', errorData);
-      } catch {
-        // If response is not JSON, use status text
-        const text = await response.text();
-        console.error('[Discover] API error (non-JSON):', text.substring(0, 200));
+        if (contentType?.includes('application/json')) {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+          console.error('[Discover] API error response:', errorData);
+        } else {
+          const text = await response.text();
+          console.error('[Discover] API error (non-JSON):', text.substring(0, 200));
+        }
+      } catch (e) {
+        console.error('[Discover] Could not read error response body:', e);
       }
       
       // Provide helpful error message
@@ -252,6 +265,31 @@ function DiscoverContent() {
   const items = useMemo(() => {
     return data?.pages.flatMap(page => page.items) || [];
   }, [data]);
+
+  // Auto-enable virtual scrolling for large lists
+  useEffect(() => {
+    if (items.length > 100 && !useVirtualScrolling) {
+      setUseVirtualScrolling(true);
+      localStorage.setItem('discover-virtual-scroll', 'true');
+    }
+  }, [items.length, useVirtualScrolling]);
+
+  // Update container size on resize
+  useEffect(() => {
+    const updateSize = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setContainerSize({
+          width: rect.width,
+          height: window.innerHeight - rect.top - 100,
+        });
+      }
+    };
+
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
 
   // Track search queries (after items is defined)
   useEffect(() => {
