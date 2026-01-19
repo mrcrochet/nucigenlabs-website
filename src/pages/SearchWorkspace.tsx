@@ -268,6 +268,9 @@ function SearchWorkspaceContent() {
               handleFollowup(`Tell me more about: ${result.title}`);
             }
           }}
+          graph={session.graph}
+          query={session.query}
+          sessionId={session.id}
         />
       </div>
 

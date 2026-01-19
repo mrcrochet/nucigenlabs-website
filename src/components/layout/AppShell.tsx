@@ -15,7 +15,7 @@
 
 import { useState, useEffect } from 'react';
 import TopNav from './TopNav';
-import SideNav from './SideNav';
+import AppNavMenu from './AppNavMenu';
 import MainContent from './MainContent';
 import RightInspector from './RightInspector';
 
@@ -30,38 +30,22 @@ export default function AppShell({
   showRightInspector = false,
   rightInspectorContent,
 }: AppShellProps) {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
-
-  // Close mobile menu when window resizes to desktop
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 1024) {
-        setMobileMenuOpen(false);
-        setMobileInspectorOpen(false);
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   return (
     <div className="min-h-screen bg-background-base flex flex-col">
       {/* TopNav - Fixed height 64px */}
       <TopNav 
-        onMenuClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        mobileMenuOpen={mobileMenuOpen}
+        onMenuClick={() => setMenuOpen(!menuOpen)}
+        mobileMenuOpen={menuOpen}
       />
 
-      {/* Mobile overlay for drawer */}
-      {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-background-overlay z-40 lg:hidden"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
+      {/* Navigation Menu Drawer */}
+      <AppNavMenu 
+        isOpen={menuOpen}
+        onClose={() => setMenuOpen(false)}
+      />
 
       {mobileInspectorOpen && showRightInspector && (
         <div
@@ -71,15 +55,7 @@ export default function AppShell({
       )}
 
       <div className="flex flex-1 overflow-hidden relative">
-        {/* SideNav - Desktop: sidebar, Mobile: drawer */}
-        <SideNav
-          collapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          mobileOpen={mobileMenuOpen}
-          onMobileClose={() => setMobileMenuOpen(false)}
-        />
-
-        {/* MainContent - Max-width 1280px, centered */}
+        {/* MainContent - Full width (no sidebar taking space) */}
         <MainContent>
           {children}
         </MainContent>

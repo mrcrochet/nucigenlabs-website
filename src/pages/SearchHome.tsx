@@ -13,6 +13,8 @@ import { Search, Loader2, Link as LinkIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
+import AnimatedEventsBackground from '../components/search/AnimatedEventsBackground';
+import SearchNavMenu from '../components/search/SearchNavMenu';
 
 // Robust URL regex pattern
 const URL_REGEX = /^https?:\/\/.+/i;
@@ -186,58 +188,66 @@ function SearchHomeContent() {
   }, [handleSearch]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background-base px-4">
+    <div className="min-h-screen bg-background-base relative overflow-hidden">
       <SEO title="Search | Nucigen Labs" description="Search events, actors, assets, and sources with AI-powered intelligence" />
       
-      {/* Logo */}
-      <div className="mb-12">
-        <h1 className="text-4xl sm:text-5xl font-light text-text-primary">Nucigen</h1>
-      </div>
-
-      {/* Search Input */}
-      <div className="w-full max-w-3xl">
-        <form onSubmit={handleSearch} className="relative">
-          <div className="relative">
-            <Search className="absolute left-6 top-1/2 transform -translate-y-1/2 w-6 h-6 text-text-secondary" />
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onPaste={handlePaste}
-              placeholder="Search anything, or paste a link"
-              disabled={isProcessing}
-              className="w-full pl-16 pr-32 py-4 text-lg bg-background-glass-subtle border border-borders-subtle rounded-xl text-text-primary placeholder-text-secondary focus:outline-none focus:border-[#E1463E]/50 focus:bg-background-glass-medium transition-all disabled:opacity-50"
-            />
-            
-            {/* Right side indicators */}
-            <div className="absolute right-6 top-1/2 transform -translate-y-1/2 flex items-center gap-3">
-              {isUrl && !isProcessing && (
-                <div className="flex items-center gap-2 text-[#E1463E]">
-                  <LinkIcon className="w-5 h-5" />
-                  <span className="text-sm">URL detected</span>
-                </div>
-              )}
-              {isProcessing && (
-                <Loader2 className="w-5 h-5 text-[#E1463E] animate-spin" />
-              )}
-              {!isProcessing && (
-                <button
-                  type="submit"
-                  disabled={!query.trim()}
-                  className="px-6 py-2 bg-[#E1463E] hover:bg-[#E1463E]/90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
-                >
-                  Search
-                </button>
-              )}
-            </div>
+      {/* Navigation Menu */}
+      <SearchNavMenu />
+      
+      {/* Animated Events Background */}
+      <AnimatedEventsBackground />
+      
+      {/* Centered Search Bar */}
+      <div className="fixed inset-0 flex items-center justify-center z-20 pointer-events-none">
+        <div className="w-full max-w-2xl px-4 pointer-events-auto">
+          {/* Logo */}
+          <div className="mb-8 text-center">
+            <h1 className="text-3xl sm:text-4xl font-light text-text-primary">Nucigen</h1>
           </div>
-        </form>
+          
+          <form onSubmit={handleSearch} className="relative">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-text-secondary" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onPaste={handlePaste}
+                placeholder="Search anything, or paste a link"
+                disabled={isProcessing}
+                className="w-full pl-12 pr-28 py-3 text-base bg-background-glass-subtle/90 backdrop-blur-sm border border-borders-subtle rounded-xl text-text-primary placeholder-text-secondary focus:outline-none focus:border-[#E1463E]/50 focus:bg-background-glass-medium transition-all disabled:opacity-50"
+              />
+              
+              {/* Right side indicators */}
+              <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
+                {isUrl && !isProcessing && (
+                  <div className="flex items-center gap-1.5 text-[#E1463E]">
+                    <LinkIcon className="w-4 h-4" />
+                    <span className="text-xs">URL</span>
+                  </div>
+                )}
+                {isProcessing && (
+                  <Loader2 className="w-4 h-4 text-[#E1463E] animate-spin" />
+                )}
+                {!isProcessing && (
+                  <button
+                    type="submit"
+                    disabled={!query.trim()}
+                    className="px-4 py-1.5 bg-[#E1463E] hover:bg-[#E1463E]/90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Search
+                  </button>
+                )}
+              </div>
+            </div>
+          </form>
 
-        {/* Helper text */}
-        <p className="mt-4 text-center text-sm text-text-tertiary">
-          Search events, actors, sectors, risks, or paste a URL to analyze
-        </p>
+          {/* Helper text */}
+          <p className="mt-3 text-center text-xs text-text-tertiary">
+            Search events, actors, sectors, risks, or paste a URL to analyze
+          </p>
+        </div>
       </div>
     </div>
   );

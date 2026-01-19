@@ -14,12 +14,12 @@ interface TopNavProps {
 export default function TopNav({ onMenuClick, mobileMenuOpen }: TopNavProps) {
   return (
     <nav className="h-16 bg-background-overlay backdrop-blur-xl border-b border-borders-subtle flex items-center justify-between px-4 sm:px-6">
-      {/* Left: Mobile Menu + Logo/Brand */}
+      {/* Left: Menu Button + Logo/Brand */}
       <div className="flex items-center gap-3 sm:gap-4">
-        {/* Mobile Menu Button */}
+        {/* Menu Button - Always visible (hamburger menu for all screens) */}
         <button
           onClick={onMenuClick}
-          className="lg:hidden p-2 text-text-secondary hover:text-text-primary hover:bg-background-glass-subtle rounded-lg transition-colors"
+          className="p-2 text-text-secondary hover:text-text-primary hover:bg-background-glass-subtle rounded-lg transition-colors"
           aria-label="Toggle menu"
         >
           {mobileMenuOpen ? (

@@ -5,6 +5,9 @@
  */
 
 import { ExternalLink, Search, Globe } from 'lucide-react';
+import CollectionsMenu from './CollectionsMenu';
+import SourceCredibility, { CredibilityBadge } from './SourceCredibility';
+import SentimentAnalysis, { SentimentBadge } from './SentimentAnalysis';
 import type { SearchResult } from '../../types/search';
 
 interface ResultCardProps {
@@ -93,18 +96,24 @@ export default function ResultCard({ result, onClick, onExploreDeeper }: ResultC
         </div>
 
         {/* Title - Bold and prominent */}
-        <h3 className="text-base font-semibold text-text-primary line-clamp-2 leading-snug group-hover:text-primary transition-colors">
-          {result.title}
-        </h3>
+        <div className="flex items-start gap-2">
+          <h3 className="text-base font-semibold text-text-primary line-clamp-2 leading-snug group-hover:text-primary transition-colors flex-1">
+            {result.title}
+          </h3>
+          <CredibilityBadge result={result} />
+        </div>
 
         {/* Snippet - Perplexity style */}
         <p className="text-sm text-text-secondary leading-relaxed line-clamp-3">
           {result.summary}
         </p>
 
+        {/* Sentiment Analysis */}
+        <SentimentAnalysis result={result} />
+
         {/* Meta Info */}
         <div className="flex items-center justify-between pt-2 border-t border-borders-subtle">
-          <div className="flex items-center gap-4 text-xs text-text-tertiary">
+          <div className="flex items-center gap-4 text-xs text-text-tertiary flex-wrap">
             <span>{new Date(result.publishedAt).toLocaleDateString('fr-FR', { 
               year: 'numeric', 
               month: 'short', 
@@ -116,10 +125,12 @@ export default function ResultCard({ result, onClick, onExploreDeeper }: ResultC
                 {(result.relevanceScore * 100).toFixed(0)}% relevant
               </span>
             )}
+            <SourceCredibility result={result} />
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-2">
+            <CollectionsMenu result={result} />
             <button
               onClick={(e) => {
                 e.stopPropagation();

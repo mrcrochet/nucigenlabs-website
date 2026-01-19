@@ -128,7 +128,7 @@ function App() {
     '/events', '/events-feed',
     '/signals', '/signals-feed',
     '/markets', '/impacts',
-    '/alerts', '/research', '/discover', '/recommendations', '/quality',  // App Research, NOT /papers (marketing)
+    '/alerts', '/research', '/discover', '/search', '/recommendations', '/quality',  // App Research, NOT /papers (marketing)
     '/profile', '/settings', '/onboarding'
   ];
   
