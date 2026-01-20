@@ -60,6 +60,23 @@ export default function SuggestedQuestions({
               .filter((n: any) => ['country', 'company', 'organization'].includes(n.type))
               .slice(0, 5)
               .map((n: any) => n.label),
+            // NEW: Include claims, impact scores, and high-impact results
+            claims: results.flatMap(r => (r as any).claims || []).slice(0, 5).map((c: any) => ({
+              text: c.text,
+              certainty: c.certainty,
+              type: c.type,
+            })),
+            highImpactResults: results
+              .filter(r => ((r as any).impactScore || 0) > 0.7)
+              .slice(0, 3)
+              .map(r => ({
+                title: r.title,
+                impactScore: (r as any).impactScore,
+              })),
+            sectors: results
+              .flatMap(r => r.tags || [])
+              .filter((tag, idx, arr) => arr.indexOf(tag) === idx)
+              .slice(0, 5),
           }),
         });
 

@@ -3198,6 +3198,7 @@ app.get('/api/impacts/:id', async (req, res) => {
 app.post('/api/search', async (req, res) => {
   try {
     const { query, mode = 'standard', filters = {} } = req.body;
+    const clerkUserId = req.headers['x-clerk-user-id'] as string || null;
 
     if (!query || typeof query !== 'string' || !query.trim()) {
       return res.status(400).json({
@@ -3206,10 +3207,20 @@ app.post('/api/search', async (req, res) => {
       });
     }
 
+    // Extract Supabase user ID if available
+    let userId = null;
+    if (clerkUserId && supabase) {
+      try {
+        userId = await getSupabaseUserId(clerkUserId, supabase);
+      } catch {
+        // Continue without userId if extraction fails
+      }
+    }
+
     console.log(`[API] Search request: "${query}" (mode: ${mode})`);
 
     const { search } = await import('./services/search-orchestrator.js');
-    const result = await search(query.trim(), mode, filters);
+    const result = await search(query.trim(), mode, filters, userId);
 
     res.json({
       success: true,
@@ -3370,7 +3381,7 @@ app.post('/api/search/session', async (req, res) => {
         // #region agent log
         fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3298',message:'Before search orchestrator',data:{query:query.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
-        searchResult = await search(query.trim(), 'standard', {});
+        searchResult = await search(query.trim(), 'standard', {}, userId);
         // #region agent log
         fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3301',message:'After search orchestrator',data:{resultsCount:searchResult?.results?.length||0,hasGraph:!!searchResult?.graph},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
@@ -3471,11 +3482,22 @@ app.post('/api/search/session/:id/followup', async (req, res) => {
       });
     }
 
+    // Extract Supabase user ID if available
+    const clerkUserId = req.headers['x-clerk-user-id'] as string || null;
+    let userId = null;
+    if (clerkUserId && supabase) {
+      try {
+        userId = await getSupabaseUserId(clerkUserId, supabase);
+      } catch {
+        // Continue without userId if extraction fails
+      }
+    }
+
     console.log(`[API] Followup search in session ${id}: "${query}"`);
 
     // Perform search
     const { search } = await import('./services/search-orchestrator.js');
-    const searchResult = await search(query.trim(), 'standard', {});
+    const searchResult = await search(query.trim(), 'standard', {}, userId);
 
     // Generate followup ID
     const followupId = `followup-${Date.now()}-${Math.random().toString(36).substring(7)}`;
@@ -3496,10 +3518,47 @@ app.post('/api/search/session/:id/followup', async (req, res) => {
   }
 });
 
+// POST /api/search/synthesize-answer - Synthesize search results into structured answer
+app.post('/api/search/synthesize-answer', async (req, res) => {
+  try {
+    const { query, results } = req.body;
+
+    if (!query || typeof query !== 'string' || !query.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Query is required',
+      });
+    }
+
+    if (!results || !Array.isArray(results) || results.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Results are required',
+      });
+    }
+
+    console.log(`[API] Synthesizing answer for query: "${query}" (${results.length} results)`);
+
+    const { synthesizeAnswer } = await import('./services/answer-synthesizer.js');
+    const answer = await synthesizeAnswer(query.trim(), results);
+
+    res.json({
+      success: true,
+      answer,
+    });
+  } catch (error: any) {
+    console.error('[API] Answer synthesis error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to synthesize answer',
+    });
+  }
+});
+
 // POST /api/search/session/questions - Generate suggested questions
 app.post('/api/search/session/questions', async (req, res) => {
   try {
-    const { query, inputType, resultsCount, entities } = req.body;
+    const { query, inputType, resultsCount, entities, claims, highImpactResults } = req.body;
 
     // Generate questions using OpenAI
     const { callOpenAI } = await import('./services/openai-optimizer.js');
@@ -3517,12 +3576,34 @@ Question types:
 
 Return ONLY a JSON array of question strings.`;
 
-    const userPrompt = `Generate follow-up questions for this search:
-
-Query: ${query}
+    // Build enhanced prompt with claims and impact data
+    let enhancedContext = `Query: ${query}
 Input Type: ${inputType}
 Results Found: ${resultsCount}
-Key Entities: ${entities?.join(', ') || 'None'}
+Key Entities: ${entities?.join(', ') || 'None'}`;
+
+    if (claims && claims.length > 0) {
+      enhancedContext += `\n\nKey Claims Found:\n${claims.slice(0, 5).map((c: any, idx: number) => 
+        `${idx + 1}. ${c.text} (${c.type}, certainty: ${(c.certainty * 100).toFixed(0)}%)`
+      ).join('\n')}`;
+    }
+
+    if (highImpactResults && highImpactResults.length > 0) {
+      enhancedContext += `\n\nHigh-Impact Results:\n${highImpactResults.map((r: any, idx: number) => 
+        `${idx + 1}. ${r.title} (impact: ${((r.impactScore || 0) * 100).toFixed(0)}%)`
+      ).join('\n')}`;
+    }
+
+    const userPrompt = `Generate follow-up questions for this search:
+
+${enhancedContext}
+
+Focus on:
+- Validating claims with low certainty
+- Exploring high-impact results in depth
+- Finding contradictions or counter-arguments
+- Assessing implications and exposures
+- Predicting next steps
 
 Return 4-6 questions as a JSON array of strings.`;
 

@@ -185,12 +185,19 @@ export interface Article {
       label: string;
       type: string;
     };
+    ranking?: number; // Source ranking
+    image?: string; // Source image URL
   };
   concepts?: Array<{
     uri: string;
     label: string;
     score: number;
     type: string[];
+  }>;
+  categories?: Array<{
+    uri: string;
+    label: string;
+    score?: number;
   }>;
   location?: {
     uri: string;
@@ -207,6 +214,22 @@ export interface Article {
     url: string;
     width?: number;
     height?: number;
+  }>;
+  links?: Array<{
+    url: string;
+    text?: string;
+  }>;
+  shares?: {
+    facebook?: number;
+    twitter?: number;
+    reddit?: number;
+    linkedin?: number;
+    total?: number;
+  };
+  dates?: Array<{
+    date: string;
+    text?: string;
+    type?: string;
   }>;
 }
 
@@ -262,10 +285,20 @@ export async function searchArticles(options: SearchArticlesOptions = {}): Promi
   // Request additional fields
   params.articlesArticleBodyLen = 500; // Limit body length
   params.articlesResultType = 'articles'; // Return articles (not events)
-  params.articlesIncludeArticleConcepts = true;
-  params.articlesIncludeArticleLocation = true;
-  params.articlesIncludeArticleImage = true;
-  params.articlesIncludeArticleSentiment = true;
+  
+  // Article metadata flags (as per NewsApi.ai documentation)
+  params.articlesIncludeArticleConcepts = true; // Concepts associated with the article
+  params.articlesIncludeArticleCategories = true; // Categories assigned to the article
+  params.articlesIncludeArticleLocation = true; // Location information
+  params.articlesIncludeArticleImage = true; // Images in the article
+  params.articlesIncludeArticleSentiment = true; // Sentiment analysis
+  params.articlesIncludeArticleLinks = true; // Web links identified in the article body
+  params.articlesIncludeArticleShares = true; // Number of shares on social media sites
+  params.articlesIncludeArticleDates = true; // Dates mentioned in the news article
+  
+  // Source metadata flags
+  params.articlesIncludeSourceRanking = true; // Source ranking
+  params.articlesIncludeSourceImage = true; // Source image
 
   return await makeRequest('/article/getArticles', params);
 }
@@ -305,6 +338,11 @@ export interface Event {
     label: string;
     score: number;
     type: string[];
+  }>;
+  categories?: Array<{
+    uri: string;
+    label: string;
+    score?: number;
   }>;
   location?: {
     uri: string;
@@ -357,10 +395,16 @@ export async function searchEvents(options: SearchEventsOptions = {}): Promise<S
 
   // Request additional fields
   params.eventsResultType = 'events';
-  params.eventsIncludeArticleConcepts = true;
-  params.eventsIncludeArticleLocation = true;
-  params.eventsIncludeArticles = true;
+  params.eventsIncludeArticleConcepts = true; // Concepts associated with articles
+  params.eventsIncludeArticleCategories = true; // Categories assigned to articles
+  params.eventsIncludeArticleLocation = true; // Location information
+  params.eventsIncludeArticles = true; // Include articles in the event
   params.eventsArticleCount = 5; // Include 5 articles per event
+  params.eventsIncludeArticleLinks = true; // Web links in articles
+  params.eventsIncludeArticleShares = true; // Social media shares
+  params.eventsIncludeArticleDates = true; // Dates mentioned in articles
+  params.eventsIncludeSourceRanking = true; // Source ranking
+  params.eventsIncludeSourceImage = true; // Source image
 
   return await makeRequest('/event/getEvents', params);
 }

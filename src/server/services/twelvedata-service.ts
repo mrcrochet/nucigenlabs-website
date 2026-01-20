@@ -158,9 +158,14 @@ export async function getRealTimePrice(symbol: string): Promise<{
           price: parseFloat(data.price || '0'),
           timestamp: data.timestamp || new Date().toISOString(),
           volume: data.volume ? parseInt(data.volume) : undefined,
-    change: data.change ? parseFloat(data.change) : undefined,
-    change_percent: data.change_percent ? parseFloat(data.change_percent) : undefined,
-  };
+          change: data.change ? parseFloat(data.change) : undefined,
+          change_percent: data.change_percent ? parseFloat(data.change_percent) : undefined,
+        },
+      };
+    },
+  );
+
+  return cached.data;
 }
 
 /**

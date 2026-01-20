@@ -11,19 +11,25 @@ import type { KnowledgeGraph } from './search-orchestrator';
 
 /**
  * Build knowledge graph from results and relationships
+ * Now includes temporal metadata (validFrom, validTo, confidence, sourceCount)
  */
 export async function buildGraph(
   results: SearchResult[],
-  relationships: Relationship[]
+  relationships: Relationship[],
+  previousGraph?: KnowledgeGraph
 ): Promise<KnowledgeGraph> {
+  const now = new Date().toISOString();
   const nodes: KnowledgeGraph['nodes'] = [];
   const links: KnowledgeGraph['links'] = [];
   const nodeMap = new Map<string, KnowledgeGraph['nodes'][0]>();
 
-  // Add nodes from results (events/articles)
+  // Add nodes from results (events/articles) with temporal metadata
   for (const result of results) {
     const nodeId = result.id;
     if (!nodeMap.has(nodeId)) {
+      // Check if node exists in previous graph
+      const previousNode = previousGraph?.nodes.find(n => n.id === nodeId);
+      
       nodeMap.set(nodeId, {
         id: nodeId,
         type: result.type === 'event' ? 'event' : 'event', // Treat articles as events for graph
@@ -31,15 +37,26 @@ export async function buildGraph(
         data: {
           ...result,
         },
+        validFrom: previousNode?.validFrom || now, // Keep original validFrom if exists
+        validTo: null, // Still valid
+        confidence: calculateNodeConfidence(result),
+        sourceCount: 1 + (previousNode?.sourceCount || 0), // Increment source count
       });
+    } else {
+      // Node already exists - update source count
+      const existing = nodeMap.get(nodeId)!;
+      existing.sourceCount = (existing.sourceCount || 1) + 1;
+      existing.validTo = null; // Still valid
     }
   }
 
-  // Add nodes from entities
+  // Add nodes from entities with temporal metadata
   for (const result of results) {
     for (const entity of result.entities) {
       const nodeId = entity.id;
       if (!nodeMap.has(nodeId)) {
+        const previousNode = previousGraph?.nodes.find(n => n.id === nodeId);
+        
         nodeMap.set(nodeId, {
           id: nodeId,
           type: entity.type,
@@ -47,7 +64,16 @@ export async function buildGraph(
           data: {
             entity,
           },
+          validFrom: previousNode?.validFrom || now,
+          validTo: null,
+          confidence: entity.confidence,
+          sourceCount: 1 + (previousNode?.sourceCount || 0),
         });
+      } else {
+        // Entity already exists - update source count
+        const existing = nodeMap.get(nodeId)!;
+        existing.sourceCount = (existing.sourceCount || 1) + 1;
+        existing.validTo = null;
       }
     }
   }
@@ -59,11 +85,20 @@ export async function buildGraph(
     const targetExists = nodeMap.has(rel.target);
 
     if (sourceExists && targetExists) {
+      // Check if link exists in previous graph
+      const previousLink = previousGraph?.links.find(l => 
+        l.source === rel.source && l.target === rel.target && l.type === rel.type
+      );
+      
       links.push({
         source: rel.source,
         target: rel.target,
         type: rel.type,
         strength: rel.strength,
+        validFrom: previousLink?.validFrom || now,
+        validTo: null,
+        confidence: rel.confidence || rel.strength,
+        sourceCount: 1 + (previousLink?.sourceCount || 0),
       });
     } else {
       // Try to find nodes by matching entity names or result IDs
@@ -105,11 +140,19 @@ export async function buildGraph(
       }
 
       if (sourceNode && targetNode) {
+        const previousLink = previousGraph?.links.find(l => 
+          l.source === sourceNode.id && l.target === targetNode.id && l.type === rel.type
+        );
+        
         links.push({
           source: sourceNode.id,
           target: targetNode.id,
           type: rel.type,
           strength: rel.strength,
+          validFrom: previousLink?.validFrom || now,
+          validTo: null,
+          confidence: rel.confidence || rel.strength,
+          sourceCount: 1 + (previousLink?.sourceCount || 0),
         });
       }
     }
@@ -139,6 +182,10 @@ export async function buildGraph(
               target: node2.id,
               type: 'related_to',
               strength: 0.5, // Medium strength for co-occurrence
+              validFrom: now,
+              validTo: null,
+              confidence: 0.5,
+              sourceCount: 1,
             });
           }
         }
@@ -161,6 +208,10 @@ export async function buildGraph(
                 target: entityNode.id,
                 type: 'related_to',
                 strength: 0.7, // Higher strength for direct mention
+                validFrom: now,
+                validTo: null,
+                confidence: 0.7,
+                sourceCount: 1,
               });
             }
           }
@@ -172,9 +223,85 @@ export async function buildGraph(
   // Convert map to array
   nodes.push(...Array.from(nodeMap.values()));
 
+  // Merge with previous graph if provided (close old relationships that no longer exist)
+  if (previousGraph) {
+    return mergeTemporalGraphs(previousGraph, { nodes, links });
+  }
+
   return {
     nodes,
     links,
+  };
+}
+
+/**
+ * Calculate node confidence based on result quality
+ */
+function calculateNodeConfidence(result: SearchResult): number {
+  // Combine source score, relevance score, and impact score
+  const sourceScore = result.sourceScore || 0.5;
+  const relevanceScore = result.relevanceScore || 0.5;
+  const impactScore = result.impactScore || 0.5;
+  
+  // Weighted average
+  return (sourceScore * 0.4 + relevanceScore * 0.3 + impactScore * 0.3);
+}
+
+/**
+ * Merge temporal graphs - close old relationships that no longer exist
+ */
+function mergeTemporalGraphs(
+  previous: KnowledgeGraph,
+  current: KnowledgeGraph
+): KnowledgeGraph {
+  const now = new Date().toISOString();
+  
+  // Track current link keys
+  const currentLinkKeys = new Set(
+    current.links.map(l => `${l.source}-${l.target}-${l.type}`)
+  );
+  
+  // Close previous links that no longer exist
+  const closedLinks = previous.links
+    .filter(l => {
+      const key = `${l.source}-${l.target}-${l.type}`;
+      return !currentLinkKeys.has(key);
+    })
+    .map(l => ({
+      ...l,
+      validTo: now, // Mark as closed
+    }));
+  
+  // Merge nodes (keep previous nodes that still exist, add new ones)
+  const nodeMap = new Map<string, KnowledgeGraph['nodes'][0]>();
+  
+  // Add previous nodes (they may still be valid)
+  for (const node of previous.nodes) {
+    nodeMap.set(node.id, node);
+  }
+  
+  // Update/add current nodes
+  for (const node of current.nodes) {
+    const existing = nodeMap.get(node.id);
+    if (existing) {
+      // Update existing node
+      nodeMap.set(node.id, {
+        ...existing,
+        ...node,
+        validFrom: existing.validFrom || node.validFrom, // Keep original validFrom
+        validTo: null, // Still valid
+        sourceCount: (existing.sourceCount || 0) + (node.sourceCount || 1), // Accumulate
+      });
+    } else {
+      // New node
+      nodeMap.set(node.id, node);
+    }
+  }
+  
+  // Combine all links (closed + current)
+  return {
+    nodes: Array.from(nodeMap.values()),
+    links: [...closedLinks, ...current.links],
   };
 }
 

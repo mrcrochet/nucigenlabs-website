@@ -20,6 +20,7 @@ import InsightPanel from '../components/search/InsightPanel';
 import SuggestedQuestions from '../components/search/SuggestedQuestions';
 import SearchSessionHeader from '../components/search/SearchSessionHeader';
 import ResultDetailsDrawer from '../components/search/ResultDetailsDrawer';
+import AnswerPanel from '../components/search/AnswerPanel';
 import type { SearchResult, KnowledgeGraph as KnowledgeGraphType } from '../types/search';
 
 interface SearchSession {
@@ -61,26 +62,49 @@ function SearchWorkspaceContent() {
     setError(null);
 
     // Load from localStorage
-    const storedSession = localStorage.getItem(`search-session-${sessionId}`);
+    const storageKey = `search-session-${sessionId}`;
+    const storedSession = localStorage.getItem(storageKey);
     
-    if (storedSession) {
-      try {
+    console.log('[SearchWorkspace] Loading session:', { sessionId, storageKey, hasStoredSession: !!storedSession });
+    
+    try {
+      if (storedSession) {
         const parsed = JSON.parse(storedSession);
-        setSession(parsed);
-      } catch (error: any) {
-        console.error('[SearchWorkspace] Error parsing stored session:', error);
-        setError('Invalid session data');
-        toast.error('Failed to load session', {
-          description: 'Session data is corrupted',
-          duration: 5000,
+        console.log('[SearchWorkspace] Session parsed successfully:', { 
+          hasResults: !!parsed.results, 
+          resultsCount: parsed.results?.length || 0,
+          hasGraph: !!parsed.graph,
+          hasQuery: !!parsed.query
         });
-      } finally {
+        
+        // Validate session structure
+        if (!parsed.results || !Array.isArray(parsed.results)) {
+          throw new Error('Invalid session structure: missing results array');
+        }
+        
+        setSession(parsed);
         setIsLoading(false);
+      } else {
+        // Session not found, redirect to search
+        console.warn('[SearchWorkspace] Session not found in localStorage:', storageKey);
+        setError('Session not found');
+        setIsLoading(false);
+        toast.error('Session not found', {
+          description: 'Redirecting to search...',
+          duration: 2000,
+        });
+        setTimeout(() => {
+          navigate('/search');
+        }, 2000);
       }
-    } else {
-      // Session not found, redirect to search
-      setError('Session not found');
+    } catch (error: any) {
+      console.error('[SearchWorkspace] Error loading session:', error);
+      setError(error.message || 'Invalid session data');
       setIsLoading(false);
+      toast.error('Failed to load session', {
+        description: error.message || 'Session data is corrupted',
+        duration: 5000,
+      });
       setTimeout(() => {
         navigate('/search');
       }, 2000);
@@ -204,6 +228,7 @@ function SearchWorkspaceContent() {
   }
 
   const selectedResult = session.results.find(r => r.id === selectedResultId) || null;
+  const [activeTab, setActiveTab] = useState<'answer' | 'results'>('answer');
 
   return (
     <AppShell>
@@ -255,23 +280,56 @@ function SearchWorkspaceContent() {
         </div>
       </div>
 
-      {/* Results Section */}
+      {/* Answer / Links Tabs Section */}
       <div id="results-section" className="col-span-1 sm:col-span-12 mt-8">
-        <ResultsPanel
-          results={session.results}
-          buckets={session.buckets}
-          isLoading={isLoadingFollowup}
-          onResultClick={setSelectedResultId}
-          onExploreDeeper={(resultId) => {
-            const result = session.results.find(r => r.id === resultId);
-            if (result) {
-              handleFollowup(`Tell me more about: ${result.title}`);
-            }
-          }}
-          graph={session.graph}
-          query={session.query}
-          sessionId={session.id}
-        />
+        {/* Tabs */}
+        <div className="flex items-center gap-1 mb-6 border-b border-borders-subtle">
+          <button
+            onClick={() => setActiveTab('answer')}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === 'answer'
+                ? 'text-text-primary border-b-2 border-[#E1463E]'
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Answer
+          </button>
+          <button
+            onClick={() => setActiveTab('results')}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              activeTab === 'results'
+                ? 'text-text-primary border-b-2 border-[#E1463E]'
+                : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            Results
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'answer' ? (
+          <AnswerPanel
+            query={session.query}
+            results={session.results}
+            onSourceClick={setSelectedResultId}
+          />
+        ) : activeTab === 'results' ? (
+          <ResultsPanel
+            results={session.results}
+            buckets={session.buckets}
+            isLoading={isLoadingFollowup}
+            onResultClick={setSelectedResultId}
+            onExploreDeeper={(resultId) => {
+              const result = session.results.find(r => r.id === resultId);
+              if (result) {
+                handleFollowup(`Tell me more about: ${result.title}`);
+              }
+            }}
+            graph={session.graph}
+            query={session.query}
+            sessionId={session.id}
+          />
+        ) : null}
       </div>
 
       {/* Suggested Questions */}

@@ -12,6 +12,10 @@ import { scrapeOfficialDocument, isFirecrawlAvailable } from '../phase4/firecraw
 import { extractEntities } from './entity-extractor';
 import { extractRelationshipsFromText, type Relationship } from './relationship-extractor';
 import { buildGraph } from './graph-builder';
+import { calculateImpactScore, type ImpactScore } from './impact-scorer';
+import { resolveCanonicalEvents } from './canonical-event-resolver';
+import { extractClaimsFromResults, type Claim } from './claims-extractor';
+import { getSearchMemory, updateSearchMemory, getRelevantEntitiesFromMemory, getRelevantRelationshipsFromMemory } from './search-memory';
 
 export type SearchMode = 'fast' | 'standard' | 'deep';
 
@@ -40,6 +44,8 @@ export interface SearchResult {
   publishedAt: string;
   relevanceScore: number;
   sourceScore: number;
+  impactScore?: number; // Impact score (0-1) for pre-Firecrawl filtering
+  impactFactors?: ImpactScore['factors']; // Impact scoring factors
   entities: Array<{
     id: string;
     type: 'country' | 'company' | 'commodity' | 'organization' | 'person';
@@ -48,6 +54,8 @@ export interface SearchResult {
   }>;
   tags: string[];
   content?: string;
+  mergedCount?: number; // Number of results merged into this canonical event
+  claims?: Claim[]; // Extracted actionable claims
 }
 
 export interface SearchBuckets {
@@ -82,12 +90,20 @@ export interface KnowledgeGraph {
     type: 'event' | 'country' | 'company' | 'commodity' | 'organization' | 'person';
     label: string;
     data: any;
+    validFrom?: string; // ISO timestamp (when this node became valid)
+    validTo?: string; // ISO timestamp (when this node became invalid, null = still valid)
+    confidence?: number; // 0-1 (confidence in this node)
+    sourceCount?: number; // How many sources support this node
   }>;
   links: Array<{
     source: string;
     target: string;
     type: 'causes' | 'precedes' | 'related_to' | 'operates_in' | 'exposes_to' | 'impacts';
     strength: number;
+    validFrom?: string; // ISO timestamp (when this link became valid)
+    validTo?: string; // ISO timestamp (when this link became invalid, null = still valid)
+    confidence?: number; // 0-1 (confidence in this link)
+    sourceCount?: number; // How many sources support this link
   }>;
 }
 
@@ -109,9 +125,21 @@ export interface SearchResponse {
 export async function search(
   query: string,
   mode: SearchMode = 'standard',
-  filters: SearchFilters = {}
+  filters: SearchFilters = {},
+  userId?: string | null // User ID for memory system
 ): Promise<SearchResponse> {
   const startTime = Date.now();
+  
+  // Load search memory if user is provided
+  const memory = userId ? await getSearchMemory(userId) : null;
+  
+  // Get relevant entities/relationships from memory for context
+  const relevantEntities = userId ? await getRelevantEntitiesFromMemory(userId, query, 20) : [];
+  const relevantRelationships = userId ? await getRelevantRelationshipsFromMemory(userId, undefined, 50) : [];
+  
+  if (memory && (relevantEntities.length > 0 || relevantRelationships.length > 0)) {
+    console.log(`[SearchOrchestrator] Using search memory: ${relevantEntities.length} entities, ${relevantRelationships.length} relationships`);
+  }
 
   // Step 1: Search with Tavily
   const tavilyOptions: TavilySearchOptions = {
@@ -149,6 +177,21 @@ export async function search(
   // Step 3: Apply filters
   results = applyFilters(results, filters);
 
+  // Step 3.5: Canonical Event Resolution (MVP - fuzzy match title+date, OpenAI only if ambiguous)
+  if (mode !== 'fast' && results.length > 1) {
+    console.log(`[SearchOrchestrator] Resolving canonical events from ${results.length} results...`);
+    const canonicalMap = await resolveCanonicalEvents(results);
+    
+    // Replace results with canonical events
+    results = Array.from(canonicalMap.values()).map(canonical => ({
+      ...canonical.representativeResult,
+      id: canonical.canonicalId, // Use stable canonical ID
+      mergedCount: canonical.mergedFrom.length, // Track how many were merged
+    }));
+    
+    console.log(`[SearchOrchestrator] Canonical resolution complete: ${results.length} unique events`);
+  }
+
   // Step 4: Extract entities (for standard and deep modes)
   if (mode !== 'fast') {
     const allText = results.map(r => `${r.title} ${r.summary} ${r.content || ''}`).join('\n\n');
@@ -168,11 +211,58 @@ export async function search(
     });
   }
 
-  // Step 5: Firecrawl enrichment (for deep mode or high-scoring results)
-  if (mode === 'deep' || (mode === 'standard' && results.some(r => r.relevanceScore > 0.8))) {
+  // Step 4.5: Impact Scoring BEFORE Firecrawl (NEW - reduces Firecrawl costs by 60-70%)
+  if (mode !== 'fast') {
+    console.log(`[SearchOrchestrator] Calculating impact scores for ${results.length} results...`);
+    
+    // Calculate impact scores in parallel (batch for efficiency)
+    const impactScorePromises = results.map(r => 
+      calculateImpactScore(r.title, r.summary, r.content, r.entities)
+        .catch(error => {
+          console.error(`[SearchOrchestrator] Error calculating impact score for ${r.id}:`, error.message);
+          return null;
+        })
+    );
+    
+    const impactScores = await Promise.all(impactScorePromises);
+    
+    // Attach impact scores to results
+    results = results.map((r, idx) => {
+      const impact = impactScores[idx];
+      if (impact) {
+        return {
+          ...r,
+          impactScore: impact.score,
+          impactFactors: impact.factors,
+        };
+      }
+      return r;
+    });
+    
+    console.log(`[SearchOrchestrator] Impact scores calculated. High-impact results (>0.7): ${results.filter(r => (r.impactScore || 0) > 0.7).length}`);
+  }
+
+  // Step 5: Firecrawl enrichment (NOW using impactScore instead of relevanceScore)
+  // Only enrich high-impact results (impactScore > 0.7) to reduce costs
+  const highImpactThreshold = 0.7;
+  const shouldEnrich = mode === 'deep' || (mode === 'standard' && results.some(r => (r.impactScore || r.relevanceScore) > highImpactThreshold));
+  
+  if (shouldEnrich) {
+    // Filter by impact score (preferred) or fallback to relevance score
     const topResults = results
-      .filter(r => r.relevanceScore > 0.8)
-      .slice(0, 3);
+      .filter(r => {
+        const score = r.impactScore ?? r.relevanceScore;
+        return score > highImpactThreshold;
+      })
+      .sort((a, b) => {
+        // Sort by impact score first, then relevance
+        const scoreA = a.impactScore ?? a.relevanceScore;
+        const scoreB = b.impactScore ?? b.relevanceScore;
+        return scoreB - scoreA;
+      })
+      .slice(0, 5); // Limit to top 5 high-impact results (was 3)
+
+    console.log(`[SearchOrchestrator] Enriching ${topResults.length} high-impact results with Firecrawl...`);
 
     for (const result of topResults) {
       if (isFirecrawlAvailable() && result.url) {
@@ -198,7 +288,40 @@ export async function search(
     }
   }
 
-  // Step 6: Extract relationships (for standard and deep modes)
+  // Step 6: Extract claims (for standard and deep modes)
+  // Claims are actionable predictions/statements/implications that inform decisions
+  if (mode !== 'fast') {
+    console.log(`[SearchOrchestrator] Extracting claims from ${results.length} results...`);
+    const allClaims = await extractClaimsFromResults(results, 5); // Max 5 claims per result
+    
+    // Attach claims to relevant results
+    const claimsByResult = new Map<string, Claim[]>();
+    for (const claim of allClaims) {
+      // Find results that mention entities from the claim
+      for (const result of results) {
+        const resultEntities = result.entities.map(e => e.name.toLowerCase());
+        const claimEntities = claim.entities.map(e => e.toLowerCase());
+        
+        // If claim entities overlap with result entities, attach claim
+        if (claimEntities.some(e => resultEntities.includes(e))) {
+          if (!claimsByResult.has(result.id)) {
+            claimsByResult.set(result.id, []);
+          }
+          claimsByResult.get(result.id)!.push(claim);
+        }
+      }
+    }
+    
+    // Attach claims to results
+    results = results.map(result => ({
+      ...result,
+      claims: claimsByResult.get(result.id) || [],
+    }));
+    
+    console.log(`[SearchOrchestrator] Extracted ${allClaims.length} total claims`);
+  }
+
+  // Step 7: Extract relationships (for standard and deep modes)
   let relationships: Relationship[] = [];
 
   if (mode !== 'fast') {
@@ -206,10 +329,10 @@ export async function search(
     relationships = await extractRelationshipsFromText(allText, results);
   }
 
-  // Step 7: Build buckets
+  // Step 8: Build buckets
   const buckets = buildBuckets(results);
 
-  // Step 8: Build knowledge graph
+  // Step 9: Build knowledge graph
   const graph = await buildGraph(results, relationships);
 
   const latencyMs = Date.now() - startTime;
