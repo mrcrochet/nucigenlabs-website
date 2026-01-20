@@ -8,7 +8,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { useUser } from '@clerk/clerk-react';
+import { useUser, useClerk } from '@clerk/clerk-react';
 import { getUserPreferences, updateUserPreferences } from '../lib/supabase';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
@@ -26,7 +26,12 @@ import {
   AlertCircle,
   Info,
   X,
-  Lock
+  Lock,
+  Mail,
+  Key,
+  Trash2,
+  Download,
+  Monitor
 } from 'lucide-react';
 
 // Available options (same as onboarding)
@@ -80,10 +85,17 @@ const TIME_HORIZON_OPTIONS = [
 
 function SettingsContent() {
   const { user } = useUser();
+  const [activeTab, setActiveTab] = useState<'preferences' | 'account' | 'security'>('preferences');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  
+  // Account management states
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
   const [preferences, setPreferences] = useState({
     preferred_sectors: [] as string[],
@@ -232,6 +244,41 @@ function SettingsContent() {
             </Card>
           )}
 
+          {/* Tabs */}
+          <div className="flex items-center gap-2 mb-6 border-b border-white/[0.02]">
+            <button
+              onClick={() => setActiveTab('preferences')}
+              className={`px-6 py-3 text-sm font-light transition-all border-b-2 ${
+                activeTab === 'preferences'
+                  ? 'text-white border-[#E1463E]'
+                  : 'text-slate-500 border-transparent hover:text-white'
+              }`}
+            >
+              Preferences
+            </button>
+            <button
+              onClick={() => setActiveTab('account')}
+              className={`px-6 py-3 text-sm font-light transition-all border-b-2 ${
+                activeTab === 'account'
+                  ? 'text-white border-[#E1463E]'
+                  : 'text-slate-500 border-transparent hover:text-white'
+              }`}
+            >
+              Account
+            </button>
+            <button
+              onClick={() => setActiveTab('security')}
+              className={`px-6 py-3 text-sm font-light transition-all border-b-2 ${
+                activeTab === 'security'
+                  ? 'text-white border-[#E1463E]'
+                  : 'text-slate-500 border-transparent hover:text-white'
+              }`}
+            >
+              Security
+            </button>
+          </div>
+
+          {activeTab === 'preferences' && (
           <div className="space-y-6">
             {/* Feed Preferences */}
             <Card className="p-6">
@@ -527,6 +574,248 @@ function SettingsContent() {
               </button>
             </div>
           </div>
+          )}
+
+          {activeTab === 'account' && (
+            <div className="space-y-6">
+              {/* Account Information */}
+              <Card className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <Mail className="w-5 h-5 text-[#E1463E]" />
+                  <h3 className="text-lg font-light text-white">Account Information</h3>
+                </div>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-light text-slate-300 mb-2">Email</label>
+                    <p className="text-sm text-slate-400">{user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress || 'N/A'}</p>
+                    <p className="text-xs text-slate-500 mt-1">Email changes are managed through Clerk</p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-light text-slate-300 mb-2">Account Created</label>
+                    <p className="text-sm text-slate-400">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</p>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Active Sessions */}
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <Monitor className="w-5 h-5 text-[#E1463E]" />
+                    <h3 className="text-lg font-light text-white">Active Sessions</h3>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      setLoadingSessions(true);
+                      try {
+                        const response = await fetch('/api/account/sessions', {
+                          headers: {
+                            'x-user-id': user?.id || '',
+                          },
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                          setSessions(data.data || []);
+                        }
+                      } catch (err) {
+                        console.error('Error loading sessions:', err);
+                      } finally {
+                        setLoadingSessions(false);
+                      }
+                    }}
+                    className="text-sm text-slate-400 hover:text-white transition-colors"
+                  >
+                    Refresh
+                  </button>
+                </div>
+                
+                {loadingSessions ? (
+                  <div className="text-center py-8">
+                    <div className="w-8 h-8 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-2"></div>
+                    <p className="text-sm text-slate-500">Loading sessions...</p>
+                  </div>
+                ) : sessions.length > 0 ? (
+                  <div className="space-y-3">
+                    {sessions.map((session, idx) => (
+                      <div key={idx} className="p-4 bg-white/5 rounded-lg border border-white/10">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm text-white font-medium">{session.ip || 'Unknown IP'}</p>
+                          <p className="text-xs text-slate-500">{new Date(session.lastSeen).toLocaleString()}</p>
+                        </div>
+                        <p className="text-xs text-slate-400 mb-1">{session.userAgent || 'Unknown browser'}</p>
+                        <p className="text-xs text-slate-500">{session.requestCount} requests</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500 text-center py-8">No active sessions found</p>
+                )}
+              </Card>
+
+              {/* Data Export */}
+              <Card className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <Download className="w-5 h-5 text-[#E1463E]" />
+                  <h3 className="text-lg font-light text-white">Data Export (GDPR)</h3>
+                </div>
+                
+                <p className="text-sm text-slate-400 mb-4">
+                  Download all your data in JSON format. This includes your profile, preferences, alerts, and activity logs.
+                </p>
+                
+                <button
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/api/account/export', {
+                        headers: {
+                          'x-user-id': user?.id || '',
+                        },
+                      });
+                      const data = await response.json();
+                      if (data.success) {
+                        // Download as JSON file
+                        const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `nucigen-data-export-${new Date().toISOString().split('T')[0]}.json`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        setSuccess(true);
+                        setTimeout(() => setSuccess(false), 3000);
+                      }
+                    } catch (err) {
+                      console.error('Error exporting data:', err);
+                      setError('Failed to export data. Please try again.');
+                    }
+                  }}
+                  className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Export My Data
+                </button>
+              </Card>
+
+              {/* Delete Account */}
+              <Card className="p-6 border-red-500/20">
+                <div className="flex items-center gap-3 mb-6">
+                  <Trash2 className="w-5 h-5 text-red-400" />
+                  <h3 className="text-lg font-light text-red-400">Delete Account</h3>
+                </div>
+                
+                <p className="text-sm text-slate-400 mb-4">
+                  Permanently delete your account and all associated data. This action cannot be undone.
+                </p>
+                
+                {!showDeleteConfirm ? (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 hover:bg-red-500/20 transition-colors text-sm font-light"
+                  >
+                    Delete Account
+                  </button>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-light text-slate-300 mb-2">
+                        Type <span className="text-red-400 font-medium">DELETE</span> to confirm
+                      </label>
+                      <input
+                        type="text"
+                        value={deleteConfirmation}
+                        onChange={(e) => setDeleteConfirmation(e.target.value)}
+                        className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-red-500/50"
+                        placeholder="DELETE"
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={async () => {
+                          if (deleteConfirmation !== 'DELETE') {
+                            setError('Please type DELETE to confirm');
+                            return;
+                          }
+                          try {
+                            const response = await fetch('/api/account/delete', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'x-user-id': user?.id || '',
+                              },
+                              body: JSON.stringify({ confirmation: deleteConfirmation }),
+                            });
+                            const data = await response.json();
+                            if (data.success) {
+                              setSuccess(true);
+                              setTimeout(() => {
+                                window.location.href = '/';
+                              }, 2000);
+                            } else {
+                              setError(data.message || 'Failed to delete account');
+                            }
+                          } catch (err) {
+                            console.error('Error deleting account:', err);
+                            setError('Failed to delete account. Please try again.');
+                          }
+                        }}
+                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-light"
+                      >
+                        Confirm Deletion
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowDeleteConfirm(false);
+                          setDeleteConfirmation('');
+                        }}
+                        className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            </div>
+          )}
+
+          {activeTab === 'security' && (
+            <div className="space-y-6">
+              {/* Password Change */}
+              <Card className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <Key className="w-5 h-5 text-[#E1463E]" />
+                  <h3 className="text-lg font-light text-white">Change Password</h3>
+                </div>
+                
+                <p className="text-sm text-slate-400 mb-4">
+                  Password changes are managed through Clerk. Use the link below to update your password.
+                </p>
+                
+                <Link
+                  to="/forgot-password"
+                  className="inline-block px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
+                >
+                  Change Password
+                </Link>
+              </Card>
+
+              {/* Email Change */}
+              <Card className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <Mail className="w-5 h-5 text-[#E1463E]" />
+                  <h3 className="text-lg font-light text-white">Change Email</h3>
+                </div>
+                
+                <p className="text-sm text-slate-400 mb-4">
+                  Email changes are managed through Clerk. Please contact support if you need to change your email address.
+                </p>
+              </Card>
+            </div>
+          )}
       </div>
     </AppShell>
   );

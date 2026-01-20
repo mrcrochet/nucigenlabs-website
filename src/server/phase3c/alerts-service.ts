@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { sendAlertEmail } from '../services/email-service.js';
 
 // Load environment variables
 const __filename = fileURLToPath(import.meta.url);

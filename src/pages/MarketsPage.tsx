@@ -19,6 +19,7 @@ import RelatedEventsCard from '../components/markets/RelatedEventsCard';
 import AssetTable from '../components/markets/AssetTable';
 import CorrelationMatrix from '../components/markets/CorrelationMatrix';
 import SignalHeatmap from '../components/markets/SignalHeatmap';
+import AlphaSignalsPanel from '../components/alpha/AlphaSignalsPanel';
 import FullscreenWrapper from '../components/ui/FullscreenWrapper';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
@@ -63,6 +64,11 @@ function MarketsPageContent() {
       <div className="col-span-1 sm:col-span-4 space-y-4">
         <AssetStatsCard symbol={selectedSymbol} />
         <RelatedEventsCard symbol={selectedSymbol} />
+        <AlphaSignalsPanel 
+          symbol={selectedSymbol}
+          autoRefresh={true}
+          refreshInterval={300}
+        />
       </div>
 
       {/* Row 3: Multi-asset visualizations */}

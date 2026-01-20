@@ -1,62 +1,51 @@
 /**
- * ErrorState - Reusable error display component
+ * ErrorState Component
  * 
- * Displays errors with clear messaging and optional retry action
+ * Displays error states with retry functionality
  */
 
-import { AlertCircle, RefreshCw, Settings } from 'lucide-react';
-import Button from './Button';
+import { AlertCircle, RefreshCw } from 'lucide-react';
+import { getUserFriendlyError } from '../../utils/error-handling-client';
 
-export interface ErrorStateProps {
-  title: string;
-  message: string;
-  provider?: string;
-  actionLabel?: string;
-  onAction?: () => void;
+interface ErrorStateProps {
+  error: any;
+  onRetry?: () => void;
+  retryLabel?: string;
   className?: string;
 }
 
 export default function ErrorState({
-  title,
-  message,
-  provider,
-  actionLabel,
-  onAction,
+  error,
+  onRetry,
+  retryLabel = 'Try Again',
   className = '',
 }: ErrorStateProps) {
+  const message = getUserFriendlyError(error);
+  const isRetryable = error?.status >= 500 || error?.status === 429 || error?.status === 408;
+
   return (
-    <div className={`bg-red-500/10 border border-red-500/20 rounded-xl p-6 ${className}`}>
-      <div className="flex items-start gap-4">
-        <div className="flex-shrink-0">
-          <AlertCircle className="w-6 h-6 text-red-400" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="text-red-400 font-medium mb-1">{title}</h3>
-          <p className="text-sm text-text-secondary mb-3">{message}</p>
-          
-          {provider && (
-            <p className="text-xs text-text-secondary/60 mb-3">
-              Provider: <span className="font-mono">{provider}</span>
-            </p>
-          )}
-          
-          {actionLabel && onAction && (
-            <Button
-              onClick={onAction}
-              variant="outline"
-              size="sm"
-              className="mt-2"
-            >
-              {actionLabel === 'Retry' || actionLabel === 'Retry Later' ? (
-                <RefreshCw className="w-4 h-4 mr-2" />
-              ) : (
-                <Settings className="w-4 h-4 mr-2" />
-              )}
-              {actionLabel}
-            </Button>
-          )}
-        </div>
+    <div className={`flex flex-col items-center justify-center py-12 px-4 text-center ${className}`}>
+      <div className="mb-4 p-4 bg-red-500/10 rounded-full">
+        <AlertCircle className="w-8 h-8 text-red-400" />
       </div>
+      
+      <h3 className="text-lg font-medium text-red-400 mb-2">
+        Something went wrong
+      </h3>
+      
+      <p className="text-sm text-text-secondary max-w-md mb-6">
+        {message}
+      </p>
+      
+      {onRetry && isRetryable && (
+        <button
+          onClick={onRetry}
+          className="flex items-center gap-2 px-6 py-3 bg-primary-red hover:bg-primary-red/90 text-white rounded-lg transition-colors text-sm font-light"
+        >
+          <RefreshCw className="w-4 h-4" />
+          {retryLabel}
+        </button>
+      )}
     </div>
   );
 }

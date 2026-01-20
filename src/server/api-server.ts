@@ -40,8 +40,11 @@ app.use(cors());
 app.use(express.json());
 
 // Audit middleware (for compliance and auditability)
-import { auditMiddleware } from './middleware/audit-middleware.js';
+import { auditMiddleware, logAuditEventManual } from './middleware/audit-middleware.js';
 app.use(auditMiddleware);
+
+// Error handling utilities
+import { asyncHandler } from './utils/error-handler.js';
 
 // Performance middleware
 import { performanceMiddleware, getPerformanceMetricsHandler } from './middleware/performance-middleware.js';
@@ -3789,6 +3792,304 @@ app.post('/api/save-search', async (req, res) => {
     });
   }
 });
+
+// Account management endpoints
+// POST /api/account/change-password - Change user password (validation only, actual change via Clerk)
+app.post('/api/account/change-password',
+  asyncHandler(async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    const userId = (req as any).user?.id || req.headers['x-user-id'] || null;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'User not authenticated',
+      });
+    }
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'Current password and new password are required',
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'New password must be at least 8 characters',
+      });
+    }
+
+    // Log password change request
+    await logAuditEventManual(
+      userId,
+      'password_change_requested',
+      'account',
+      userId,
+      { timestamp: new Date().toISOString() },
+      req.ip,
+      req.headers['user-agent'] as string,
+      req.path,
+      req.method
+    ).catch(() => {});
+
+    res.json({
+      success: true,
+      message: 'Password change should be handled via Clerk on the frontend',
+    });
+  }, {
+    timeout: 5000,
+    context: (req) => ({ endpoint: '/api/account/change-password' }),
+  })
+);
+
+// POST /api/account/change-email - Request email change (validation only, actual change via Clerk)
+app.post('/api/account/change-email',
+  asyncHandler(async (req, res) => {
+    const { newEmail } = req.body;
+    const userId = (req as any).user?.id || req.headers['x-user-id'] || null;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'User not authenticated',
+      });
+    }
+
+    if (!newEmail || typeof newEmail !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'New email is required',
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail)) {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'Invalid email format',
+      });
+    }
+
+    // Log email change request
+    await logAuditEventManual(
+      userId,
+      'email_change_requested',
+      'account',
+      userId,
+      { newEmail, timestamp: new Date().toISOString() },
+      req.ip,
+      req.headers['user-agent'] as string,
+      req.path,
+      req.method
+    ).catch(() => {});
+
+    res.json({
+      success: true,
+      message: 'Email change should be handled via Clerk on the frontend',
+    });
+  }, {
+    timeout: 5000,
+    context: (req) => ({ endpoint: '/api/account/change-email' }),
+  })
+);
+
+// GET /api/account/sessions - Get active sessions
+app.get('/api/account/sessions',
+  asyncHandler(async (req, res) => {
+    const userId = (req as any).user?.id || req.headers['x-user-id'] || null;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'User not authenticated',
+      });
+    }
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'SERVICE_UNAVAILABLE',
+        message: 'Database not configured',
+      });
+    }
+
+    // Get recent sessions from audit logs (last 30 days)
+    const { data: sessions } = await supabase
+      .from('audit_trail')
+      .select('source_ip, user_agent, created_at, request_path')
+      .eq('user_id', userId)
+      .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    // Group by IP and user agent to identify unique sessions
+    const uniqueSessions = new Map<string, any>();
+    if (sessions) {
+      sessions.forEach((session: any) => {
+        const key = `${session.source_ip}-${session.user_agent}`;
+        if (!uniqueSessions.has(key)) {
+          uniqueSessions.set(key, {
+            ip: session.source_ip,
+            userAgent: session.user_agent,
+            firstSeen: session.created_at,
+            lastSeen: session.created_at,
+            requestCount: 1,
+          });
+        } else {
+          const existing = uniqueSessions.get(key)!;
+          existing.lastSeen = session.created_at;
+          existing.requestCount++;
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: Array.from(uniqueSessions.values()),
+    });
+  }, {
+    timeout: 10000,
+    context: (req) => ({ endpoint: '/api/account/sessions' }),
+  })
+);
+
+// POST /api/account/delete - Request account deletion
+app.post('/api/account/delete',
+  asyncHandler(async (req, res) => {
+    const { confirmation } = req.body;
+    const userId = (req as any).user?.id || req.headers['x-user-id'] || null;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'User not authenticated',
+      });
+    }
+
+    if (confirmation !== 'DELETE') {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'Please type DELETE to confirm account deletion',
+      });
+    }
+
+    // Log deletion request
+    await logAuditEventManual(
+      userId,
+      'account_deletion_requested',
+      'account',
+      userId,
+      { timestamp: new Date().toISOString() },
+      req.ip,
+      req.headers['user-agent'] as string,
+      req.path,
+      req.method
+    ).catch(() => {});
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'SERVICE_UNAVAILABLE',
+        message: 'Database not configured',
+      });
+    }
+
+    // Mark user for deletion (soft delete)
+    const { error } = await supabase
+      .from('users')
+      .update({ 
+        email: `deleted_${Date.now()}@deleted.local`,
+        name: 'Deleted User',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId);
+
+    if (error) {
+      throw new Error(`Failed to mark account for deletion: ${error.message}`);
+    }
+
+    res.json({
+      success: true,
+      message: 'Account marked for deletion. Please contact support to complete the process.',
+    });
+  }, {
+    timeout: 10000,
+    context: (req) => ({ endpoint: '/api/account/delete' }),
+  })
+);
+
+// GET /api/account/export - Export user data (GDPR)
+app.get('/api/account/export',
+  asyncHandler(async (req, res) => {
+    const userId = (req as any).user?.id || req.headers['x-user-id'] || null;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'User not authenticated',
+      });
+    }
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'SERVICE_UNAVAILABLE',
+        message: 'Database not configured',
+      });
+    }
+
+    // Collect all user data
+    const [userProfile, preferences, alerts, auditLogs] = await Promise.all([
+      supabase.from('users').select('*').eq('id', userId).maybeSingle(),
+      supabase.from('user_preferences').select('*').eq('user_id', userId).maybeSingle(),
+      supabase.from('user_alerts').select('*').eq('user_id', userId).limit(1000),
+      supabase.from('audit_trail').select('*').eq('user_id', userId).limit(1000),
+    ]);
+
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      userId,
+      profile: userProfile.data || null,
+      preferences: preferences.data || null,
+      alerts: alerts.data || [],
+      auditLogs: auditLogs.data || [],
+    };
+
+    // Log export request
+    await logAuditEventManual(
+      userId,
+      'data_export_requested',
+      'account',
+      userId,
+      { timestamp: new Date().toISOString() },
+      req.ip,
+      req.headers['user-agent'] as string,
+      req.path,
+      req.method
+    ).catch(() => {});
+
+    res.json({
+      success: true,
+      data: exportData,
+    });
+  }, {
+    timeout: 30000,
+    context: (req) => ({ endpoint: '/api/account/export' }),
+  })
+);
 
 const server = app.listen(PORT, () => {
   console.log(`🚀 API Server running on http://localhost:${PORT}`);

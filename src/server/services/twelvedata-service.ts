@@ -19,6 +19,7 @@
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { withCache } from './cache-service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -131,7 +132,7 @@ async function makeRequest(
 }
 
 /**
- * Get real-time price for a symbol
+ * Get real-time price for a symbol (with cache)
  */
 export async function getRealTimePrice(symbol: string): Promise<{
   symbol: string;
@@ -141,13 +142,22 @@ export async function getRealTimePrice(symbol: string): Promise<{
   change?: number;
   change_percent?: number;
 }> {
-  const data = await makeRequest('/price', { symbol });
-  
-  return {
-    symbol: data.symbol || symbol,
-    price: parseFloat(data.price || '0'),
-    timestamp: data.timestamp || new Date().toISOString(),
-    volume: data.volume ? parseInt(data.volume) : undefined,
+  // Use cache for market data (1 minute TTL for real-time prices)
+  const cached = await withCache(
+    {
+      apiType: 'openai', // Using generic cache type
+      endpoint: 'getRealTimePrice',
+      ttlSeconds: 60, // 1 minute for real-time prices
+    },
+    { symbol },
+    async () => {
+      const data = await makeRequest('/price', { symbol });
+      return {
+        data: {
+          symbol: data.symbol || symbol,
+          price: parseFloat(data.price || '0'),
+          timestamp: data.timestamp || new Date().toISOString(),
+          volume: data.volume ? parseInt(data.volume) : undefined,
     change: data.change ? parseFloat(data.change) : undefined,
     change_percent: data.change_percent ? parseFloat(data.change_percent) : undefined,
   };

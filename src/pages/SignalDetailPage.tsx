@@ -28,6 +28,8 @@ import type { Signal } from '../types/intelligence';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import SignalEnrichment from '../components/signals/SignalEnrichment';
 import SignalExplanation from '../components/signals/SignalExplanation';
+import AlphaSignalsPanel from '../components/alpha/AlphaSignalsPanel';
+import type { Event } from '../types/intelligence';
 
 function SignalDetailContent() {
   const { id } = useParams<{ id: string }>();
@@ -37,6 +39,8 @@ function SignalDetailContent() {
   const [preferences, setPreferences] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [relatedEvents, setRelatedEvents] = useState<Event[]>([]);
+  const [symbols, setSymbols] = useState<string[]>([]);
 
   useEffect(() => {
     if (!id) {
@@ -55,6 +59,32 @@ function SignalDetailContent() {
           setError('Signal not found');
         } else {
           setSignal(foundSignal);
+          
+          // Load related events for alpha signals
+          if (foundSignal.related_event_ids && foundSignal.related_event_ids.length > 0) {
+            try {
+              const events = await Promise.all(
+                foundSignal.related_event_ids.map(async (eventId) => {
+                  try {
+                    return await getNormalizedEventById(eventId);
+                  } catch (err) {
+                    console.warn(`[SignalDetailPage] Failed to load event ${eventId}:`, err);
+                    return null;
+                  }
+                })
+              );
+              const validEvents = events.filter((e): e is Event => e !== null);
+              setRelatedEvents(validEvents);
+              
+              // Extract symbols from events
+              const eventSymbols = validEvents
+                .map(e => e.market_data?.symbol)
+                .filter((s): s is string => !!s);
+              setSymbols([...new Set(eventSymbols)]);
+            } catch (err) {
+              console.warn('[SignalDetailPage] Failed to load related events:', err);
+            }
+          }
         }
 
         // Load user preferences for enrichment
@@ -145,6 +175,15 @@ function SignalDetailContent() {
       <div className="col-span-1 sm:col-span-4 space-y-6">
         <SignalMetricsCard signal={signal} />
         <MarketValidationCard signal={signal} />
+        {/* Alpha Signals for related symbols */}
+        {symbols.length > 0 && (
+          <AlphaSignalsPanel 
+            symbol={symbols[0]} 
+            events={relatedEvents}
+            autoRefresh={true}
+            refreshInterval={300}
+          />
+        )}
       </div>
 
       {/* Row 3: NextActionsBar */}

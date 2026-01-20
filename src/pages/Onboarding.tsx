@@ -113,6 +113,51 @@ export default function Onboarding() {
 
   const [focusAreaInput, setFocusAreaInput] = useState('');
 
+  // Auto-save to localStorage
+  const STORAGE_KEY = user?.id ? `onboarding-${user.id}` : 'onboarding-draft';
+
+  // Load saved data from localStorage on mount
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.formData) setFormData(parsed.formData);
+        if (parsed.preferences) setPreferences(parsed.preferences);
+        if (parsed.currentStep) setCurrentStep(parsed.currentStep);
+      }
+    } catch (err) {
+      console.warn('[Onboarding] Failed to load saved data:', err);
+    }
+  }, [user?.id, STORAGE_KEY]);
+
+  // Auto-save on changes
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const saveData = {
+      formData,
+      preferences,
+      currentStep,
+      savedAt: new Date().toISOString(),
+    };
+    
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
+    } catch (err) {
+      console.warn('[Onboarding] Failed to save data:', err);
+    }
+  }, [formData, preferences, currentStep, user?.id, STORAGE_KEY]);
+
+  // Clear saved data on successful submission
+  const clearSavedData = () => {
+    if (user?.id) {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  };
+
   // Redirect if not authenticated (but don't redirect during form submission)
   useEffect(() => {
     if (authLoaded && !isSignedIn && !loading) {
@@ -231,6 +276,9 @@ export default function Onboarding() {
 
       // Only navigate after all data is saved successfully
       setLoading(false);
+      
+      // Clear saved data on success
+      clearSavedData();
       
       // Show success message before navigation
       showToast('Profile saved successfully!', 'success');

@@ -22,6 +22,7 @@ import KeyMetricsPanel from '../components/markets/KeyMetricsPanel';
 import RelatedEventsList from '../components/markets/RelatedEventsList';
 import ActiveSignalsList from '../components/markets/ActiveSignalsList';
 import AttributionPanel from '../components/markets/AttributionPanel';
+import AlphaSignalsPanel from '../components/alpha/AlphaSignalsPanel';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import SkeletonCard from '../components/ui/SkeletonCard';
@@ -89,8 +90,13 @@ function AssetDetailContent() {
       <div className="col-span-1 sm:col-span-8">
         <PriceChartWithMarkers symbol={symbol} />
       </div>
-      <div className="col-span-1 sm:col-span-4">
+      <div className="col-span-1 sm:col-span-4 space-y-6">
         <KeyMetricsPanel symbol={symbol} />
+        <AlphaSignalsPanel 
+          symbol={symbol}
+          autoRefresh={true}
+          refreshInterval={300}
+        />
       </div>
 
       {/* Row 3: Left (6) + Right (6) */}

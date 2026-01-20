@@ -27,10 +27,10 @@ export default function SignalHeader({ signal }: SignalHeaderProps) {
           </Badge>
         )}
 
-        {/* Horizon */}
-        {signal.horizon && (
+        {/* Time Horizon */}
+        {signal.time_horizon && (
           <Badge variant="neutral">
-            Horizon: {signal.horizon}
+            Horizon: {signal.time_horizon.charAt(0).toUpperCase() + signal.time_horizon.slice(1)}
           </Badge>
         )}
 
