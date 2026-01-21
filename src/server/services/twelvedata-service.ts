@@ -162,7 +162,7 @@ export async function getRealTimePrice(symbol: string): Promise<{
           change_percent: data.change_percent ? parseFloat(data.change_percent) : undefined,
         },
       };
-    },
+    }
   );
 
   return cached.data;

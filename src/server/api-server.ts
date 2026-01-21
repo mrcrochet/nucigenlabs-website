@@ -3518,47 +3518,10 @@ app.post('/api/search/session/:id/followup', async (req, res) => {
   }
 });
 
-// POST /api/search/synthesize-answer - Synthesize search results into structured answer
-app.post('/api/search/synthesize-answer', async (req, res) => {
-  try {
-    const { query, results } = req.body;
-
-    if (!query || typeof query !== 'string' || !query.trim()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Query is required',
-      });
-    }
-
-    if (!results || !Array.isArray(results) || results.length === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'Results are required',
-      });
-    }
-
-    console.log(`[API] Synthesizing answer for query: "${query}" (${results.length} results)`);
-
-    const { synthesizeAnswer } = await import('./services/answer-synthesizer.js');
-    const answer = await synthesizeAnswer(query.trim(), results);
-
-    res.json({
-      success: true,
-      answer,
-    });
-  } catch (error: any) {
-    console.error('[API] Answer synthesis error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to synthesize answer',
-    });
-  }
-});
-
 // POST /api/search/session/questions - Generate suggested questions
 app.post('/api/search/session/questions', async (req, res) => {
   try {
-    const { query, inputType, resultsCount, entities, claims, highImpactResults } = req.body;
+    const { query, inputType, resultsCount, entities } = req.body;
 
     // Generate questions using OpenAI
     const { callOpenAI } = await import('./services/openai-optimizer.js');
@@ -3576,34 +3539,12 @@ Question types:
 
 Return ONLY a JSON array of question strings.`;
 
-    // Build enhanced prompt with claims and impact data
-    let enhancedContext = `Query: ${query}
-Input Type: ${inputType}
-Results Found: ${resultsCount}
-Key Entities: ${entities?.join(', ') || 'None'}`;
-
-    if (claims && claims.length > 0) {
-      enhancedContext += `\n\nKey Claims Found:\n${claims.slice(0, 5).map((c: any, idx: number) => 
-        `${idx + 1}. ${c.text} (${c.type}, certainty: ${(c.certainty * 100).toFixed(0)}%)`
-      ).join('\n')}`;
-    }
-
-    if (highImpactResults && highImpactResults.length > 0) {
-      enhancedContext += `\n\nHigh-Impact Results:\n${highImpactResults.map((r: any, idx: number) => 
-        `${idx + 1}. ${r.title} (impact: ${((r.impactScore || 0) * 100).toFixed(0)}%)`
-      ).join('\n')}`;
-    }
-
     const userPrompt = `Generate follow-up questions for this search:
 
-${enhancedContext}
-
-Focus on:
-- Validating claims with low certainty
-- Exploring high-impact results in depth
-- Finding contradictions or counter-arguments
-- Assessing implications and exposures
-- Predicting next steps
+Query: ${query}
+Input Type: ${inputType}
+Results Found: ${resultsCount}
+Key Entities: ${entities?.join(', ') || 'None'}
 
 Return 4-6 questions as a JSON array of strings.`;
 

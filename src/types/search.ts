@@ -29,29 +29,9 @@ export interface SearchResult {
   publishedAt: string;
   relevanceScore: number;
   sourceScore: number;
-  impactScore?: number; // Impact score (0-1) for pre-Firecrawl filtering
-  impactFactors?: {
-    eventType: 'critical' | 'high' | 'medium' | 'low';
-    rarity: number;
-    entityCount: number;
-    sectorImpact: number;
-    temporalNovelty: number;
-  };
   entities: Entity[];
   tags: string[];
   content?: string;
-  claims?: Array<{
-    id: string;
-    text: string;
-    certainty: number;
-    actor: string;
-    timeHorizon: 'immediate' | 'short' | 'medium' | 'long';
-    type: 'prediction' | 'statement' | 'implication' | 'warning';
-    entities: string[];
-    sectors?: string[];
-    regions?: string[];
-  }>;
-  mergedCount?: number; // Number of results merged into this canonical event
 }
 
 export interface Entity {
