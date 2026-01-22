@@ -53,7 +53,6 @@ const ImpactDetailPage = lazy(() => import('./pages/ImpactDetailPage'));
 const Alerts = lazy(() => import('./pages/Alerts'));
 const Research = lazy(() => import('./pages/Research'));
 const Discover = lazy(() => import('./pages/Discover'));
-const Market = lazy(() => import('./pages/Market'));
 const SearchHome = lazy(() => import('./pages/SearchHome'));
 const SearchWorkspace = lazy(() => import('./pages/SearchWorkspace'));
 // Intelligence Detail Pages
@@ -222,7 +221,6 @@ function App() {
         <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
         <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} /> {/* App Research - Protected, different from /papers (marketing) */}
         <Route path="/discover" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
-        <Route path="/market" element={<ProtectedRoute><Market /></ProtectedRoute>} />
         <Route path="/search" element={<ProtectedRoute><SearchHome /></ProtectedRoute>} /> {/* Search Home - Simple entry point */}
         <Route path="/search/session/:sessionId" element={<ProtectedRoute><SearchWorkspace /></ProtectedRoute>} /> {/* Search Workspace - Results page */}
         {/* Recommendations (PHASE 7) */}
