@@ -95,12 +95,9 @@ export default function MarketValidationCard({ signal }: MarketValidationCardPro
             className="flex items-center justify-between p-3 bg-background-glass-subtle rounded-lg"
           >
             <div className="flex-1">
-              <Link
-                to={`/markets/${asset.symbol}`}
-                className="text-sm font-medium text-text-primary hover:text-primary-red transition-colors"
-              >
+              <span className="text-sm font-medium text-text-primary">
                 {asset.symbol}
-              </Link>
+              </span>
               <p className="text-xs text-text-tertiary mt-1">
                 Correlation: {(asset.correlation * 100).toFixed(0)}%
               </p>

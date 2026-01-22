@@ -28,7 +28,7 @@ const navItems = [
   { path: '/events-feed', label: 'Events', icon: Calendar },
   { path: '/signals-feed', label: 'Signals', icon: TrendingUp },
   { path: '/impacts', label: 'Impacts', icon: Target },
-  { path: '/markets', label: 'Markets', icon: BarChart3 },
+  { path: '/corporate-impact', label: 'Corporate Impact', icon: BarChart3 },
   { path: '/research', label: 'Research', icon: FileText },
   { path: '/alerts', label: 'Alerts', icon: Bell },
   { path: '/settings', label: 'Settings', icon: Settings },

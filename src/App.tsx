@@ -45,8 +45,6 @@ const EventsFeed = lazy(() => import('./pages/EventsFeed'));
 const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
 const SignalsFeed = lazy(() => import('./pages/SignalsFeed'));
 const SignalDetailPage = lazy(() => import('./pages/SignalDetailPage'));
-const MarketsPage = lazy(() => import('./pages/MarketsPage'));
-const AssetDetailPage = lazy(() => import('./pages/AssetDetailPage'));
 const ImpactsPage = lazy(() => import('./pages/ImpactsPage'));
 const ImpactDetailPage = lazy(() => import('./pages/ImpactDetailPage'));
 // Modules (Beta / Locked)
@@ -60,6 +58,7 @@ const IntelligenceRisks = lazy(() => import('./pages/IntelligenceRisks'));
 const IntelligencePredictions = lazy(() => import('./pages/IntelligencePredictions'));
 const IntelligenceImplications = lazy(() => import('./pages/IntelligenceImplications'));
 const PredictionPage = lazy(() => import('./pages/PredictionPage'));
+const CorporateImpactPage = lazy(() => import('./pages/CorporateImpactPage'));
 // User / System
 const Profile = lazy(() => import('./pages/Profile'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -132,7 +131,7 @@ function App() {
     '/app', '/dashboard', '/overview',
     '/events', '/events-feed',
     '/signals', '/signals-feed',
-    '/markets', '/impacts',
+    '/impacts',
     '/alerts', '/research', '/discover', '/search', '/recommendations', '/quality',  // App Research, NOT /papers (marketing)
     '/profile', '/settings', '/onboarding'
   ];
@@ -212,8 +211,6 @@ function App() {
         <Route path="/events-feed/:id" element={<ProtectedRoute><EventDetailPage /></ProtectedRoute>} />
         <Route path="/signals-feed" element={<ProtectedRoute><SignalsFeed /></ProtectedRoute>} />
         <Route path="/signals/:id" element={<ProtectedRoute><SignalDetailPage /></ProtectedRoute>} />
-        <Route path="/markets" element={<ProtectedRoute><MarketsPage /></ProtectedRoute>} />
-        <Route path="/markets/:symbol" element={<ProtectedRoute><AssetDetailPage /></ProtectedRoute>} />
         <Route path="/impacts" element={<ProtectedRoute><ImpactsPage /></ProtectedRoute>} />
         <Route path="/impacts/:id" element={<ProtectedRoute><ImpactDetailPage /></ProtectedRoute>} />
         
@@ -221,6 +218,7 @@ function App() {
         <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
         <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} /> {/* App Research - Protected, different from /papers (marketing) */}
         <Route path="/discover" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
+        <Route path="/corporate-impact" element={<ProtectedRoute><CorporateImpactPage /></ProtectedRoute>} />
         <Route path="/search" element={<ProtectedRoute><SearchHome /></ProtectedRoute>} /> {/* Search Home - Simple entry point */}
         <Route path="/search/session/:sessionId" element={<ProtectedRoute><SearchWorkspace /></ProtectedRoute>} /> {/* Search Workspace - Results page */}
         {/* Recommendations (PHASE 7) */}

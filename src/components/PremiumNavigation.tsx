@@ -27,7 +27,7 @@ export default function PremiumNavigation() {
     '/app', '/dashboard', '/overview',
     '/events', '/events-feed',
     '/signals', '/signals-feed',
-    '/markets', '/impacts',
+    '/impacts', '/corporate-impact',
     '/alerts', '/research', '/recommendations', '/quality',
     '/profile', '/settings', '/onboarding'
   ];

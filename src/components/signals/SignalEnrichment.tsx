@@ -9,7 +9,7 @@ import { enrichSignalWithPerplexity } from '../../lib/api/perplexity-api';
 import type { Signal } from '../../types/intelligence';
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
-import { Loader2, ExternalLink, Sparkles, TrendingUp, BookOpen } from 'lucide-react';
+import { Loader2, ExternalLink, Sparkles, TrendingUp, BookOpen, Users, AlertTriangle, Building2, Quote, Clock, History } from 'lucide-react';
 
 interface SignalEnrichmentProps {
   signal: Signal;
@@ -23,6 +23,35 @@ interface EnrichmentData {
   historical_context?: string;
   expert_analysis?: string;
   market_implications?: string;
+  comparable_events?: Array<{
+    event: string;
+    date: string;
+    outcome: string;
+  }>;
+  key_stakeholders?: Array<{
+    name: string;
+    role: string;
+    impact: string;
+  }>;
+  risk_factors?: Array<{
+    factor: string;
+    severity: 'low' | 'medium' | 'high';
+    description: string;
+  }>;
+  impacted_sectors?: Array<{
+    sector: string;
+    impact_level: 'low' | 'medium' | 'high';
+    reasoning: string;
+  }>;
+  expert_quotes?: Array<{
+    quote: string;
+    source: string;
+    date?: string;
+  }>;
+  timeline?: Array<{
+    date: string;
+    event: string;
+  }>;
   citations?: string[];
   related_questions?: string[];
   confidence?: number;
@@ -44,11 +73,66 @@ export default function SignalEnrichment({ signal, userPreferences }: SignalEnri
       // Ensure we have at least a summary
       const signalSummary = signal.summary || signal.why_it_matters || 'Signal detected with significant implications';
       
+      // Extract sector and region from signal if available
+      // Try to extract from title/summary if not directly available
+      let sector: string | undefined = undefined;
+      let region: string | undefined = undefined;
+      
+      // Common sector keywords
+      const sectorKeywords: Record<string, string> = {
+        'energy': 'Energy',
+        'oil': 'Energy',
+        'gas': 'Energy',
+        'renewable': 'Energy',
+        'defense': 'Defense',
+        'military': 'Defense',
+        'technology': 'Technology',
+        'semiconductor': 'Technology',
+        'chip': 'Technology',
+        'mining': 'Materials',
+        'supply chain': 'Supply Chain',
+        'manufacturing': 'Manufacturing',
+        'finance': 'Financial',
+        'banking': 'Financial',
+        'agriculture': 'Agriculture',
+        'food': 'Agriculture',
+      };
+      
+      // Common region keywords
+      const regionKeywords: Record<string, string> = {
+        'china': 'Asia',
+        'russia': 'Europe',
+        'europe': 'Europe',
+        'nato': 'Europe',
+        'middle east': 'Middle East',
+        'south america': 'South America',
+        'africa': 'Africa',
+        'asia': 'Asia',
+        'pacific': 'Asia-Pacific',
+      };
+      
+      // Try to extract sector from title/summary
+      const signalText = `${signal.title} ${signalSummary}`.toLowerCase();
+      for (const [keyword, sectorName] of Object.entries(sectorKeywords)) {
+        if (signalText.includes(keyword)) {
+          sector = sectorName;
+          break;
+        }
+      }
+      
+      // Try to extract region from title/summary
+      for (const [keyword, regionName] of Object.entries(regionKeywords)) {
+        if (signalText.includes(keyword)) {
+          region = regionName;
+          break;
+        }
+      }
+      
       const response = await enrichSignalWithPerplexity(signal.id, {
         signalTitle: signal.title,
         signalSummary: signalSummary,
-        sector: undefined, // Will be extracted from signal if needed
-        region: undefined, // Will be extracted from signal if needed
+        sector,
+        region,
         user_preferences: userPreferences,
       });
 
@@ -98,6 +182,26 @@ export default function SignalEnrichment({ signal, userPreferences }: SignalEnri
             </div>
           )}
 
+          {enrichment.comparable_events && enrichment.comparable_events.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <History className="w-4 h-4 text-text-secondary" />
+                <h4 className="text-sm font-semibold text-text-primary">Comparable Past Events</h4>
+              </div>
+              <div className="space-y-3">
+                {enrichment.comparable_events.map((event, idx) => (
+                  <div key={idx} className="p-3 bg-white/[0.03] border border-white/[0.08] rounded-lg">
+                    <div className="flex items-start justify-between mb-1">
+                      <span className="text-sm font-medium text-text-primary">{event.event}</span>
+                      <span className="text-xs text-text-tertiary ml-2">{event.date}</span>
+                    </div>
+                    <p className="text-xs text-text-secondary">{event.outcome}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {enrichment.expert_analysis && (
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -110,6 +214,26 @@ export default function SignalEnrichment({ signal, userPreferences }: SignalEnri
             </div>
           )}
 
+          {enrichment.expert_quotes && enrichment.expert_quotes.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Quote className="w-4 h-4 text-text-secondary" />
+                <h4 className="text-sm font-semibold text-text-primary">Expert Quotes</h4>
+              </div>
+              <div className="space-y-3">
+                {enrichment.expert_quotes.map((quote, idx) => (
+                  <div key={idx} className="p-3 bg-white/[0.03] border-l-2 border-[#E1463E] rounded">
+                    <p className="text-sm text-text-secondary italic mb-2">"{quote.quote}"</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-text-tertiary">— {quote.source}</span>
+                      {quote.date && <span className="text-xs text-text-tertiary">{quote.date}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {enrichment.market_implications && (
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -119,6 +243,97 @@ export default function SignalEnrichment({ signal, userPreferences }: SignalEnri
               <p className="text-sm text-text-secondary leading-relaxed">
                 {enrichment.market_implications}
               </p>
+            </div>
+          )}
+
+          {enrichment.impacted_sectors && enrichment.impacted_sectors.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Building2 className="w-4 h-4 text-text-secondary" />
+                <h4 className="text-sm font-semibold text-text-primary">Impacted Sectors</h4>
+              </div>
+              <div className="space-y-2">
+                {enrichment.impacted_sectors.map((sector, idx) => (
+                  <div key={idx} className="p-3 bg-white/[0.03] border border-white/[0.08] rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-text-primary">{sector.sector}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        sector.impact_level === 'high' ? 'bg-red-500/20 text-red-400' :
+                        sector.impact_level === 'medium' ? 'bg-orange-500/20 text-orange-400' :
+                        'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {sector.impact_level.toUpperCase()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-text-secondary">{sector.reasoning}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {enrichment.key_stakeholders && enrichment.key_stakeholders.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="w-4 h-4 text-text-secondary" />
+                <h4 className="text-sm font-semibold text-text-primary">Key Stakeholders Affected</h4>
+              </div>
+              <div className="space-y-2">
+                {enrichment.key_stakeholders.map((stakeholder, idx) => (
+                  <div key={idx} className="p-3 bg-white/[0.03] border border-white/[0.08] rounded-lg">
+                    <div className="flex items-start justify-between mb-1">
+                      <div>
+                        <span className="text-sm font-medium text-text-primary">{stakeholder.name}</span>
+                        <span className="text-xs text-text-tertiary ml-2">— {stakeholder.role}</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-text-secondary">{stakeholder.impact}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {enrichment.risk_factors && enrichment.risk_factors.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-4 h-4 text-text-secondary" />
+                <h4 className="text-sm font-semibold text-text-primary">Risk Factors</h4>
+              </div>
+              <div className="space-y-2">
+                {enrichment.risk_factors.map((risk, idx) => (
+                  <div key={idx} className="p-3 bg-white/[0.03] border border-white/[0.08] rounded-lg">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-text-primary">{risk.factor}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        risk.severity === 'high' ? 'bg-red-500/20 text-red-400' :
+                        risk.severity === 'medium' ? 'bg-orange-500/20 text-orange-400' :
+                        'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {risk.severity.toUpperCase()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-text-secondary">{risk.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {enrichment.timeline && enrichment.timeline.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Clock className="w-4 h-4 text-text-secondary" />
+                <h4 className="text-sm font-semibold text-text-primary">Timeline of Similar Events</h4>
+              </div>
+              <div className="space-y-2">
+                {enrichment.timeline.map((item, idx) => (
+                  <div key={idx} className="flex items-start gap-3 p-2">
+                    <div className="flex-shrink-0 w-20 text-xs text-text-tertiary">{item.date}</div>
+                    <div className="flex-1 text-sm text-text-secondary">{item.event}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -163,9 +378,9 @@ export default function SignalEnrichment({ signal, userPreferences }: SignalEnri
     <Card className="mt-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-text-primary mb-1">Enrich with Perplexity</h3>
+          <h3 className="text-sm font-semibold text-text-primary mb-1">Enrich with Perplexity AI</h3>
           <p className="text-xs text-text-secondary">
-            Get historical context, expert analysis, and market implications
+            Get comprehensive analysis: comparable past events, expert quotes, impacted sectors, risk factors, and key stakeholders
           </p>
         </div>
         <button

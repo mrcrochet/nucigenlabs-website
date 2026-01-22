@@ -83,6 +83,17 @@ async function runCycle(config: OrchestratorConfig) {
       // Don't fail the whole cycle if Perplexity tracking fails
     }
 
+    // Step 1E: Generate Corporate Impact signals
+    console.log('\n[Orchestrator] Step 1E: Generating Corporate Impact signals...');
+    try {
+      const { processCorporateImpactSignals } = await import('./corporate-impact-worker.js');
+      const corporateImpactResult = await processCorporateImpactSignals(5); // Process top 5 events
+      console.log(`[Orchestrator] Corporate Impact: ${corporateImpactResult.eventsProcessed} events processed, ${corporateImpactResult.signalsGenerated} signals generated, ${corporateImpactResult.errors} errors`);
+    } catch (error: any) {
+      console.warn('[Orchestrator] Corporate Impact generation failed:', error.message);
+      // Don't fail the whole cycle if Corporate Impact generation fails
+    }
+
     // Step 2: Process pending events
     console.log('\n[Orchestrator] Step 2: Processing pending events...');
     const processingResult = await processPendingEvents(config.processingBatchSize);

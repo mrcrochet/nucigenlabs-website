@@ -149,17 +149,15 @@ export default function ContextInspector({ eventId }: ContextInspectorProps) {
           <SectionHeader title="Related Assets" />
           <div className="mt-4 space-y-2">
             {data.relatedAssets.slice(0, 6).map((asset) => (
-              <Link
+              <div
                 key={asset.symbol}
-                to={`/markets/${asset.symbol}`}
-                className="flex items-center justify-between p-2 bg-background-glass-subtle rounded-lg hover:bg-background-glass-medium transition-colors"
+                className="flex items-center justify-between p-2 bg-background-glass-subtle rounded-lg"
               >
                 <div>
                   <p className="text-sm text-text-primary">{asset.symbol}</p>
                   <p className="text-xs text-text-tertiary">{asset.name}</p>
                 </div>
-                <ExternalLink className="w-4 h-4 text-text-tertiary" />
-              </Link>
+              </div>
             ))}
           </div>
         </Card>

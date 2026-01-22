@@ -53,6 +53,35 @@ export interface SignalEnrichmentResponse {
     historical_context?: string;
     expert_analysis?: string;
     market_implications?: string;
+    comparable_events?: Array<{
+      event: string;
+      date: string;
+      outcome: string;
+    }>;
+    key_stakeholders?: Array<{
+      name: string;
+      role: string;
+      impact: string;
+    }>;
+    risk_factors?: Array<{
+      factor: string;
+      severity: 'low' | 'medium' | 'high';
+      description: string;
+    }>;
+    impacted_sectors?: Array<{
+      sector: string;
+      impact_level: 'low' | 'medium' | 'high';
+      reasoning: string;
+    }>;
+    expert_quotes?: Array<{
+      quote: string;
+      source: string;
+      date?: string;
+    }>;
+    timeline?: Array<{
+      date: string;
+      event: string;
+    }>;
     citations?: string[];
     related_questions?: string[];
     confidence?: number;

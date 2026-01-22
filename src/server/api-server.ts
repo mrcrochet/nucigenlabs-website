@@ -192,6 +192,50 @@ app.get('/api/market-data/:symbol/timeseries', async (req, res) => {
   }
 });
 
+// Economic Data Endpoints (using Perplexity instead of Trading Economics)
+app.get('/api/economic-data/indicators', asyncHandler(async (req, res) => {
+  const { country, indicators } = req.query;
+  const { getEconomicIndicators } = await import('./services/economic-data-service.js');
+  
+  const indicatorList = indicators ? (Array.isArray(indicators) ? indicators : [indicators]) as string[] : undefined;
+  const data = await getEconomicIndicators(country as string, indicatorList);
+  
+  res.json({ success: true, data });
+}));
+
+app.get('/api/economic-data/market-indicators', asyncHandler(async (req, res) => {
+  const { type } = req.query;
+  const { getMarketIndicators } = await import('./services/economic-data-service.js');
+  
+  const data = await getMarketIndicators(type as 'commodities' | 'currencies' | 'bonds' | 'all' | undefined);
+  
+  res.json({ success: true, data });
+}));
+
+app.get('/api/economic-data/calendar', asyncHandler(async (req, res) => {
+  const { days = '7' } = req.query;
+  const { getEconomicCalendar } = await import('./services/economic-data-service.js');
+  
+  const data = await getEconomicCalendar(parseInt(days as string, 10));
+  
+  res.json({ success: true, data });
+}));
+
+// Health check for economic data service
+app.get('/api/economic-data/health', asyncHandler(async (req, res) => {
+  const { checkPerplexityHealth } = await import('./services/perplexity-service.js');
+  const isHealthy = await checkPerplexityHealth();
+  
+  res.json({
+    status: isHealthy ? 'ok' : 'unavailable',
+    service: 'economic-data',
+    provider: 'perplexity',
+    message: isHealthy 
+      ? 'Economic data service is operational (using Perplexity AI)'
+      : 'Economic data service unavailable (Perplexity API not configured)',
+  });
+}));
+
 // Performance metrics endpoint
 app.get('/metrics', getPerformanceMetricsHandler);
 
@@ -827,38 +871,6 @@ app.post('/api/intelligence/cluster', async (req, res) => {
   }
 });
 
-// Market Disconnect endpoint
-app.post('/api/markets/disconnect', async (req, res) => {
-  try {
-    const { signal, marketData } = req.body;
-
-    if (!signal) {
-      return res.status(400).json({
-        success: false,
-        error: 'signal is required',
-      });
-    }
-
-    const { MarketDisconnectAgent } = await import('./agents/market-disconnect-agent.js');
-    const agent = new MarketDisconnectAgent();
-    const disconnect = await agent.detectDisconnect({
-      signal,
-      marketData: marketData || {},
-    });
-
-    res.json({
-      success: true,
-      data: disconnect,
-    });
-  } catch (error: any) {
-    console.error('[API] Market disconnect error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Internal server error',
-    });
-  }
-});
-
 // Signal Explanation endpoint
 app.post('/api/signals/:id/explain', async (req, res) => {
   try {
@@ -1179,65 +1191,6 @@ app.get('/api/overview/narrative', async (req, res) => {
     });
   } catch (error: any) {
     console.error('[API] Overview narrative error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Internal server error',
-    });
-  }
-});
-
-// GET /api/markets/movers - Market movers
-app.get('/api/markets/movers', async (req, res) => {
-  try {
-    const range = (req.query.range as string) || '24h';
-    const limit = parseInt((req.query.limit as string) || '8', 10);
-
-    // Common symbols to track
-    const symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX', 'JPM', 'BAC'];
-
-    const movers = await Promise.all(
-      symbols.slice(0, limit).map(async (symbol) => {
-        try {
-          const priceData = await getRealTimePrice(symbol);
-          
-          // Get timeseries for sparkline
-          let sparklineData: number[] = [];
-          try {
-            const tsData = await getTimeSeries(symbol, { interval: '1h', days: 1 });
-            if (tsData && tsData.values) {
-              sparklineData = tsData.values.map((point: any) => parseFloat(point.close || point.price || 0));
-            }
-          } catch (tsError) {
-            // Ignore timeseries errors
-          }
-
-          return {
-            symbol,
-            name: `${symbol} Inc.`, // TODO: Get real name from API
-            change_percent: parseFloat(priceData.percent_change || '0'),
-            volume: parseInt(priceData.volume || '0'),
-            sparkline_data: sparklineData.length > 0 ? sparklineData : Array.from({ length: 10 }, () => Math.random() * 100),
-          };
-        } catch (error) {
-          console.warn(`[API] Failed to fetch data for ${symbol}:`, error);
-          return null;
-        }
-      })
-    );
-
-    const validMovers = movers.filter(m => m !== null);
-    
-    // Sort by change_percent (absolute value)
-    validMovers.sort((a, b) => Math.abs(b!.change_percent) - Math.abs(a!.change_percent));
-
-    res.json({
-      success: true,
-      data: {
-        movers: validMovers,
-      },
-    });
-  } catch (error: any) {
-    console.error('[API] Market movers error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Internal server error',
@@ -1614,128 +1567,6 @@ app.get('/api/signals/:id', async (req, res) => {
     });
   } catch (error: any) {
     console.error('[API] Signal detail error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Internal server error',
-    });
-  }
-});
-
-// ============================================
-// Optional Endpoints - Markets
-// ============================================
-
-// GET /api/markets/overview - Markets overview
-app.get('/api/markets/overview', async (req, res) => {
-  try {
-    // Get indices data
-    const indices = ['SPX', 'DJI', 'IXIC'].map(symbol => ({
-      symbol,
-      name: symbol === 'SPX' ? 'S&P 500' : symbol === 'DJI' ? 'Dow Jones' : 'NASDAQ',
-      price: 0,
-      change_percent: 0,
-    }));
-
-    // Get watchlist heatmap data (placeholder)
-    const heatmap = {
-      watchlist: 'default',
-      data: [] as any[],
-    };
-
-    res.json({
-      success: true,
-      data: {
-        indices,
-        heatmap,
-      },
-    });
-  } catch (error: any) {
-    console.error('[API] Markets overview error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Internal server error',
-    });
-  }
-});
-
-// GET /api/markets/asset/:symbol/attribution - Asset attribution
-app.get('/api/markets/asset/:symbol/attribution', async (req, res) => {
-  try {
-    const { symbol } = req.params;
-    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
-
-    if (!supabase) {
-      return res.status(503).json({
-        success: false,
-        error: 'Supabase not configured',
-      });
-    }
-
-    const supabaseUserId = userId ? await getSupabaseUserId(userId, supabase) : null;
-
-    // Get timeseries for the asset
-    const tsData = await getTimeSeries(symbol, { interval: '1h', days: 7 });
-    
-    if (!tsData || !tsData.values || tsData.values.length === 0) {
-      return res.json({
-        success: true,
-        data: {
-          symbol,
-          attributions: [],
-          note: 'Temporal proximity, not causality',
-        },
-      });
-    }
-
-    // Get events that might be related (same sector or region)
-    const { getNormalizedEvents } = await import('../lib/supabase.js');
-    const recentEvents = await getNormalizedEvents({
-      dateFrom: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      dateTo: new Date().toISOString(),
-      limit: 50,
-    }, supabaseUserId || undefined);
-
-    // Calculate price changes and match with events
-    const attributions: any[] = [];
-    const prices = tsData.values.map((v: any) => ({
-      timestamp: new Date(v.datetime),
-      price: parseFloat(v.close || v.price || 0),
-    }));
-
-    for (let i = 1; i < prices.length; i++) {
-      const delta = ((prices[i].price - prices[i - 1].price) / prices[i - 1].price) * 100;
-      
-      if (Math.abs(delta) > 1) { // Significant change (>1%)
-        // Find events within 24h of this price change
-        const eventTime = prices[i].timestamp;
-        const nearbyEvents = recentEvents.filter(e => {
-          const eventDate = new Date(e.created_at);
-          const diffHours = Math.abs(eventTime.getTime() - eventDate.getTime()) / (1000 * 60 * 60);
-          return diffHours <= 24;
-        });
-
-        if (nearbyEvents.length > 0) {
-          attributions.push({
-            event_id: nearbyEvents[0].id,
-            event_headline: nearbyEvents[0].summary || 'Event',
-            timestamp: eventTime.toISOString(),
-            delta_percent: delta,
-            temporal_proximity: 'within 24h',
-          });
-        }
-      }
-    }
-
-    res.json({
-      success: true,
-      data: {
-        symbol,
-        attributions: attributions.slice(0, 10), // Limit to 10
-        note: 'Temporal proximity, not causality',
-      },
-    });
-  } catch (error: any) {
-    console.error('[API] Asset attribution error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Internal server error',
@@ -2534,146 +2365,6 @@ app.get('/api/signals/:id', async (req, res) => {
     });
   } catch (error: any) {
     console.error('[API] Signal detail error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Internal server error',
-    });
-  }
-});
-
-// GET /api/markets/overview - Markets overview
-app.get('/api/markets/overview', async (req, res) => {
-  try {
-    // Common indices and symbols
-    const indices = [
-      { symbol: 'SPX', name: 'S&P 500' },
-      { symbol: 'DJI', name: 'Dow Jones' },
-      { symbol: 'IXIC', name: 'NASDAQ' },
-    ];
-
-    const indicesData = await Promise.all(
-      indices.map(async (index) => {
-        try {
-          const priceData = await getRealTimePrice(index.symbol);
-          return {
-            symbol: index.symbol,
-            name: index.name,
-            price: priceData.price || 0,
-            change_percent: priceData.change_percent || 0,
-          };
-        } catch (error: any) {
-          console.warn(`[API] Failed to fetch ${index.symbol}:`, error.message);
-          return null;
-        }
-      })
-    );
-
-    // Heatmap data (placeholder - TODO: implement watchlist-based heatmap)
-    const heatmap = {
-      watchlist: 'default',
-      data: [],
-    };
-
-    res.json({
-      success: true,
-      data: {
-        indices: indicesData.filter((i): i is NonNullable<typeof i> => i !== null),
-        heatmap,
-      },
-    });
-  } catch (error: any) {
-    console.error('[API] Markets overview error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Internal server error',
-    });
-  }
-});
-
-// GET /api/markets/asset/:symbol/attribution - Asset attribution (temporal proximity)
-app.get('/api/markets/asset/:symbol/attribution', async (req, res) => {
-  try {
-    const { symbol } = req.params;
-    const userId = (req.query.userId as string) || (req.body?.userId as string) || null;
-    const days = req.query.days ? parseInt(req.query.days as string, 10) : 7;
-
-    if (!supabase) {
-      return res.status(500).json({
-        success: false,
-        error: 'Supabase not configured',
-      });
-    }
-
-    // Import functions dynamically
-    const { getNormalizedEvents } = await import('../lib/supabase.js');
-
-    // Get price history to find significant moves
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    
-    const timeseries = await getTimeSeries(symbol, {
-      interval: '1day',
-      start_date: startDate.toISOString().split('T')[0],
-      end_date: endDate.toISOString().split('T')[0],
-    });
-
-    if (!timeseries || !timeseries.values || timeseries.values.length === 0) {
-      return res.json({
-        success: true,
-        data: {
-          symbol,
-          attributions: [],
-          note: 'Temporal proximity, not causality',
-        },
-      });
-    }
-
-    // Find significant price moves (> 2%)
-    const significantMoves: Array<{ timestamp: string; delta_percent: number }> = [];
-    for (let i = 1; i < timeseries.values.length; i++) {
-            const prev = parseFloat(timeseries.values[i - 1].close || '0');
-            const curr = parseFloat(timeseries.values[i].close || '0');
-      const delta = ((curr - prev) / prev) * 100;
-      
-      if (Math.abs(delta) > 2) {
-        significantMoves.push({
-          timestamp: timeseries.values[i].datetime,
-          delta_percent: delta,
-        });
-      }
-    }
-
-    // Get events within 24h of significant moves
-    const attributions = await Promise.all(
-      significantMoves.map(async (move) => {
-        const moveDate = new Date(move.timestamp);
-        const eventStart = new Date(moveDate.getTime() - 24 * 60 * 60 * 1000);
-        const eventEnd = new Date(moveDate.getTime() + 24 * 60 * 60 * 1000);
-
-        const allEvents = await getNormalizedEvents({}, userId || undefined);
-        const events = filterEventsByDateRange(allEvents, eventStart.toISOString(), eventEnd.toISOString());
-
-        return events.map((event: any) => ({
-          event_id: event.id,
-          event_headline: event.headline || event.description?.substring(0, 100) || 'Event',
-          timestamp: move.timestamp,
-          delta_percent: move.delta_percent,
-          temporal_proximity: 'within 24h',
-        }));
-      })
-    ).then(results => results.flat());
-
-    res.json({
-      success: true,
-      data: {
-        symbol,
-        attributions: attributions.slice(0, 10), // Limit to 10
-        note: 'Temporal proximity, not causality',
-      },
-    });
-  } catch (error: any) {
-    console.error('[API] Asset attribution error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Internal server error',
@@ -4262,6 +3953,145 @@ app.get('/api/account/export',
   })
 );
 
+// ============================================
+// Corporate Impact Endpoints
+// ============================================
+
+// GET /api/corporate-impact/signals - Get market signals with filters
+app.get('/api/corporate-impact/signals', async (req, res) => {
+  try {
+    const type = req.query.type as string; // 'all', 'opportunity', 'risk'
+    const sector = req.query.sector as string;
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+    const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    // Build query
+    let query = supabase
+      .from('market_signals')
+      .select('*', { count: 'exact' })
+      .eq('is_active', true)
+      .order('generated_at', { ascending: false });
+
+    // Apply filters
+    if (type && type !== 'all') {
+      query = query.eq('type', type);
+    }
+    if (sector) {
+      query = query.eq('company_sector', sector);
+    }
+
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1);
+
+    const { data: signals, error, count } = await query;
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    // Calculate stats
+    const { data: allSignals } = await supabase
+      .from('market_signals')
+      .select('type')
+      .eq('is_active', true);
+
+    const opportunities = allSignals?.filter(s => s.type === 'opportunity').length || 0;
+    const risks = allSignals?.filter(s => s.type === 'risk').length || 0;
+
+    // Transform to MarketSignal format
+    const transformedSignals = (signals || []).map((signal: any) => ({
+      id: signal.id,
+      type: signal.type,
+      company: {
+        name: signal.company_name,
+        ticker: signal.company_ticker,
+        sector: signal.company_sector,
+        market_cap: signal.company_market_cap,
+        current_price: signal.company_current_price,
+        exchange: signal.company_exchange,
+      },
+      prediction: {
+        direction: signal.prediction_direction,
+        magnitude: signal.prediction_magnitude,
+        timeframe: signal.prediction_timeframe,
+        confidence: signal.prediction_confidence,
+        target_price: signal.prediction_target_price,
+      },
+      catalyst_event: {
+        title: signal.catalyst_event_title,
+        event_id: signal.event_id,
+        tier: signal.catalyst_event_tier,
+        published: signal.generated_at ? new Date(signal.generated_at).toISOString() : new Date().toISOString(),
+      },
+      reasoning: {
+        summary: signal.reasoning_summary,
+        key_factors: signal.reasoning_key_factors || [],
+        risks: signal.reasoning_risks || [],
+      },
+      market_data: signal.market_data || {},
+      sources: signal.sources || [],
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        signals: transformedSignals,
+        total: count || 0,
+        stats: {
+          total_signals: allSignals?.length || 0,
+          opportunities,
+          risks,
+          avg_confidence: 'Medium-High', // Could calculate from actual data
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Corporate Impact signals error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// POST /api/corporate-impact/generate - Generate signals for a specific event (admin only)
+app.post('/api/corporate-impact/generate', async (req, res) => {
+  try {
+    const { eventId } = req.body;
+
+    if (!eventId) {
+      return res.status(400).json({
+        success: false,
+        error: 'eventId is required',
+      });
+    }
+
+    const { generateMarketSignalsFromEvent } = await import('./workers/corporate-impact-worker.js');
+    const count = await generateMarketSignalsFromEvent(eventId);
+
+    res.json({
+      success: true,
+      data: {
+        signalsGenerated: count,
+        eventId,
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Corporate Impact generate error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
 const server = app.listen(PORT, () => {
   console.log(`🚀 API Server running on http://localhost:${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/health`);
@@ -4280,18 +4110,17 @@ const server = app.listen(PORT, () => {
   console.log(`\n   Optional Endpoints (for performance):`);
   console.log(`   Overview KPIs: GET http://localhost:${PORT}/api/overview/kpis`);
   console.log(`   Overview Narrative: GET http://localhost:${PORT}/api/overview/narrative`);
-  console.log(`   Market Movers: GET http://localhost:${PORT}/api/markets/movers`);
   console.log(`   Triggered Alerts: GET http://localhost:${PORT}/api/alerts/triggered`);
   console.log(`   Events List: GET http://localhost:${PORT}/api/events`);
   console.log(`   Event Context: GET http://localhost:${PORT}/api/events/:id/context`);
   console.log(`   Event Predictions: GET http://localhost:${PORT}/api/events/:eventId/predictions`);
   console.log(`   Signals List: GET http://localhost:${PORT}/api/signals`);
   console.log(`   Signal Detail: GET http://localhost:${PORT}/api/signals/:id`);
-  console.log(`   Markets Overview: GET http://localhost:${PORT}/api/markets/overview`);
-  console.log(`   Asset Attribution: GET http://localhost:${PORT}/api/markets/asset/:symbol/attribution`);
   console.log(`   Impacts List: GET http://localhost:${PORT}/api/impacts`);
   console.log(`   Impact Detail: GET http://localhost:${PORT}/api/impacts/:id`);
   console.log(`   Discover Feed: GET http://localhost:${PORT}/api/discover`);
+  console.log(`   Corporate Impact Signals: GET http://localhost:${PORT}/api/corporate-impact/signals`);
+  console.log(`   Corporate Impact Generate: POST http://localhost:${PORT}/api/corporate-impact/generate`);
   console.log(`   EventRegistry Search Articles: GET http://localhost:${PORT}/api/eventregistry/search-articles`);
   console.log(`   EventRegistry Search Events: GET http://localhost:${PORT}/api/eventregistry/search-events`);
   console.log(`   EventRegistry Trending: GET http://localhost:${PORT}/api/eventregistry/trending`);

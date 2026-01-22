@@ -101,10 +101,9 @@ export default function MarketMoversCard() {
       
       <div className="mt-4 space-y-2">
         {movers.map((mover) => (
-          <Link
+          <div
             key={mover.symbol}
-            to={`/markets/${mover.symbol}`}
-            className="flex items-center justify-between p-3 bg-background-glass-subtle rounded-lg hover:bg-background-glass-medium transition-colors"
+            className="flex items-center justify-between p-3 bg-background-glass-subtle rounded-lg"
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
@@ -128,7 +127,7 @@ export default function MarketMoversCard() {
             <div className="w-16 h-8 ml-4">
               <Sparkline data={mover.sparklineData} />
             </div>
-          </Link>
+          </div>
         ))}
       </div>
     </Card>
