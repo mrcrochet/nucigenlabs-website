@@ -2,83 +2,113 @@
  * Corporate Impact Filters
  * 
  * Filter controls for Corporate Impact page
+ * Includes: Type filter, Sector filter, Category filter, and Search
  */
 
-import { Filter } from 'lucide-react';
+import { Filter, Search, X } from 'lucide-react';
+import { useState } from 'react';
 
 interface CorporateImpactFiltersProps {
   selectedFilter: 'all' | 'opportunity' | 'risk';
   selectedSector: string;
+  selectedCategory: string;
+  searchQuery: string;
   onFilterChange: (filter: 'all' | 'opportunity' | 'risk') => void;
   onSectorChange: (sector: string) => void;
+  onCategoryChange: (category: string) => void;
+  onSearchChange: (search: string) => void;
   opportunitiesCount: number;
   risksCount: number;
   totalCount: number;
+  availableSectors?: string[];
+  availableCategories?: string[];
 }
 
 export default function CorporateImpactFilters({
   selectedFilter,
   selectedSector,
+  selectedCategory,
+  searchQuery,
   onFilterChange,
   onSectorChange,
+  onCategoryChange,
+  onSearchChange,
   opportunitiesCount,
   risksCount,
   totalCount,
+  availableSectors = [],
+  availableCategories = [],
 }: CorporateImpactFiltersProps) {
-  const sectors = [
-    'All Sectors',
-    'Technology',
-    'Energy',
-    'Materials',
-    'Renewable Energy',
-    'Software',
+  const [showSearch, setShowSearch] = useState(false);
+
+  // Use available sectors from API, fallback to defaults
+  const sectors = availableSectors.length > 0 
+    ? ['All Sectors', ...availableSectors]
+    : ['All Sectors', 'Technology', 'Energy', 'Materials', 'Renewable Energy', 'Software', 'Finance', 'Healthcare', 'Industrial'];
+
+  // Map display names to database values
+  const categoryMap: Record<string, string> = {
+    'All Categories': 'all',
+    'Geopolitics': 'geopolitics',
+    'Finance': 'finance',
+    'Energy': 'energy',
+    'Supply Chain': 'supply-chain',
+  };
+
+  const categories = [
+    'All Categories',
+    'Geopolitics',
     'Finance',
-    'Healthcare',
-    'Industrial',
+    'Energy',
+    'Supply Chain',
   ];
 
   return (
     <div className="backdrop-blur-xl bg-gradient-to-br from-[#0A0A0A] to-[#0F0F0F] border-b border-white/[0.08] sticky top-[172px] z-40">
       <div className="max-w-6xl mx-auto px-6 py-4">
-        <div className="flex items-center gap-3">
-          <Filter className="w-5 h-5 text-slate-400" />
-          <div className="flex gap-2 flex-1">
+        {/* Main Filters Row */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <Filter className="w-5 h-5 text-slate-400 flex-shrink-0" />
+          
+          {/* Type Filters */}
+          <div className="flex gap-2 flex-1 min-w-0">
             <button
               onClick={() => onFilterChange('all')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                 selectedFilter === 'all'
                   ? 'backdrop-blur-xl bg-gradient-to-br from-white/[0.12] to-white/[0.04] border border-white/[0.2] text-white'
                   : 'backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] text-slate-400 hover:from-white/[0.08] hover:to-white/[0.04]'
               }`}
             >
-              All Signals ({totalCount})
+              All ({totalCount})
             </button>
             <button
               onClick={() => onFilterChange('opportunity')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                 selectedFilter === 'opportunity'
                   ? 'backdrop-blur-xl bg-gradient-to-br from-green-500/20 to-green-500/10 border border-green-500/30 text-green-400'
                   : 'backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] text-slate-400 hover:from-green-500/10 hover:to-green-500/5'
               }`}
             >
-              Opportunities ({opportunitiesCount})
+              ↑ Opportunities ({opportunitiesCount})
             </button>
             <button
               onClick={() => onFilterChange('risk')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                 selectedFilter === 'risk'
                   ? 'backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/20 to-[#E1463E]/10 border border-[#E1463E]/30 text-[#E1463E]'
                   : 'backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] text-slate-400 hover:from-[#E1463E]/10 hover:to-[#E1463E]/5'
               }`}
             >
-              Risks ({risksCount})
+              ↓ Risks ({risksCount})
             </button>
           </div>
 
+          {/* Sector Filter */}
           <select
             value={selectedSector}
             onChange={(e) => onSectorChange(e.target.value)}
-            className="px-4 py-2 backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50"
+            className="px-4 py-2 backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 min-w-[140px]"
           >
             {sectors.map((sector) => (
               <option key={sector} value={sector === 'All Sectors' ? 'all' : sector} className="bg-[#0A0A0A]">
@@ -86,7 +116,62 @@ export default function CorporateImpactFilters({
               </option>
             ))}
           </select>
+
+          {/* Category Filter */}
+          <select
+            value={selectedCategory}
+            onChange={(e) => onCategoryChange(e.target.value)}
+            className="px-4 py-2 backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 min-w-[140px]"
+          >
+            {categories.map((category) => (
+              <option key={category} value={categoryMap[category] || 'all'} className="bg-[#0A0A0A]">
+                {category}
+              </option>
+            ))}
+          </select>
+
+          {/* Search Toggle */}
+          <button
+            onClick={() => {
+              setShowSearch(!showSearch);
+              if (showSearch) {
+                onSearchChange('');
+              }
+            }}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              showSearch || searchQuery
+                ? 'backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/20 to-[#E1463E]/10 border border-[#E1463E]/30 text-[#E1463E]'
+                : 'backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] text-slate-400 hover:from-white/[0.08] hover:to-white/[0.04]'
+            }`}
+          >
+            <Search className="w-4 h-4" />
+          </button>
         </div>
+
+        {/* Search Bar */}
+        {showSearch && (
+          <div className="mt-3 flex items-center gap-2">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                placeholder="Search by company name..."
+                className="w-full pl-10 pr-10 py-2 backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50"
+                autoFocus
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => onSearchChange('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

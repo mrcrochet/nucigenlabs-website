@@ -26,6 +26,7 @@
     "pipeline:run-once": "RUN_ONCE=true npx tsx src/server/workers/pipeline-orchestrator.ts",
     "track:perplexity": "npx tsx scripts/track-perplexity-discover.ts",
     "track:perplexity:dev": "npx tsx --watch scripts/track-perplexity-discover.ts",
+    "trigger:corporate-impact": "npx tsx scripts/trigger-corporate-impact.ts",
     "quality:metrics": "npx tsx src/server/phase3b/quality-metrics-calculator.ts",
     "quality:metrics-range": "npx tsx src/server/phase3b/quality-metrics-calculator.ts range",
     "alerts:generate": "npx tsx src/server/workers/alerts-generator.ts",

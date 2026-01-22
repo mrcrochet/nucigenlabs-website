@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Sparkles, Activity, Info, ArrowRight } from 'lucide-react';
+import { Sparkles, Activity, Info, ArrowRight, AlertTriangle } from 'lucide-react';
 import CorporateImpactHeader from '../components/corporate-impact/CorporateImpactHeader';
 import CorporateImpactFilters from '../components/corporate-impact/CorporateImpactFilters';
 import SignalCard from '../components/corporate-impact/SignalCard';
@@ -23,12 +23,17 @@ export default function CorporateImpactPage() {
   });
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'opportunity' | 'risk'>('all');
   const [selectedSector, setSelectedSector] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [availableSectors, setAvailableSectors] = useState<string[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
 
   useEffect(() => {
     loadSignals();
-  }, [selectedFilter, selectedSector]);
+  }, [selectedFilter, selectedSector, selectedCategory, searchQuery]);
 
   const loadSignals = async () => {
     try {
@@ -40,136 +45,62 @@ export default function CorporateImpactPage() {
       if (selectedSector !== 'all') {
         params.append('sector', selectedSector);
       }
+      if (selectedCategory !== 'all') {
+        params.append('category', selectedCategory);
+      }
+      if (searchQuery) {
+        params.append('search', searchQuery);
+      }
       params.append('limit', '50');
 
-      const response = await fetch(`/api/corporate-impact/signals?${params.toString()}`);
+      const url = `/api/corporate-impact/signals?${params.toString()}`;
+      console.log('[Corporate Impact] Fetching signals from:', url);
+
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Corporate Impact] API error:', response.status, errorText);
+        throw new Error(`API error: ${response.status} - ${errorText.substring(0, 100)}`);
+      }
+
       const data = await response.json();
+      console.log('[Corporate Impact] API response:', { success: data.success, signalsCount: data.data?.signals?.length || 0 });
 
       if (data.success && data.data) {
         setSignals(data.data.signals || []);
         if (data.data.stats) {
           setStats(data.data.stats);
         }
+        if (data.data.available_sectors) {
+          setAvailableSectors(data.data.available_sectors);
+        }
+        if (data.data.available_categories) {
+          setAvailableCategories(data.data.available_categories);
+        }
+      } else if (data.error) {
+        console.error('[Corporate Impact] API returned error:', data.error);
+        setSignals([]);
       }
-    } catch (error) {
-      console.error('Error loading signals:', error);
+    } catch (error: any) {
+      console.error('[Corporate Impact] Error loading signals:', error);
       setSignals([]);
+      // Show error to user
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+        setError('API server not available. Please start it with: npm run api:server');
+      } else {
+        setError(error.message || 'Failed to load signals');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // Demo signals (shown when no real signals available)
-  const demoSignals: MarketSignal[] = [
-    {
-      id: 'demo-1',
-      type: 'opportunity',
-      company: {
-        name: 'Lockheed Martin',
-        ticker: 'LMT',
-        sector: 'Defense',
-        market_cap: '$120B',
-        current_price: '$450.20',
-        exchange: 'NYSE',
-      },
-      prediction: {
-        direction: 'up',
-        magnitude: '15-25%',
-        timeframe: '3-6 months',
-        confidence: 'medium-high',
-        target_price: '$520-560 (post-event, past cases)',
-      },
-      catalyst_event: {
-        title: 'NATO increases military readiness in response to regional tensions',
-        event_id: null,
-        tier: 'Strategic',
-        published: new Date().toISOString(),
-      },
-      reasoning: {
-        summary:
-          'Escalation in regional defense spending has historically increased procurement cycles for major defense contractors. Past NATO escalation cycles (2014-2018) showed consistent 15-25% stock appreciation for defense contractors within 3-6 months.',
-        key_factors: [
-          'NATO defense budgets increased 15% YoY in Q4 2024',
-          'Historical pattern: 2014-2018 Europe defense spending surge correlated with 40% LMT stock increase',
-          'Lockheed Martin holds 35% market share in F-35 program (NATO\'s primary fighter)',
-          'Recent $12B contract win for missile defense systems',
-        ],
-        risks: [
-          'Defense spending cycles can be delayed by political processes',
-          'Competition from European defense contractors (BAE Systems, Airbus)',
-          'Supply chain constraints may limit production capacity',
-        ],
-      },
-      market_data: {
-        volume_change: '+85%',
-        institutional_interest: 'Increasing (5 new positions last quarter)',
-        analyst_coverage: 'Heavy (18 analysts, avg target $480)',
-        short_interest: '2.1%',
-      },
-      sources: ['Reuters', 'Bloomberg', 'NATO Defense Procurement Database', 'Company SEC filings'],
-    },
-    {
-      id: 'demo-2',
-      type: 'risk',
-      company: {
-        name: 'Foxconn Technology Group',
-        ticker: '2317.TW',
-        sector: 'Manufacturing / Supply Chain',
-        market_cap: '$45B',
-        current_price: 'NT$105',
-        exchange: 'TWSE',
-      },
-      prediction: {
-        direction: 'down',
-        magnitude: '12-20%',
-        timeframe: '2-4 weeks',
-        confidence: 'medium',
-        target_price: 'NT$84-92 (post-event, past cases)',
-      },
-      catalyst_event: {
-        title: 'New semiconductor export restrictions expand to manufacturing equipment',
-        event_id: null,
-        tier: 'Critical',
-        published: new Date().toISOString(),
-      },
-      reasoning: {
-        summary:
-          'Rising geopolitical tensions and export controls increase operational risks for companies with heavy exposure to restricted manufacturing zones. Past trade disruption cycles (2020) showed 12-20% stock declines for China-exposed manufacturers within 2-4 weeks.',
-        key_factors: [
-          'Export controls directly impact Foxconn\'s China manufacturing facilities',
-          'Historical pattern: 2020 trade disruption caused 18% stock decline',
-          'Apple (major customer) diversifying supply chain away from China',
-          'Labor costs increasing in China, reducing margin advantage',
-        ],
-        risks: [
-          'Foxconn could pivot to other markets (India, Vietnam)',
-          'Strong relationships with major tech companies provide buffer',
-          'Export restrictions may be less severe than feared',
-        ],
-      },
-      market_data: {
-        volume_change: '+120%',
-        institutional_interest: 'Decreasing (3 large funds reduced positions)',
-        analyst_coverage: 'Moderate (8 analysts, avg target NT$95)',
-        short_interest: '8.5%',
-      },
-      sources: ['Financial Times', 'Bloomberg', 'Nikkei Asia', 'Company investor relations'],
-    },
-  ];
+  // Demo signals removed - system is now live
+  // Only real signals from database are displayed
 
-  const filteredSignals = signals.length > 0
-    ? signals.filter((signal) => {
-        if (selectedFilter === 'opportunities') return signal.type === 'opportunity';
-        if (selectedFilter === 'risks') return signal.type === 'risk';
-        if (selectedSector !== 'all' && signal.company.sector !== selectedSector) return false;
-        return true;
-      })
-    : demoSignals.filter((signal) => {
-        if (selectedFilter === 'opportunities') return signal.type === 'opportunity';
-        if (selectedFilter === 'risks') return signal.type === 'risk';
-        if (selectedSector !== 'all' && signal.company.sector !== selectedSector) return false;
-        return true;
-      });
+  // Filtering is now done server-side, but keep client-side filter as fallback
+  const filteredSignals = signals;
 
   return (
     <div className="min-h-screen bg-[#0A0A0A]">
@@ -178,11 +109,17 @@ export default function CorporateImpactPage() {
       <CorporateImpactFilters
         selectedFilter={selectedFilter}
         selectedSector={selectedSector}
+        selectedCategory={selectedCategory}
+        searchQuery={searchQuery}
         onFilterChange={setSelectedFilter}
         onSectorChange={setSelectedSector}
+        onCategoryChange={setSelectedCategory}
+        onSearchChange={setSearchQuery}
         opportunitiesCount={stats.opportunities}
         risksCount={stats.risks}
         totalCount={stats.total_signals}
+        availableSectors={availableSectors}
+        availableCategories={availableCategories}
       />
 
       {/* Activity Indicator */}
@@ -253,7 +190,7 @@ export default function CorporateImpactPage() {
             <div className="flex items-center gap-2 text-sm text-slate-400">
               <Info className="w-4 h-4" />
               <span>
-                <span className="text-white font-medium">Low Noise Mode Enabled</span> — Only companies with clear, evidence-backed exposure to real-world events are shown.
+                <span className="text-white font-medium">Low Noise Mode — Evidence-only signals</span> — Only companies with clear, evidence-backed exposure to real-world events are shown.
               </span>
             </div>
           </div>
@@ -267,6 +204,23 @@ export default function CorporateImpactPage() {
             <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-slate-400">Loading signals...</p>
           </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <div className="backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/10 to-[#E1463E]/5 border border-[#E1463E]/30 rounded-2xl p-8 max-w-2xl mx-auto">
+              <AlertTriangle className="w-12 h-12 text-[#E1463E] mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-white mb-2">Error Loading Signals</h3>
+              <p className="text-slate-400 mb-4">{error}</p>
+              <button
+                onClick={() => {
+                  setError(null);
+                  loadSignals();
+                }}
+                className="px-4 py-2 backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/20 to-[#E1463E]/10 border border-[#E1463E]/30 rounded-lg text-sm font-medium text-[#E1463E] hover:from-[#E1463E]/30 hover:to-[#E1463E]/20 transition-all"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
         ) : (
           <div className="space-y-6">
             {filteredSignals.map((signal) => (
@@ -275,17 +229,8 @@ export default function CorporateImpactPage() {
           </div>
         )}
 
-        {!loading && filteredSignals.length === 0 && signals.length === 0 && (
+        {!loading && !error && filteredSignals.length === 0 && (
           <EmptyState onShowHowItWorks={() => setShowHowItWorks(true)} />
-        )}
-
-        {/* Demo Signal Badge */}
-        {!loading && signals.length === 0 && filteredSignals.length > 0 && (
-          <div className="mb-4 backdrop-blur-xl bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border border-yellow-500/20 rounded-lg p-3">
-            <p className="text-sm text-yellow-400 text-center">
-              <span className="font-semibold">Demo signals</span> — Live signals coming soon
-            </p>
-          </div>
         )}
       </div>
     </div>

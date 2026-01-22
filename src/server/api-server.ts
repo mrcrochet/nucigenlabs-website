@@ -3962,6 +3962,8 @@ app.get('/api/corporate-impact/signals', async (req, res) => {
   try {
     const type = req.query.type as string; // 'all', 'opportunity', 'risk'
     const sector = req.query.sector as string;
+    const category = req.query.category as string; // 'geopolitics', 'finance', 'energy', 'supply-chain'
+    const search = req.query.search as string; // Search by company name
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
     const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
 
@@ -3970,6 +3972,34 @@ app.get('/api/corporate-impact/signals', async (req, res) => {
         success: false,
         error: 'Supabase not configured',
       });
+    }
+
+    // First, get event IDs if filtering by category
+    let eventIdsForCategory: string[] = [];
+    if (category && category !== 'all') {
+      const { data: events } = await supabase
+        .from('events')
+        .select('id')
+        .eq('discover_category', category);
+      eventIdsForCategory = (events || []).map((e: any) => e.id);
+      if (eventIdsForCategory.length === 0) {
+        // No events with this category, return empty
+        return res.json({
+          success: true,
+          data: {
+            signals: [],
+            total: 0,
+            stats: {
+              total_signals: 0,
+              opportunities: 0,
+              risks: 0,
+              avg_confidence: 'Medium-High',
+            },
+            available_sectors: [],
+            available_categories: [],
+          },
+        });
+      }
     }
 
     // Build query
@@ -3983,8 +4013,14 @@ app.get('/api/corporate-impact/signals', async (req, res) => {
     if (type && type !== 'all') {
       query = query.eq('type', type);
     }
-    if (sector) {
+    if (sector && sector !== 'all') {
       query = query.eq('company_sector', sector);
+    }
+    if (category && category !== 'all' && eventIdsForCategory.length > 0) {
+      query = query.in('event_id', eventIdsForCategory);
+    }
+    if (search) {
+      query = query.ilike('company_name', `%${search}%`);
     }
 
     // Apply pagination
@@ -3996,47 +4032,96 @@ app.get('/api/corporate-impact/signals', async (req, res) => {
       throw new Error(error.message);
     }
 
-    // Calculate stats
+    // Calculate stats and get available sectors/categories
     const { data: allSignals } = await supabase
       .from('market_signals')
-      .select('type')
+      .select('type, company_sector, event_id')
       .eq('is_active', true);
 
-    const opportunities = allSignals?.filter(s => s.type === 'opportunity').length || 0;
-    const risks = allSignals?.filter(s => s.type === 'risk').length || 0;
+    const opportunities = allSignals?.filter((s: any) => s.type === 'opportunity').length || 0;
+    const risks = allSignals?.filter((s: any) => s.type === 'risk').length || 0;
+
+    // Get unique sectors
+    const uniqueSectors = [...new Set((allSignals || []).map((s: any) => s.company_sector).filter(Boolean))];
+
+    // Get unique categories from events
+    const eventIds = [...new Set((allSignals || []).map((s: any) => s.event_id).filter(Boolean))];
+    let uniqueCategories: string[] = [];
+    if (eventIds.length > 0) {
+      const { data: events } = await supabase
+        .from('events')
+        .select('discover_category')
+        .in('id', eventIds.slice(0, 100)); // Limit to avoid too many queries
+      uniqueCategories = [...new Set((events || []).map((e: any) => e.discover_category).filter(Boolean))];
+    }
+
+    // Get event categories for signals
+    const signalEventIds = [...new Set((signals || []).map((s: any) => s.event_id).filter(Boolean))];
+    let eventCategoriesMap: Record<string, string> = {};
+    if (signalEventIds.length > 0) {
+      const { data: events } = await supabase
+        .from('events')
+        .select('id, discover_category')
+        .in('id', signalEventIds);
+      eventCategoriesMap = (events || []).reduce((acc: Record<string, string>, e: any) => {
+        if (e.id && e.discover_category) {
+          acc[e.id] = e.discover_category;
+        }
+        return acc;
+      }, {});
+    }
 
     // Transform to MarketSignal format
-    const transformedSignals = (signals || []).map((signal: any) => ({
-      id: signal.id,
-      type: signal.type,
-      company: {
-        name: signal.company_name,
-        ticker: signal.company_ticker,
-        sector: signal.company_sector,
-        market_cap: signal.company_market_cap,
-        current_price: signal.company_current_price,
-        exchange: signal.company_exchange,
-      },
-      prediction: {
-        direction: signal.prediction_direction,
-        magnitude: signal.prediction_magnitude,
-        timeframe: signal.prediction_timeframe,
-        confidence: signal.prediction_confidence,
-        target_price: signal.prediction_target_price,
-      },
-      catalyst_event: {
-        title: signal.catalyst_event_title,
-        event_id: signal.event_id,
-        tier: signal.catalyst_event_tier,
-        published: signal.generated_at ? new Date(signal.generated_at).toISOString() : new Date().toISOString(),
-      },
-      reasoning: {
-        summary: signal.reasoning_summary,
-        key_factors: signal.reasoning_key_factors || [],
-        risks: signal.reasoning_risks || [],
-      },
-      market_data: signal.market_data || {},
-      sources: signal.sources || [],
+    const transformedSignals = await Promise.all((signals || []).map(async (signal: any) => {
+      // Extract event category if available
+      const eventCategory = signal.event_id ? eventCategoriesMap[signal.event_id] || null : null;
+      // Get trade impact data from signal (already stored in trade_impact column)
+      let tradeImpact = null;
+      if (signal.trade_impact) {
+        try {
+          // Parse trade_impact JSONB if it's a string
+          tradeImpact = typeof signal.trade_impact === 'string' 
+            ? JSON.parse(signal.trade_impact) 
+            : signal.trade_impact;
+        } catch (error: any) {
+          console.warn(`[Corporate Impact API] Failed to parse trade_impact for signal ${signal.id}:`, error.message);
+        }
+      }
+      
+      return {
+        id: signal.id,
+        type: signal.type,
+        company: {
+          name: signal.company_name,
+          ticker: signal.company_ticker,
+          sector: signal.company_sector,
+          market_cap: signal.company_market_cap,
+          current_price: signal.company_current_price,
+          exchange: signal.company_exchange,
+        },
+        prediction: {
+          direction: signal.prediction_direction,
+          magnitude: signal.prediction_magnitude,
+          timeframe: signal.prediction_timeframe,
+          confidence: signal.prediction_confidence,
+          target_price: signal.prediction_target_price,
+        },
+        catalyst_event: {
+          title: signal.catalyst_event_title,
+          event_id: signal.event_id,
+          tier: signal.catalyst_event_tier,
+          category: eventCategory,
+          published: signal.generated_at ? new Date(signal.generated_at).toISOString() : new Date().toISOString(),
+        },
+        reasoning: {
+          summary: signal.reasoning_summary,
+          key_factors: signal.reasoning_key_factors || [],
+          risks: signal.reasoning_risks || [],
+        },
+        market_data: signal.market_data || {},
+        sources: Array.isArray(signal.sources) ? signal.sources : (signal.sources ? [signal.sources] : []),
+        ...(tradeImpact ? { trade_impact: tradeImpact } : {}),
+      };
     }));
 
     res.json({
@@ -4050,6 +4135,8 @@ app.get('/api/corporate-impact/signals', async (req, res) => {
           risks,
           avg_confidence: 'Medium-High', // Could calculate from actual data
         },
+        available_sectors: uniqueSectors,
+        available_categories: uniqueCategories,
       },
     });
   } catch (error: any) {
@@ -4092,6 +4179,266 @@ app.post('/api/corporate-impact/generate', async (req, res) => {
   }
 });
 
+// POST /api/corporate-impact/trigger - Manually trigger signal generation (admin/dev)
+app.post('/api/corporate-impact/trigger', async (req, res) => {
+  try {
+    const limit = req.body.limit ? parseInt(req.body.limit as string, 10) : 20;
+
+    console.log('[API] Manually triggering Corporate Impact signal generation...');
+
+    const { processCorporateImpactSignals } = await import('./workers/corporate-impact-worker.js');
+    const result = await processCorporateImpactSignals(limit);
+
+    console.log('[API] Corporate Impact generation complete:', result);
+
+    res.json({
+      success: true,
+      result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('[API] Error generating Corporate Impact signals:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate Corporate Impact signals',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// GET /api/corporate-impact/comparable-events - Get comparable historical events
+app.get('/api/corporate-impact/comparable-events', async (req, res) => {
+  try {
+    const eventId = req.query.event_id as string;
+    const company = req.query.company as string;
+    const type = req.query.type as string;
+
+    if (!eventId) {
+      return res.status(400).json({
+        success: false,
+        error: 'event_id is required',
+      });
+    }
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    // Get current event
+    const { data: currentEvent, error: eventError } = await supabase
+      .from('events')
+      .select('*')
+      .eq('id', eventId)
+      .single();
+
+    if (eventError || !currentEvent) {
+      return res.status(404).json({
+        success: false,
+        error: 'Event not found',
+      });
+    }
+
+    // Get historical events (events before current event)
+    const { data: historicalEvents, error: historicalError } = await supabase
+      .from('events')
+      .select('id, title, description, content, published_at, discover_category, discover_tier')
+      .neq('id', eventId)
+      .lt('published_at', currentEvent.published_at || new Date().toISOString())
+      .order('published_at', { ascending: false })
+      .limit(20);
+
+    if (historicalError) {
+      throw new Error(historicalError.message);
+    }
+
+    if (!historicalEvents || historicalEvents.length === 0) {
+      return res.json({
+        success: true,
+        data: { events: [] },
+      });
+    }
+
+    // Use OpenAI to find similar events
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) {
+      return res.json({
+        success: true,
+        data: { events: historicalEvents.slice(0, 5).map((e: any) => ({
+          id: e.id,
+          title: e.title,
+          description: e.description,
+          published_at: e.published_at,
+          discover_category: e.discover_category,
+          discover_tier: e.discover_tier,
+        })) },
+      });
+    }
+
+    const OpenAI = (await import('openai')).default;
+    const openai = new OpenAI({ apiKey: openaiApiKey });
+
+    const historicalContext = historicalEvents.map((e: any, idx: number) => 
+      `[Historical Event ${idx + 1}]
+ID: ${e.id}
+Title: ${e.title}
+${e.description ? `Description: ${e.description.substring(0, 200)}` : ''}
+Category: ${e.discover_category || 'N/A'}
+Tier: ${e.discover_tier || 'N/A'}
+Published: ${e.published_at}`
+    ).join('\n\n');
+
+    const prompt = `Compare this current event with historical events to find similar patterns.
+
+CURRENT EVENT:
+Title: ${currentEvent.title}
+${currentEvent.description ? `Description: ${currentEvent.description.substring(0, 300)}` : ''}
+Category: ${currentEvent.discover_category || 'N/A'}
+Tier: ${currentEvent.discover_tier || 'N/A'}
+Company: ${company || 'N/A'}
+Signal Type: ${type || 'N/A'}
+
+HISTORICAL EVENTS:
+${historicalContext}
+
+Find events that are similar in:
+- Category/type
+- Sector/region impact
+- Event characteristics
+- Potential market impact
+
+For each similar event (similarity >= 0.6), return:
+- similarity_score (0-1)
+- similarity_factors (array of strings like ['category', 'sector', 'region'])
+- comparison_insights (2-3 sentences)
+- outcome_differences (2-3 sentences about what happened)
+- lessons_learned (2-3 sentences)
+
+Return JSON object with "comparisons" array (max 5 events, sorted by similarity_score descending):
+{
+  "comparisons": [
+    {
+      "id": "event-id",
+      "similarity_score": 0.85,
+      "similarity_factors": ["category", "sector"],
+      "comparison_insights": "...",
+      "outcome_differences": "...",
+      "lessons_learned": "..."
+    }
+  ]
+}`;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a financial historian specializing in identifying similar historical events. Return only valid JSON object with "comparisons" array.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.3,
+      max_tokens: 2000,
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      return res.json({
+        success: true,
+        data: { events: historicalEvents.slice(0, 5).map((e: any) => ({
+          id: e.id,
+          title: e.title,
+          description: e.description,
+          published_at: e.published_at,
+          discover_category: e.discover_category,
+          discover_tier: e.discover_tier,
+        })) },
+      });
+    }
+
+    const parsed = JSON.parse(content);
+    const comparisons = parsed.comparisons || [];
+
+    // Merge with event data
+    const eventsMap = new Map(historicalEvents.map((e: any) => [e.id, e]));
+    const comparableEvents = comparisons
+      .filter((c: any) => eventsMap.has(c.id))
+      .map((c: any) => {
+        const event = eventsMap.get(c.id);
+        return {
+          id: event.id,
+          title: event.title,
+          description: event.description,
+          published_at: event.published_at,
+          discover_category: event.discover_category,
+          discover_tier: event.discover_tier,
+          similarity_score: c.similarity_score,
+          similarity_factors: c.similarity_factors || [],
+          comparison_insights: c.comparison_insights,
+          outcome_differences: c.outcome_differences,
+          lessons_learned: c.lessons_learned,
+        };
+      })
+      .slice(0, 5);
+
+    res.json({
+      success: true,
+      data: { events: comparableEvents },
+    });
+  } catch (error: any) {
+    console.error('[API] Comparable events error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/cron/corporate-impact - Vercel Cron Job endpoint (automatic signal generation every hour)
+app.get('/api/cron/corporate-impact', async (req: express.Request, res: express.Response) => {
+  try {
+    // Verify cron secret (Vercel sends this header)
+    const authHeader = req.headers['authorization'];
+    const cronSecret = process.env.CRON_SECRET || process.env.VERCEL_CRON_SECRET;
+
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      if (process.env.NODE_ENV === 'production' && !authHeader) {
+        return res.status(401).json({
+          success: false,
+          error: 'Unauthorized - cron secret required',
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+
+    console.log('[API Cron] Starting Corporate Impact signal generation...');
+
+    const { processCorporateImpactSignals } = await import('./workers/corporate-impact-worker.js');
+    const result = await processCorporateImpactSignals(20); // Process top 20 events (increased from 5)
+
+    console.log('[API Cron] Corporate Impact generation complete:', result);
+
+    res.json({
+      success: true,
+      result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('[API Cron] Error generating Corporate Impact signals:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate Corporate Impact signals',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 const server = app.listen(PORT, () => {
   console.log(`🚀 API Server running on http://localhost:${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/health`);
@@ -4121,6 +4468,9 @@ const server = app.listen(PORT, () => {
   console.log(`   Discover Feed: GET http://localhost:${PORT}/api/discover`);
   console.log(`   Corporate Impact Signals: GET http://localhost:${PORT}/api/corporate-impact/signals`);
   console.log(`   Corporate Impact Generate: POST http://localhost:${PORT}/api/corporate-impact/generate`);
+  console.log(`   Corporate Impact Trigger: POST http://localhost:${PORT}/api/corporate-impact/trigger`);
+  console.log(`   Corporate Impact Comparable Events: GET http://localhost:${PORT}/api/corporate-impact/comparable-events`);
+  console.log(`   Corporate Impact Cron: GET http://localhost:${PORT}/api/cron/corporate-impact`);
   console.log(`   EventRegistry Search Articles: GET http://localhost:${PORT}/api/eventregistry/search-articles`);
   console.log(`   EventRegistry Search Events: GET http://localhost:${PORT}/api/eventregistry/search-events`);
   console.log(`   EventRegistry Trending: GET http://localhost:${PORT}/api/eventregistry/trending`);

@@ -94,7 +94,7 @@ async function getRelevantEvents(limit: number = 10): Promise<Event[]> {
   try {
     const { data, error } = await supabase
       .from('events')
-      .select('id, title, description, summary, discover_tier, discover_category, sector, region, published_at')
+      .select('id, title, description, content, discover_tier, discover_category, published_at')
       .or('discover_tier.eq.critical,discover_tier.eq.strategic')
       .in('discover_category', ['geopolitics', 'finance', 'energy', 'supply-chain'])
       .gte('published_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
@@ -125,10 +125,9 @@ async function identifyCompaniesWithPerplexity(event: Event): Promise<CompanyImp
   try {
     const eventContext = `
 Event Title: ${event.title}
-${event.summary ? `Summary: ${event.summary}` : ''}
 ${event.description ? `Description: ${event.description.substring(0, 500)}` : ''}
-${event.sector ? `Sector: ${event.sector}` : ''}
-${event.region ? `Region: ${event.region}` : ''}
+${event.content ? `Content: ${event.content.substring(0, 500)}` : ''}
+${event.discover_category ? `Category: ${event.discover_category}` : ''}
 ${event.discover_category ? `Category: ${event.discover_category}` : ''}
 `;
 
@@ -182,6 +181,11 @@ Return a JSON array with this structure:
       return [];
     }
 
+    // Extract citations/URLs from Perplexity response
+    const citations = response.choices[0]?.message?.citations || response.citations || [];
+    const urlPattern = /https?:\/\/[^\s\)]+/g;
+    const foundUrls = [...new Set([...content.match(urlPattern) || [], ...citations])];
+
     // Extract JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
@@ -192,7 +196,13 @@ Return a JSON array with this structure:
     const parsed = JSON.parse(jsonMatch[0]);
     const companies = parsed.companies || [];
 
-    console.log(`[Corporate Impact] Identified ${companies.length} companies for event ${event.id}`);
+    // Store URLs in a global variable or return them with companies
+    // We'll attach them to the companies array as metadata
+    (companies as any[]).forEach((company: any) => {
+      company._perplexityUrls = foundUrls;
+    });
+
+    console.log(`[Corporate Impact] Identified ${companies.length} companies for event ${event.id} with ${foundUrls.length} source URLs`);
     return companies as CompanyImpact[];
   } catch (error: any) {
     console.error('[Corporate Impact] Error identifying companies:', error.message);
@@ -319,7 +329,7 @@ Return JSON:
 /**
  * Generate market signals from an event
  */
-async function generateMarketSignalsFromEvent(eventId: string): Promise<number> {
+export async function generateMarketSignalsFromEvent(eventId: string): Promise<number> {
   try {
     // Get event
     const { data: event, error: eventError } = await supabase
@@ -331,6 +341,57 @@ async function generateMarketSignalsFromEvent(eventId: string): Promise<number> 
     if (eventError || !event) {
       console.error(`[Corporate Impact] Event not found: ${eventId}`);
       return 0;
+    }
+
+    // STEP: Analyze trade impact with Comtrade (if applicable)
+    let tradeImpactData = null;
+    try {
+      const { analyzeTradeImpact, generateTradeImpactExplanation, storeTradeImpactData } = await import('../services/comtrade-impact-analyzer.js');
+      
+      // Extract countries and sectors from event
+      const countries: string[] = [];
+      const sectors: string[] = [];
+      
+      // Try to extract from event fields
+      if (event.region) {
+        countries.push(event.region);
+      }
+      if (event.sector) {
+        sectors.push(event.sector);
+      }
+      if ((event as any).country) {
+        countries.push((event as any).country);
+      }
+      
+      // If we have countries and sectors, analyze trade impact
+      if (countries.length > 0 && sectors.length > 0) {
+        console.log(`[Corporate Impact] Analyzing trade impact with Comtrade for event ${eventId}`);
+        
+        const tradeImpact = await analyzeTradeImpact({
+          event_id: eventId,
+          countries,
+          sectors,
+          event_date: event.published_at || new Date().toISOString(),
+          comparison_window: '3-6 months',
+        });
+
+        if (tradeImpact && tradeImpact.trade_impact_score > 0.3) {
+          // Only store if impact is significant
+          const explanation = await generateTradeImpactExplanation(
+            tradeImpact,
+            event.title,
+            event.description || event.content || ''
+          );
+          
+          await storeTradeImpactData(eventId, tradeImpact, explanation);
+          tradeImpactData = tradeImpact;
+          
+          console.log(`[Corporate Impact] Trade impact validated: Score ${tradeImpact.trade_impact_score.toFixed(2)}, Type: ${tradeImpact.impact_type}`);
+        }
+      }
+    } catch (error: any) {
+      console.warn(`[Corporate Impact] Comtrade analysis failed (non-blocking):`, error.message);
+      // Continue without trade impact data
     }
 
     // Identify companies
@@ -347,7 +408,51 @@ async function generateMarketSignalsFromEvent(eventId: string): Promise<number> 
         const prediction = await generateSignalPrediction(company, event as Event);
 
         // Get sources from Perplexity citations (if available)
-        const sources = ['Perplexity Research', 'Market Analysis'];
+        const perplexityUrls = (company as any)._perplexityUrls || [];
+        const sources: Array<string | { type: string; title?: string; url?: string }> = [];
+        
+        // Add Perplexity sources with URLs
+        if (perplexityUrls.length > 0) {
+          perplexityUrls.slice(0, 10).forEach((url: string) => {
+            sources.push({
+              type: 'perplexity',
+              url: url,
+              title: new URL(url).hostname.replace('www.', ''),
+            });
+          });
+        } else {
+          // Fallback if no URLs found
+          sources.push('Perplexity Research');
+        }
+        
+        // Add Market Analysis
+        sources.push('Market Analysis');
+
+        // Boost confidence if trade impact is validated
+        let finalConfidence = prediction.confidence;
+        if (tradeImpactData && tradeImpactData.confidence > 0.7) {
+          // Boost confidence by one level if trade impact is validated
+          const confidenceLevels: Array<'low' | 'medium-low' | 'medium' | 'medium-high' | 'high'> = 
+            ['low', 'medium-low', 'medium', 'medium-high', 'high'];
+          const currentIndex = confidenceLevels.indexOf(prediction.confidence);
+          if (currentIndex < confidenceLevels.length - 1) {
+            finalConfidence = confidenceLevels[currentIndex + 1];
+          }
+        }
+
+        // Include trade impact data if available
+        let tradeImpactForSignal = null;
+        if (tradeImpactData) {
+          tradeImpactForSignal = {
+            trade_impact_score: tradeImpactData.trade_impact_score,
+            impact_type: tradeImpactData.impact_type,
+            direction: tradeImpactData.direction,
+            confidence: tradeImpactData.confidence,
+            trade_evidence: tradeImpactData.trade_evidence,
+            hs_codes: tradeImpactData.hs_codes,
+            countries_affected: tradeImpactData.countries_affected,
+          };
+        }
 
         const signal: MarketSignalData = {
           type: company.impact_type,
@@ -360,7 +465,7 @@ async function generateMarketSignalsFromEvent(eventId: string): Promise<number> 
           prediction_direction: company.impact_type === 'opportunity' ? 'up' : 'down',
           prediction_magnitude: prediction.magnitude,
           prediction_timeframe: prediction.timeframe,
-          prediction_confidence: prediction.confidence,
+          prediction_confidence: finalConfidence,
           prediction_target_price: prediction.target_price,
           catalyst_event_title: event.title,
           catalyst_event_tier: (event as any).discover_tier || null,
@@ -368,7 +473,8 @@ async function generateMarketSignalsFromEvent(eventId: string): Promise<number> 
           reasoning_key_factors: prediction.key_factors,
           reasoning_risks: prediction.risks,
           market_data: prediction.market_data,
-          sources,
+          sources: tradeImpactData ? [...sources, { type: 'comtrade', title: 'UN Comtrade', description: 'Trade flow analysis' }] : sources,
+          trade_impact: tradeImpactForSignal || undefined,
         };
 
         signals.push(signal);
@@ -404,6 +510,7 @@ async function generateMarketSignalsFromEvent(eventId: string): Promise<number> 
             reasoning_risks: signal.reasoning_risks,
             market_data: signal.market_data,
             sources: signal.sources,
+            trade_impact: signal.trade_impact || null,
             is_active: true,
             generated_by: 'corporate_impact_worker',
           } as any);

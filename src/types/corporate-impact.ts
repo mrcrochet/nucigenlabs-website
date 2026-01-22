@@ -27,6 +27,7 @@ export interface MarketSignal {
     title: string;
     event_id: string | null;
     tier: string | null;
+    category: string | null; // 'geopolitics', 'finance', 'energy', 'supply-chain'
     published: string;
   };
   reasoning: {
@@ -40,12 +41,32 @@ export interface MarketSignal {
     analyst_coverage?: string;
     short_interest?: string;
   };
-  sources: string[];
+  sources: Array<string | {
+    type: 'perplexity' | 'market_analysis' | 'comtrade' | 'other';
+    title?: string;
+    url?: string;
+    description?: string;
+  }>;
+  trade_impact?: {
+    trade_impact_score: number;
+    impact_type: 'Trade Disruption' | 'Trade Reallocation' | 'Supply Chain Risk' | 'Trade Opportunity';
+    direction: 'Positive' | 'Negative' | 'Mixed';
+    confidence: number;
+    trade_evidence: Array<{
+      metric: string;
+      value: string;
+      period_before: string;
+      period_after: string;
+    }>;
+    explanation?: string;
+  };
 }
 
 export interface MarketSignalFilters {
   type?: 'all' | 'opportunity' | 'risk';
   sector?: string;
+  category?: string; // 'all', 'geopolitics', 'finance', 'energy', 'supply-chain'
+  search?: string; // Search by company name
   limit?: number;
   offset?: number;
 }
@@ -63,6 +84,8 @@ export interface CorporateImpactResponse {
     signals: MarketSignal[];
     total: number;
     stats?: MarketSignalStats;
+    available_sectors?: string[];
+    available_categories?: string[];
   };
   error?: string;
 }

@@ -19,10 +19,127 @@ import {
   FileText,
   ArrowRight,
   BarChart3,
+  ChevronRight,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { MarketSignal } from '../../types/corporate-impact';
 import ConfidenceBreakdown from './ConfidenceBreakdown';
+import ComparableEventsModal from './ComparableEventsModal';
+import ExposureBreakdownModal from './ExposureBreakdownModal';
+
+// Helper component for expandable evidence source sections
+function EvidenceSourceSection({ 
+  title, 
+  icon, 
+  sources 
+}: { 
+  title: string; 
+  icon: string; 
+  sources: Array<string | { type: string; title?: string; url?: string; description?: string }> 
+}) {
+  const [expanded, setExpanded] = useState(false);
+  
+  // Extract URLs from sources
+  const webSources = sources
+    .map(s => {
+      if (typeof s === 'string') {
+        // Try to extract URL from string
+        const urlMatch = s.match(/https?:\/\/[^\s\)]+/);
+        if (urlMatch) {
+          try {
+            const url = urlMatch[0];
+            const hostname = new URL(url).hostname.replace('www.', '');
+            return {
+              title: s.replace(urlMatch[0], '').trim() || hostname,
+              url: url,
+              description: null,
+            };
+          } catch {
+            return null;
+          }
+        }
+        return null;
+      } else if (s.url) {
+        try {
+          const hostname = new URL(s.url).hostname.replace('www.', '');
+          return {
+            title: s.title || hostname,
+            url: s.url,
+            description: s.description || null,
+          };
+        } catch {
+          return null;
+        }
+      }
+      return null;
+    })
+    .filter(Boolean) as Array<{ title: string; url: string; description: string | null }>;
+
+  const hasWebSources = webSources.length > 0;
+
+  return (
+    <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.15] rounded-xl overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between p-3 hover:from-white/[0.08] hover:to-white/[0.04] transition-all"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-lg">{icon}</span>
+          <span className="text-sm font-medium text-white">{title}</span>
+          {hasWebSources && (
+            <span className="text-xs text-slate-500">({webSources.length} sources)</span>
+          )}
+        </div>
+        <ChevronRight
+          className={`w-4 h-4 text-slate-400 transition-transform ${expanded ? 'rotate-90' : ''}`}
+        />
+      </button>
+
+      {expanded && (
+        <div className="px-3 pb-3 pt-0 border-t border-white/[0.08]">
+          {hasWebSources ? (
+            <div className="space-y-2 mt-3">
+              {webSources.map((source, idx) => (
+                <a
+                  key={idx}
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-start gap-2 p-2 backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded-lg hover:from-white/[0.05] hover:to-white/[0.02] transition-all group"
+                >
+                  <ExternalLink className="w-4 h-4 text-slate-500 group-hover:text-[#E1463E] transition-colors flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-slate-300 group-hover:text-white transition-colors line-clamp-2">
+                      {source.title}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1 truncate">
+                      {(() => {
+                        try {
+                          return new URL(source.url).hostname.replace('www.', '');
+                        } catch {
+                          return source.url;
+                        }
+                      })()}
+                    </div>
+                    {source.description && (
+                      <div className="text-xs text-slate-500 mt-1 line-clamp-2">
+                        {source.description}
+                      </div>
+                    )}
+                  </div>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 text-sm text-slate-400 italic">
+              Sources web en cours de collecte...
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface SignalCardProps {
   signal: MarketSignal;
@@ -31,6 +148,8 @@ interface SignalCardProps {
 export default function SignalCard({ signal }: SignalCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [showConfidence, setShowConfidence] = useState(false);
+  const [showComparableEvents, setShowComparableEvents] = useState(false);
+  const [showExposureBreakdown, setShowExposureBreakdown] = useState(false);
   const isOpportunity = signal.type === 'opportunity';
 
   // Calculate confidence percentage from confidence string
@@ -43,6 +162,46 @@ export default function SignalCard({ signal }: SignalCardProps) {
       low: 30,
     };
     return map[confidence.toLowerCase()] || 60;
+  };
+
+  // Check if company is "underground" (small cap, < $10B market cap)
+  const isUndergroundCompany = (marketCap: string | null): boolean => {
+    if (!marketCap) return false;
+    // Parse market cap (e.g., "$5.2B", "$500M", "$1.2T")
+    const match = marketCap.match(/\$?([\d.]+)([BMKT])?/i);
+    if (!match) return false;
+    const value = parseFloat(match[1]);
+    const unit = (match[2] || '').toUpperCase();
+    const multiplier: Record<string, number> = { B: 1, M: 0.001, K: 0.000001, T: 1000 };
+    const marketCapValue = value * (multiplier[unit] || 1);
+    return marketCapValue < 10; // Less than $10B
+  };
+
+  // Format unavailable data with institutional wording
+  const formatDataAvailability = (value: string | null | undefined): string | null => {
+    if (!value) return null;
+    const unavailablePatterns = [
+      /not available/i,
+      /not available in search results/i,
+      /n\/a/i,
+      /na/i,
+    ];
+    if (unavailablePatterns.some(pattern => pattern.test(value))) {
+      return null; // Return null to hide it, or use badge below
+    }
+    return value;
+  };
+
+  // Check if data is unavailable
+  const isDataUnavailable = (value: string | null | undefined): boolean => {
+    if (!value) return true;
+    const unavailablePatterns = [
+      /not available/i,
+      /not available in search results/i,
+      /n\/a/i,
+      /na/i,
+    ];
+    return unavailablePatterns.some(pattern => pattern.test(value));
   };
 
   const confidencePercent = getConfidencePercent(signal.prediction.confidence);
@@ -97,7 +256,15 @@ export default function SignalCard({ signal }: SignalCardProps) {
           <div className="mb-4">
             <div className="flex items-start justify-between mb-2">
               <div className="flex-1">
-                <h3 className="text-xl font-light text-white mb-1">{signal.company.name}</h3>
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <h3 className="text-xl font-light text-white">{signal.company.name}</h3>
+                  {/* Underground Badge - for small cap companies */}
+                  {signal.company.market_cap && isUndergroundCompany(signal.company.market_cap) && (
+                    <span className="px-2 py-0.5 backdrop-blur-xl bg-gradient-to-br from-purple-500/20 to-purple-500/10 border border-purple-500/30 rounded text-xs font-semibold text-purple-400">
+                      UNDERGROUND
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-3 text-sm text-slate-400 flex-wrap">
                   {signal.company.ticker && (
                     <>
@@ -115,7 +282,7 @@ export default function SignalCard({ signal }: SignalCardProps) {
                 </div>
               </div>
               <div className="text-right ml-4">
-                {signal.company.current_price && (
+                {signal.company.current_price && !isDataUnavailable(signal.company.current_price) && (
                   <div className="text-2xl font-light text-white">{signal.company.current_price}</div>
                 )}
                 {signal.prediction.target_price && (
@@ -148,8 +315,11 @@ export default function SignalCard({ signal }: SignalCardProps) {
                 Observed Impact Range: {isOpportunity ? '+' : ''}{signal.prediction.magnitude}
               </span>
             </div>
-            <div className="flex items-center gap-4 text-sm text-slate-400">
+            <div className="flex items-center gap-4 text-sm text-slate-400 mb-2">
               <span>⏱ Observed timeframe: {signal.prediction.timeframe}</span>
+            </div>
+            <div className="text-xs text-slate-500 italic mb-2">
+              Median outcome across comparable post-event cases
             </div>
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               <span className="text-xs text-slate-500 italic">
@@ -162,6 +332,11 @@ export default function SignalCard({ signal }: SignalCardProps) {
               }`}>
                 Replay-validated
               </span>
+              {signal.trade_impact && (
+                <span className="px-2 py-0.5 backdrop-blur-xl bg-gradient-to-br from-blue-500/20 to-blue-500/10 border border-blue-500/30 rounded text-xs font-semibold text-blue-400">
+                  Trade-Validated
+                </span>
+              )}
             </div>
           </div>
 
@@ -182,13 +357,18 @@ export default function SignalCard({ signal }: SignalCardProps) {
                 ) : (
                   <p className="text-sm text-white font-medium">{signal.catalyst_event.title}</p>
                 )}
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
                   <span className="text-xs text-slate-500">
-                    {new Date(signal.catalyst_event.published).toLocaleDateString()}
+                    Signal detected: {new Date(signal.catalyst_event.published).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </span>
                   {signal.catalyst_event.tier && (
                     <span className="px-1.5 py-0.5 backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/20 to-[#E1463E]/10 border border-[#E1463E]/30 rounded text-xs font-semibold text-[#E1463E]">
                       {signal.catalyst_event.tier}
+                    </span>
+                  )}
+                  {signal.catalyst_event.category && (
+                    <span className="px-1.5 py-0.5 backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] rounded text-xs font-medium text-slate-400">
+                      {signal.catalyst_event.category}
                     </span>
                   )}
                 </div>
@@ -220,12 +400,28 @@ export default function SignalCard({ signal }: SignalCardProps) {
                   Key Bullish Factors
                 </h4>
                 <ul className="space-y-2">
-                  {signal.reasoning.key_factors.map((factor, idx) => (
-                    <li key={idx} className="text-sm text-slate-300 flex items-start gap-2">
-                      <span className="text-green-400 font-bold flex-shrink-0 mt-0.5">✓</span>
-                      <span>{factor}</span>
-                    </li>
-                  ))}
+                  {signal.reasoning.key_factors.map((factor, idx) => {
+                    // Classify factor type (simple heuristic)
+                    const isStructural = /structural|long.?term|permanent|fundamental/i.test(factor);
+                    const isCyclical = /cyclical|seasonal|cycle|periodic/i.test(factor);
+                    const isEventDriven = /event|immediate|short.?term|temporary|one.?off/i.test(factor);
+                    
+                    let factorType = 'Event-driven';
+                    if (isStructural) factorType = 'Structural';
+                    else if (isCyclical) factorType = 'Cyclical';
+                    
+                    return (
+                      <li key={idx} className="text-sm text-slate-300 flex items-start gap-2">
+                        <span className="text-green-400 font-bold flex-shrink-0 mt-0.5">✓</span>
+                        <div className="flex-1">
+                          <span>{factor}</span>
+                          <span className="ml-2 px-1.5 py-0.5 backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded text-xs font-medium text-slate-500">
+                            {factorType}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
 
@@ -236,14 +432,85 @@ export default function SignalCard({ signal }: SignalCardProps) {
                   Key Risks
                 </h4>
                 <ul className="space-y-2">
-                  {signal.reasoning.risks.map((risk, idx) => (
-                    <li key={idx} className="text-sm text-slate-300 flex items-start gap-2">
-                      <span className="text-orange-400 font-bold flex-shrink-0 mt-0.5">⚠</span>
-                      <span>{risk}</span>
-                    </li>
-                  ))}
+                  {signal.reasoning.risks.map((risk, idx) => {
+                    // Classify risk type (simple heuristic)
+                    const isStructural = /structural|long.?term|permanent|fundamental/i.test(risk);
+                    const isCyclical = /cyclical|seasonal|cycle|periodic/i.test(risk);
+                    const isEventDriven = /event|immediate|short.?term|temporary|one.?off/i.test(risk);
+                    const isExecution = /execution|operational|delivery|implementation/i.test(risk);
+                    
+                    let riskType = 'Event-driven';
+                    if (isStructural) riskType = 'Structural';
+                    else if (isCyclical) riskType = 'Cyclical';
+                    else if (isExecution) riskType = 'Execution risk';
+                    
+                    return (
+                      <li key={idx} className="text-sm text-slate-300 flex items-start gap-2">
+                        <span className="text-orange-400 font-bold flex-shrink-0 mt-0.5">⚠</span>
+                        <div className="flex-1">
+                          <span>{risk}</span>
+                          <span className="ml-2 px-1.5 py-0.5 backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded text-xs font-medium text-slate-500">
+                            {riskType}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
+
+              {/* Trade Impact Section */}
+              {signal.trade_impact && (
+                <div className="p-4 backdrop-blur-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20 rounded-xl">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BarChart3 className="w-4 h-4 text-blue-400" />
+                    <h4 className="font-semibold text-white text-sm">Trade Impact</h4>
+                    <span className="ml-auto px-2 py-0.5 backdrop-blur-xl bg-gradient-to-br from-blue-500/20 to-blue-500/10 border border-blue-500/30 rounded text-xs font-semibold text-blue-400">
+                      UN Comtrade
+                    </span>
+                  </div>
+                  
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-slate-400">Impact Type</span>
+                      <span className="text-sm font-semibold text-white">{signal.trade_impact.impact_type}</span>
+                    </div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-slate-400">Direction</span>
+                      <span className={`text-sm font-semibold ${
+                        signal.trade_impact.direction === 'Positive' ? 'text-green-400' :
+                        signal.trade_impact.direction === 'Negative' ? 'text-[#E1463E]' :
+                        'text-yellow-400'
+                      }`}>
+                        {signal.trade_impact.direction}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-400">Trade Impact Score</span>
+                      <span className="text-sm font-semibold text-white">
+                        {(signal.trade_impact.trade_impact_score * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  </div>
+
+                  {signal.trade_impact.trade_evidence && signal.trade_impact.trade_evidence.length > 0 && (
+                    <div className="pt-3 border-t border-blue-500/20">
+                      <p className="text-xs font-semibold text-slate-400 mb-2">Trade Evidence</p>
+                      <div className="space-y-1.5">
+                        {signal.trade_impact.trade_evidence.map((evidence, idx) => (
+                          <div key={idx} className="text-xs text-slate-300">
+                            <span className="font-medium text-blue-400">{evidence.metric}:</span>
+                            <span className="ml-1">{evidence.value}</span>
+                            {evidence.description && (
+                              <span className="ml-1 text-slate-500">({evidence.description})</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Market Data */}
               {Object.keys(signal.market_data).length > 0 && (
@@ -282,22 +549,81 @@ export default function SignalCard({ signal }: SignalCardProps) {
 
               {/* Evidence Section */}
               <div>
-                <h4 className="font-semibold text-white mb-2 text-sm flex items-center gap-2">
+                <h4 className="font-semibold text-white mb-3 text-sm flex items-center gap-2">
                   <FileText className="w-4 h-4" />
                   Evidence
                 </h4>
-                <div className="space-y-2">
-                  {signal.sources.slice(0, 3).map((source, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-2 text-sm text-slate-400 p-2 backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded-lg"
-                    >
-                      <span className="text-[#E1463E]">📰</span>
-                      <span>{source}</span>
+                <div className="space-y-3">
+                  {/* Perplexity Research Section */}
+                  {signal.sources.some(s => {
+                    const sourceStr = typeof s === 'string' ? s : s.type;
+                    return sourceStr === 'perplexity' || (typeof s === 'string' && s.toLowerCase().includes('perplexity'));
+                  }) && (
+                    <EvidenceSourceSection
+                      title="Perplexity Research"
+                      icon="🔍"
+                      sources={signal.sources.filter(s => {
+                        const sourceStr = typeof s === 'string' ? s : s.type;
+                        return sourceStr === 'perplexity' || (typeof s === 'string' && s.toLowerCase().includes('perplexity'));
+                      })}
+                    />
+                  )}
+
+                  {/* Market Analysis Section */}
+                  {signal.sources.some(s => {
+                    const sourceStr = typeof s === 'string' ? s : s.type;
+                    return sourceStr === 'market_analysis' || (typeof s === 'string' && s.toLowerCase().includes('market'));
+                  }) && (
+                    <EvidenceSourceSection
+                      title="Market Analysis"
+                      icon="📊"
+                      sources={signal.sources.filter(s => {
+                        const sourceStr = typeof s === 'string' ? s : s.type;
+                        return sourceStr === 'market_analysis' || (typeof s === 'string' && s.toLowerCase().includes('market'));
+                      })}
+                    />
+                  )}
+
+                  {/* Other Sources (Comtrade, etc.) */}
+                  {signal.sources.filter(s => {
+                    const sourceStr = typeof s === 'string' ? s : s.type;
+                    return !sourceStr.toLowerCase().includes('perplexity') && 
+                           !sourceStr.toLowerCase().includes('market') &&
+                           sourceStr !== 'perplexity' &&
+                           sourceStr !== 'market_analysis';
+                  }).length > 0 && (
+                    <div className="space-y-2">
+                      {signal.sources.filter(s => {
+                        const sourceStr = typeof s === 'string' ? s : s.type;
+                        return !sourceStr.toLowerCase().includes('perplexity') && 
+                               !sourceStr.toLowerCase().includes('market') &&
+                               sourceStr !== 'perplexity' &&
+                               sourceStr !== 'market_analysis';
+                      }).map((source, idx) => {
+                        const sourceStr = typeof source === 'string' ? source : source.title || source.type;
+                        const sourceUrl = typeof source === 'object' ? source.url : null;
+                        return (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-2 text-sm text-slate-400 p-2 backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded-lg"
+                          >
+                            <span className="text-[#E1463E]">📰</span>
+                            {sourceUrl ? (
+                              <a
+                                href={sourceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-slate-300 hover:text-[#E1463E] transition-colors underline underline-offset-2"
+                              >
+                                {sourceStr}
+                              </a>
+                            ) : (
+                              <span>{sourceStr}</span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                  {signal.sources.length > 3 && (
-                    <p className="text-xs text-slate-500">+ {signal.sources.length - 3} more sources</p>
                   )}
                 </div>
               </div>
@@ -331,7 +657,7 @@ export default function SignalCard({ signal }: SignalCardProps) {
               {/* Actions */}
               <div className="flex gap-2 pt-2">
                 <button className="flex-1 py-2 px-4 bg-[#E1463E] text-white rounded-lg hover:bg-[#E1463E]/90 transition-colors text-sm font-medium">
-                  Track This Signal
+                  Track & get notified on pressure changes
                 </button>
                 {signal.catalyst_event.event_id && (
                   <Link
@@ -352,6 +678,33 @@ export default function SignalCard({ signal }: SignalCardProps) {
         <ConfidenceBreakdown
           confidence={confidencePercent}
           onClose={() => setShowConfidence(false)}
+        />
+      )}
+
+      {/* Comparable Events Modal */}
+      {showComparableEvents && (
+        <ComparableEventsModal
+          isOpen={showComparableEvents}
+          onClose={() => setShowComparableEvents(false)}
+          eventId={signal.catalyst_event.event_id}
+          eventTitle={signal.catalyst_event.title}
+          companyName={signal.company.name}
+          signalType={signal.type}
+        />
+      )}
+
+      {/* Exposure Breakdown Modal */}
+      {showExposureBreakdown && (
+        <ExposureBreakdownModal
+          isOpen={showExposureBreakdown}
+          onClose={() => setShowExposureBreakdown(false)}
+          companyName={signal.company.name}
+          companyTicker={signal.company.ticker}
+          companySector={signal.company.sector}
+          eventTitle={signal.catalyst_event.title}
+          signalType={signal.type}
+          reasoning={signal.reasoning}
+          marketData={signal.market_data}
         />
       )}
     </>

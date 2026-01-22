@@ -87,7 +87,7 @@ async function runCycle(config: OrchestratorConfig) {
     console.log('\n[Orchestrator] Step 1E: Generating Corporate Impact signals...');
     try {
       const { processCorporateImpactSignals } = await import('./corporate-impact-worker.js');
-      const corporateImpactResult = await processCorporateImpactSignals(5); // Process top 5 events
+      const corporateImpactResult = await processCorporateImpactSignals(20); // Process top 20 events (increased for live mode)
       console.log(`[Orchestrator] Corporate Impact: ${corporateImpactResult.eventsProcessed} events processed, ${corporateImpactResult.signalsGenerated} signals generated, ${corporateImpactResult.errors} errors`);
     } catch (error: any) {
       console.warn('[Orchestrator] Corporate Impact generation failed:', error.message);

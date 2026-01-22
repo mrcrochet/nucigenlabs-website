@@ -459,30 +459,19 @@ Always reference your sources. Be factual, specific, and actionable. Return stru
 
     const analysisContent = openaiResponse.choices[0]?.message?.content || '';
 
-    // Parse OpenAI response (same parsing logic as before)
-    const response = {
-      choices: [{
-        message: {
-          content: analysisContent,
-          citations: uniqueUrls, // Use found URLs as citations
-        },
-      }],
-      citations: uniqueUrls,
-      related_questions: relatedQuestions,
-    };
-
-    // Extract information from response
-    const content = response.choices[0]?.message?.content || '';
-    const citations = response.choices[0]?.message?.citations || response.citations || [];
-    const relatedQuestions = response.related_questions || [];
+    // Extract information directly from OpenAI response and Perplexity data
+    // Note: content here is from OpenAI analysis, not Perplexity
+    const analysisText = analysisContent;
+    const finalCitations = uniqueUrls;
+    const finalRelatedQuestions = perplexityResponse.related_questions || [];
 
     // Parse content to extract sections with improved regex
-    const historicalContextMatch = content.match(/(?:Historical Context|Historical context)[:\-]?\s*(.+?)(?=\n\n(?:Expert|Market|Comparable|Key|Risk|Impacted|Timeline)|$)/is);
-    const expertAnalysisMatch = content.match(/(?:Expert Analysis|Expert analysis)[:\-]?\s*(.+?)(?=\n\n(?:Market|Comparable|Key|Risk|Impacted|Timeline|Historical)|$)/is);
-    const marketImplicationsMatch = content.match(/(?:Market Implications|Market implications)[:\-]?\s*(.+?)(?=\n\n(?:Comparable|Key|Risk|Impacted|Timeline|Expert|Historical)|$)/is);
+    const historicalContextMatch = analysisText.match(/(?:Historical Context|Historical context)[:\-]?\s*(.+?)(?=\n\n(?:Expert|Market|Comparable|Key|Risk|Impacted|Timeline)|$)/is);
+    const expertAnalysisMatch = analysisText.match(/(?:Expert Analysis|Expert analysis)[:\-]?\s*(.+?)(?=\n\n(?:Market|Comparable|Key|Risk|Impacted|Timeline|Historical)|$)/is);
+    const marketImplicationsMatch = analysisText.match(/(?:Market Implications|Market implications)[:\-]?\s*(.+?)(?=\n\n(?:Comparable|Key|Risk|Impacted|Timeline|Expert|Historical)|$)/is);
     
     // Extract comparable events
-    const comparableEventsSection = content.match(/(?:Comparable Past Events|Comparable events)[:\-]?\s*(.+?)(?=\n\n(?:Key|Risk|Impacted|Timeline|Expert|Market|Historical)|$)/is);
+    const comparableEventsSection = analysisText.match(/(?:Comparable Past Events|Comparable events)[:\-]?\s*(.+?)(?=\n\n(?:Key|Risk|Impacted|Timeline|Expert|Market|Historical)|$)/is);
     const comparableEvents: Array<{ event: string; date: string; outcome: string }> = [];
     if (comparableEventsSection) {
       const eventsText = comparableEventsSection[1];
@@ -499,7 +488,7 @@ Always reference your sources. Be factual, specific, and actionable. Return stru
     }
 
     // Extract key stakeholders
-    const stakeholdersSection = content.match(/(?:Key Stakeholders|Stakeholders Affected)[:\-]?\s*(.+?)(?=\n\n(?:Risk|Impacted|Timeline|Comparable|Expert|Market|Historical)|$)/is);
+    const stakeholdersSection = analysisText.match(/(?:Key Stakeholders|Stakeholders Affected)[:\-]?\s*(.+?)(?=\n\n(?:Risk|Impacted|Timeline|Comparable|Expert|Market|Historical)|$)/is);
     const keyStakeholders: Array<{ name: string; role: string; impact: string }> = [];
     if (stakeholdersSection) {
       const stakeholdersText = stakeholdersSection[1];
@@ -516,7 +505,7 @@ Always reference your sources. Be factual, specific, and actionable. Return stru
     }
 
     // Extract risk factors
-    const riskFactorsSection = content.match(/(?:Risk Factors|Risk factors)[:\-]?\s*(.+?)(?=\n\n(?:Impacted|Timeline|Comparable|Key|Expert|Market|Historical)|$)/is);
+    const riskFactorsSection = analysisText.match(/(?:Risk Factors|Risk factors)[:\-]?\s*(.+?)(?=\n\n(?:Impacted|Timeline|Comparable|Key|Expert|Market|Historical)|$)/is);
     const riskFactors: Array<{ factor: string; severity: 'low' | 'medium' | 'high'; description: string }> = [];
     if (riskFactorsSection) {
       const risksText = riskFactorsSection[1];
@@ -535,7 +524,7 @@ Always reference your sources. Be factual, specific, and actionable. Return stru
     }
 
     // Extract impacted sectors
-    const sectorsSection = content.match(/(?:Impacted Sectors|Sectors)[:\-]?\s*(.+?)(?=\n\n(?:Timeline|Comparable|Key|Risk|Expert|Market|Historical)|$)/is);
+    const sectorsSection = analysisText.match(/(?:Impacted Sectors|Sectors)[:\-]?\s*(.+?)(?=\n\n(?:Timeline|Comparable|Key|Risk|Expert|Market|Historical)|$)/is);
     const impactedSectors: Array<{ sector: string; impact_level: 'low' | 'medium' | 'high'; reasoning: string }> = [];
     if (sectorsSection) {
       const sectorsText = sectorsSection[1];
@@ -554,7 +543,7 @@ Always reference your sources. Be factual, specific, and actionable. Return stru
     }
 
     // Extract expert quotes
-    const quotesSection = content.match(/(?:Expert Quotes|Quotes)[:\-]?\s*(.+?)(?=\n\n(?:Timeline|Comparable|Key|Risk|Impacted|Expert|Market|Historical)|$)/is);
+    const quotesSection = analysisText.match(/(?:Expert Quotes|Quotes)[:\-]?\s*(.+?)(?=\n\n(?:Timeline|Comparable|Key|Risk|Impacted|Expert|Market|Historical)|$)/is);
     const expertQuotes: Array<{ quote: string; source: string; date?: string }> = [];
     if (quotesSection) {
       const quotesText = quotesSection[1];
@@ -571,7 +560,7 @@ Always reference your sources. Be factual, specific, and actionable. Return stru
     }
 
     // Extract timeline
-    const timelineSection = content.match(/(?:Timeline|Timeline of similar events)[:\-]?\s*(.+?)(?=\n\n(?:Comparable|Key|Risk|Impacted|Expert|Market|Historical)|$)/is);
+    const timelineSection = analysisText.match(/(?:Timeline|Timeline of similar events)[:\-]?\s*(.+?)(?=\n\n(?:Comparable|Key|Risk|Impacted|Expert|Market|Historical)|$)/is);
     const timeline: Array<{ date: string; event: string }> = [];
     if (timelineSection) {
       const timelineText = timelineSection[1];
@@ -596,8 +585,8 @@ Always reference your sources. Be factual, specific, and actionable. Return stru
       impacted_sectors: impactedSectors.length > 0 ? impactedSectors : undefined,
       expert_quotes: expertQuotes.length > 0 ? expertQuotes : undefined,
       timeline: timeline.length > 0 ? timeline : undefined,
-      citations,
-      related_questions: relatedQuestions,
+      citations: finalCitations,
+      related_questions: finalRelatedQuestions,
       confidence: citations.length > 0 ? Math.min(100, citations.length * 15 + (comparableEvents.length * 5)) : undefined,
     };
   } catch (error: any) {
