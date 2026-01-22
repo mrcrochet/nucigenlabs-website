@@ -9,8 +9,9 @@
  * - confidence badge (quality)
  */
 
+import { useNavigate } from 'react-router-dom';
 import Badge from '../ui/Badge';
-import { Calendar, MapPin, ExternalLink } from 'lucide-react';
+import { Calendar, MapPin, ExternalLink, Brain } from 'lucide-react';
 import type { Event } from '../../types/intelligence';
 
 interface EventDetailHeaderProps {
@@ -18,6 +19,8 @@ interface EventDetailHeaderProps {
 }
 
 export default function EventDetailHeader({ event }: EventDetailHeaderProps) {
+  const navigate = useNavigate();
+
   const getSourceTypeLabel = (sourceType?: string) => {
     switch (sourceType) {
       case 'newsapi_ai':
@@ -76,6 +79,17 @@ export default function EventDetailHeader({ event }: EventDetailHeaderProps) {
             {event.source_count} source{event.source_count > 1 ? 's' : ''}
           </span>
         )}
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex items-center gap-3 mt-4 pt-4 border-t border-white/[0.05]">
+        <button
+          onClick={() => navigate(`/events/${event.id}/predictions`)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 rounded-lg text-sm font-light text-blue-300 transition-all duration-200 hover:scale-105"
+        >
+          <Brain className="w-4 h-4" />
+          <span>View Predictions</span>
+        </button>
       </div>
     </div>
   );

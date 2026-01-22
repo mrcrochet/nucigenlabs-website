@@ -15,7 +15,12 @@ export type AnalyticsEvent =
   | 'scroll_depth'
   | 'time_on_page'
   | 'view_mode_change'
-  | 'advanced_filter_apply';
+  | 'advanced_filter_apply'
+  | 'filter_sector'
+  | 'filter_region'
+  | 'filter_entity'
+  | 'prediction_view'
+  | 'virtual_scroll_enabled';
 
 /**
  * Track view mode change
@@ -159,6 +164,75 @@ export function trackTimeOnPage(seconds: number, properties?: AnalyticsPropertie
 }
 
 /**
+ * Track advanced filter application
+ */
+export function trackAdvancedFilterApply(
+  filterType: 'sector' | 'region' | 'entity' | 'tag' | 'consensus' | 'tier',
+  values: string[],
+  properties?: AnalyticsProperties
+): void {
+  trackEvent('advanced_filter_apply', {
+    filter_type: filterType,
+    filter_values: values.join(','),
+    filter_count: values.length,
+    ...properties,
+  });
+}
+
+/**
+ * Track sector filter
+ */
+export function trackSectorFilter(sectors: string[], properties?: AnalyticsProperties): void {
+  trackEvent('filter_sector', {
+    sectors: sectors.join(','),
+    sector_count: sectors.length,
+    ...properties,
+  });
+}
+
+/**
+ * Track region filter
+ */
+export function trackRegionFilter(regions: string[], properties?: AnalyticsProperties): void {
+  trackEvent('filter_region', {
+    regions: regions.join(','),
+    region_count: regions.length,
+    ...properties,
+  });
+}
+
+/**
+ * Track entity filter
+ */
+export function trackEntityFilter(entities: string[], properties?: AnalyticsProperties): void {
+  trackEvent('filter_entity', {
+    entities: entities.join(','),
+    entity_count: entities.length,
+    ...properties,
+  });
+}
+
+/**
+ * Track prediction view
+ */
+export function trackPredictionView(eventId: string, properties?: AnalyticsProperties): void {
+  trackEvent('prediction_view', {
+    event_id: eventId,
+    ...properties,
+  });
+}
+
+/**
+ * Track virtual scroll enabled
+ */
+export function trackVirtualScrollEnabled(itemCount: number, properties?: AnalyticsProperties): void {
+  trackEvent('virtual_scroll_enabled', {
+    item_count: itemCount,
+    ...properties,
+  });
+}
+
+/**
  * Analytics object for backward compatibility
  */
 export const analytics = {
@@ -179,4 +253,10 @@ export const analytics = {
   trackScrollDepth,
   trackTimeOnPage,
   trackViewModeChange,
+  trackAdvancedFilterApply,
+  trackSectorFilter,
+  trackRegionFilter,
+  trackEntityFilter,
+  trackPredictionView,
+  trackVirtualScrollEnabled,
 };

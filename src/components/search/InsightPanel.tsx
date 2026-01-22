@@ -8,6 +8,7 @@
 import { useMemo } from 'react';
 import { Sparkles, TrendingUp, Users, AlertTriangle, FileText, Eye } from 'lucide-react';
 import type { SearchResult, KnowledgeGraph } from '../../types/search';
+import TopClaimsPanel from './TopClaimsPanel';
 
 interface InsightPanelProps {
   results: SearchResult[];
@@ -218,6 +219,9 @@ export default function InsightPanel({
             </div>
           </div>
         )}
+
+        {/* Top Claims / Risks / Uncertainties - PRIORITÉ PRODUIT #2 */}
+        <TopClaimsPanel results={results} />
 
         {/* Actions */}
         <div className="pt-4 border-t border-borders-subtle space-y-2">

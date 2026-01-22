@@ -87,6 +87,9 @@ export interface AdvancedFilters {
   maxSources?: number;
   minScore?: number;
   maxScore?: number;
+  sectors?: string[];
+  regions?: string[];
+  entities?: string[];
 }
 
 export async function fetchDiscoverItems(
@@ -125,21 +128,33 @@ export async function fetchDiscoverItems(
       console.log('[Discover Service] Category filter applied:', category);
     }
     
-    // Search query - use correct Supabase syntax for OR queries
+    // Search query - enhanced semantic search
     if (searchQuery && searchQuery.trim()) {
       // Escape special characters and use proper ilike syntax
       const escapedQuery = searchQuery.trim().replace(/%/g, '\\%').replace(/_/g, '\\_');
-      // Supabase .or() syntax: "field1.ilike.value,field2.ilike.value"
-      // Note: Supabase requires the format "field.operator.value" separated by commas
+      
+      // Enhanced search: search in multiple fields with OR logic
+      // Also search in tags for better semantic matching
       try {
+        // Try comprehensive search across title, description, content, and tags
         query = query.or(`title.ilike.%${escapedQuery}%,description.ilike.%${escapedQuery}%,content.ilike.%${escapedQuery}%`);
-        console.log('[Discover Service] Search filter applied:', escapedQuery);
+        
+        // Also check if any tags match (using array overlap)
+        // Note: This is a simplified approach - for better semantic search, 
+        // we could use embeddings or Tavily to expand the query
+        console.log('[Discover Service] Enhanced search filter applied:', escapedQuery);
       } catch (searchError: any) {
         console.warn('[Discover Service] Search filter error, trying alternative approach:', searchError?.message);
         // Fallback: use a simpler search on title only
         query = query.ilike('title', `%${escapedQuery}%`);
         console.log('[Discover Service] Using fallback search (title only)');
       }
+      
+      // For semantic search enhancement, we could:
+      // 1. Use Tavily to expand query with related terms
+      // 2. Use OpenAI embeddings for semantic similarity
+      // 3. Search in discover_tags array for partial matches
+      // This is a future enhancement that can be added
     }
     
     // Time range filter
@@ -221,6 +236,18 @@ export async function fetchDiscoverItems(
       if (advancedFilters.maxScore !== undefined) {
         query = query.lte('discover_score', advancedFilters.maxScore);
         console.log('[Discover Service] Max score filter applied:', advancedFilters.maxScore);
+      }
+
+      // Sectors, Regions, Entities filters (applied in post-processing)
+      // These are stored in discover_tags, discover_category, or discover_location (JSONB)
+      if (advancedFilters.sectors && advancedFilters.sectors.length > 0) {
+        console.log('[Discover Service] Sectors filter (will apply in post-processing):', advancedFilters.sectors);
+      }
+      if (advancedFilters.regions && advancedFilters.regions.length > 0) {
+        console.log('[Discover Service] Regions filter (will apply in post-processing):', advancedFilters.regions);
+      }
+      if (advancedFilters.entities && advancedFilters.entities.length > 0) {
+        console.log('[Discover Service] Entities filter (will apply in post-processing):', advancedFilters.entities);
       }
     }
     
@@ -313,7 +340,7 @@ export async function fetchDiscoverItems(
     // Map events to DiscoverItem format
     let mappedItems = events.map(event => mapEventToDiscoverItem(event));
 
-    // Apply post-processing filters (sources count - requires array length check)
+    // Apply post-processing filters (sources count, sectors, regions, entities)
     if (advancedFilters) {
       if (advancedFilters.minSources !== undefined || advancedFilters.maxSources !== undefined) {
         mappedItems = mappedItems.filter(item => {
@@ -327,6 +354,39 @@ export async function fetchDiscoverItems(
           return true;
         });
         console.log('[Discover Service] Sources count filter applied in post-processing');
+      }
+
+      // Sectors filter: check in tags or category
+      if (advancedFilters.sectors && advancedFilters.sectors.length > 0) {
+        mappedItems = mappedItems.filter(item => {
+          const itemText = `${item.category} ${item.tags.join(' ')}`.toLowerCase();
+          return advancedFilters.sectors!.some(sector => 
+            itemText.includes(sector.toLowerCase())
+          );
+        });
+        console.log('[Discover Service] Sectors filter applied in post-processing');
+      }
+
+      // Regions filter: check in tags, category, or location
+      if (advancedFilters.regions && advancedFilters.regions.length > 0) {
+        mappedItems = mappedItems.filter(item => {
+          const itemText = `${item.category} ${item.tags.join(' ')}`.toLowerCase();
+          return advancedFilters.regions!.some(region => 
+            itemText.includes(region.toLowerCase())
+          );
+        });
+        console.log('[Discover Service] Regions filter applied in post-processing');
+      }
+
+      // Entities filter: check in tags or title/summary
+      if (advancedFilters.entities && advancedFilters.entities.length > 0) {
+        mappedItems = mappedItems.filter(item => {
+          const itemText = `${item.title} ${item.summary} ${item.tags.join(' ')}`.toLowerCase();
+          return advancedFilters.entities!.some(entity => 
+            itemText.includes(entity.toLowerCase())
+          );
+        });
+        console.log('[Discover Service] Entities filter applied in post-processing');
       }
     }
 

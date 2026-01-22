@@ -55,6 +55,11 @@ const Research = lazy(() => import('./pages/Research'));
 const Discover = lazy(() => import('./pages/Discover'));
 const SearchHome = lazy(() => import('./pages/SearchHome'));
 const SearchWorkspace = lazy(() => import('./pages/SearchWorkspace'));
+// Intelligence Detail Pages
+const IntelligenceRisks = lazy(() => import('./pages/IntelligenceRisks'));
+const IntelligencePredictions = lazy(() => import('./pages/IntelligencePredictions'));
+const IntelligenceImplications = lazy(() => import('./pages/IntelligenceImplications'));
+const PredictionPage = lazy(() => import('./pages/PredictionPage'));
 // User / System
 const Profile = lazy(() => import('./pages/Profile'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -192,6 +197,10 @@ function App() {
         <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
         <Route path="/app" element={<Navigate to="/overview" replace />} /> {/* Legacy redirect */}
         <Route path="/intelligence" element={<ProtectedRoute><IntelligenceFeed /></ProtectedRoute>} /> {/* App Intelligence - Protected, different from /intelligence-page */}
+        <Route path="/intelligence/risks" element={<ProtectedRoute><IntelligenceRisks /></ProtectedRoute>} /> {/* Top Risks Detail Page */}
+        <Route path="/intelligence/predictions" element={<ProtectedRoute><IntelligencePredictions /></ProtectedRoute>} /> {/* Top Predictions Detail Page */}
+        <Route path="/intelligence/implications" element={<ProtectedRoute><IntelligenceImplications /></ProtectedRoute>} /> {/* Key Implications Detail Page */}
+        <Route path="/events/:eventId/predictions" element={<ProtectedRoute><PredictionPage /></ProtectedRoute>} /> {/* Event Prediction Page */}
         
         {/* Legacy redirect: /events → /events-feed (new UI spec compliant page) */}
         <Route path="/events" element={<Navigate to="/events-feed" replace />} />

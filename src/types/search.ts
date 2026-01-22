@@ -19,6 +19,57 @@ export interface SearchFilters {
   language?: string;
 }
 
+export interface Scenario {
+  id: string;
+  title: string;
+  description: string;
+  relativeProbability: number; // 0-1, relative to other scenarios
+  mechanisms: string[]; // Causal mechanisms at play
+  invalidationConditions: string[]; // What would invalidate this scenario
+  confidence: number; // 0-1, confidence in this scenario
+  timeframe?: 'immediate' | 'short' | 'medium' | 'long';
+  sources?: Array<{
+    title: string;
+    url: string;
+    relevanceScore: number;
+    snippet?: string;
+  }>; // Web sources backing this scenario
+}
+
+export interface EvidenceSource {
+  text: string; // Quote or evidence text
+  url?: string; // Link to article/source
+  title?: string; // Article title
+  source?: string; // Source domain/name
+  publishedAt?: string; // Publication date
+  relevanceScore?: number; // 0-1 relevance score
+  type: 'article' | 'historical_pattern'; // Type of evidence
+  historicalContext?: string; // For historical patterns: when/where this happened before
+}
+
+export interface Claim {
+  id: string;
+  text: string;
+  certainty: number; // 0-1
+  actor: string;
+  timeHorizon: 'immediate' | 'short' | 'medium' | 'long';
+  type: 'prediction' | 'statement' | 'implication' | 'warning' | 'scenario_outlook';
+  evidence: EvidenceSource[]; // Enhanced evidence with sources and historical patterns
+  entities: string[];
+  sectors?: string[];
+  regions?: string[];
+  // Scenario Outlook fields (for probabilistic outlook)
+  scenarios?: Scenario[]; // Multiple plausible scenarios
+  currentState?: string; // "What's happening now"
+  mechanisms?: string[]; // Mechanisms in play
+  crossScenarioInsights?: {
+    keyDrivers?: string[]; // Key drivers across all scenarios
+    commonFactors?: string[]; // Factors common to multiple scenarios
+    criticalUncertainties?: string[]; // Critical uncertainties that affect multiple scenarios
+    decisionPoints?: string[]; // Key decision points or inflection points
+  };
+}
+
 export interface SearchResult {
   id: string;
   type: 'event' | 'article' | 'document';
@@ -32,6 +83,7 @@ export interface SearchResult {
   entities: Entity[];
   tags: string[];
   content?: string;
+  claims?: Claim[]; // Extracted actionable claims
 }
 
 export interface Entity {

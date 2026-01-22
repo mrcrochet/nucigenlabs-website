@@ -13,6 +13,8 @@ import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { withCache, type CacheOptions } from './cache-service';
+import type { EvidenceSource } from '../types/search';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -36,7 +38,7 @@ export interface Claim {
   actor: string; // Who/what made the claim (entity, source, or "implied")
   timeHorizon: 'immediate' | 'short' | 'medium' | 'long';
   type: 'prediction' | 'statement' | 'implication' | 'warning';
-  evidence: string[]; // Supporting evidence from the text
+  evidence: EvidenceSource[]; // Supporting evidence with sources and historical patterns
   entities: string[]; // Related entity names
   sectors?: string[]; // Affected sectors (if mentioned)
   regions?: string[]; // Affected regions (if mentioned)
@@ -73,7 +75,18 @@ export async function extractClaims(
     ? `\n\nContext:\nTitle: ${context.title || 'N/A'}\nSource: ${context.source || 'N/A'}\n${context.entities && context.entities.length > 0 ? `Entities: ${context.entities.map(e => e.name).join(', ')}` : ''}`
     : '';
 
-  const prompt = `Extract actionable claims from this text. A claim is:
+  // Use cache to avoid re-extracting same claims (PRIORITÉ ABSOLUE #3)
+  const cacheOptions: CacheOptions = {
+    apiType: 'openai',
+    endpoint: 'extractClaims',
+    ttlSeconds: 24 * 60 * 60, // 24 hours - claims don't change much for same text
+  };
+
+  return await withCache(
+    cacheOptions,
+    { text: truncatedText, context },
+    async () => {
+      const prompt = `Extract actionable claims from this text. A claim is:
 - A prediction ("X might happen", "Y could occur")
 - A statement ("X is happening", "Y has occurred")
 - An implication ("X could lead to Y", "This means Z")
@@ -99,63 +112,75 @@ Focus on claims that are:
 
 Return empty array [] if no actionable claims found.`;
 
-  try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are an expert intelligence analyst. Extract actionable claims from text that can inform strategic decisions.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      temperature: 0.3,
-      max_tokens: 2000,
-      response_format: { type: 'json_object' },
-    });
+      try {
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert intelligence analyst. Extract actionable claims from text that can inform strategic decisions.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          temperature: 0.3,
+          max_tokens: 2000,
+          response_format: { type: 'json_object' },
+        });
 
-    const responseText = completion.choices[0]?.message?.content;
-    if (!responseText) {
-      return [];
+        const responseText = completion.choices[0]?.message?.content;
+        if (!responseText) {
+          return [];
+        }
+
+        const result = JSON.parse(responseText);
+        const claims = result.claims || [];
+
+        // Add IDs and validate
+        return claims
+          .filter((claim: any) => claim.text && claim.text.trim().length > 0)
+          .map((claim: any, idx: number) => ({
+            id: `claim-${Date.now()}-${idx}`,
+            text: claim.text.trim(),
+            certainty: Math.min(1, Math.max(0, claim.certainty || 0.5)),
+            actor: claim.actor || 'implied',
+            timeHorizon: claim.timeHorizon || 'medium',
+            type: claim.type || 'statement',
+            // Convert string evidence to EvidenceSource format (will be enriched later)
+            evidence: Array.isArray(claim.evidence) 
+              ? claim.evidence.map((text: string) => ({
+                  text: text,
+                  type: 'article' as const,
+                }))
+              : [],
+            entities: Array.isArray(claim.entities) ? claim.entities : [],
+            sectors: Array.isArray(claim.sectors) ? claim.sectors : undefined,
+            regions: Array.isArray(claim.regions) ? claim.regions : undefined,
+          })) as Claim[];
+      } catch (error: any) {
+        console.error('[ClaimsExtractor] Error extracting claims:', error.message);
+        return [];
+      }
     }
-
-    const result = JSON.parse(responseText);
-    const claims = result.claims || [];
-
-    // Add IDs and validate
-    return claims
-      .filter((claim: any) => claim.text && claim.text.trim().length > 0)
-      .map((claim: any, idx: number) => ({
-        id: `claim-${Date.now()}-${idx}`,
-        text: claim.text.trim(),
-        certainty: Math.min(1, Math.max(0, claim.certainty || 0.5)),
-        actor: claim.actor || 'implied',
-        timeHorizon: claim.timeHorizon || 'medium',
-        type: claim.type || 'statement',
-        evidence: Array.isArray(claim.evidence) ? claim.evidence : [],
-        entities: Array.isArray(claim.entities) ? claim.entities : [],
-        sectors: Array.isArray(claim.sectors) ? claim.sectors : undefined,
-        regions: Array.isArray(claim.regions) ? claim.regions : undefined,
-      })) as Claim[];
-  } catch (error: any) {
-    console.error('[ClaimsExtractor] Error extracting claims:', error.message);
-    return [];
-  }
+  );
 }
 
 /**
  * Extract claims from multiple search results
- * Processes in batches for efficiency
+ * Processes in batches for efficiency and enriches evidence with sources
  */
 export async function extractClaimsFromResults(
   results: Array<{
+    id?: string;
     title: string;
     summary: string;
     content?: string;
     source?: string;
+    url?: string;
+    publishedAt?: string;
+    relevanceScore?: number;
     entities?: Array<{ name: string; type: string }>;
   }>,
   maxClaimsPerResult: number = 5
@@ -173,14 +198,52 @@ export async function extractClaimsFromResults(
     
     const batchPromises = batch.map(async (result) => {
       const text = result.content || result.summary || result.title;
-      const claims = await extractClaims(text, {
+      const rawClaims = await extractClaims(text, {
         title: result.title,
         source: result.source,
         entities: result.entities,
       });
       
-      // Limit claims per result
-      return claims.slice(0, maxClaimsPerResult);
+      // Enrich evidence with sources and historical patterns
+      const { enrichEvidence } = await import('./evidence-enricher');
+      
+      // Prepare all results for better article matching
+      const allResults = results.map(r => ({
+        id: r.id || '',
+        title: r.title,
+        url: r.url || '',
+        summary: r.summary,
+        content: r.content,
+        publishedAt: r.publishedAt || new Date().toISOString(),
+        source: r.source || 'unknown',
+        relevanceScore: r.relevanceScore || 0.5,
+      }));
+      
+      const enrichedClaims = await Promise.all(
+        rawClaims.slice(0, maxClaimsPerResult).map(async (claim) => {
+          // Extract evidence texts from EvidenceSource objects (they're already converted to objects in extractClaims)
+          const evidenceTexts = claim.evidence.map((ev: any) => typeof ev === 'string' ? ev : ev.text || '');
+          
+          // Enrich with real articles and historical patterns
+          const enrichedEvidence = await enrichEvidence(
+            claim.text,
+            evidenceTexts.filter(t => t.length > 0), // Filter empty texts
+            allResults, // Pass all results for better article matching
+            {
+              entities: result.entities?.map(e => e.name),
+              sectors: claim.sectors,
+              regions: claim.regions,
+            }
+          );
+
+          return {
+            ...claim,
+            evidence: enrichedEvidence,
+          };
+        })
+      );
+      
+      return enrichedClaims;
     });
 
     const batchResults = await Promise.allSettled(batchPromises);

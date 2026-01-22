@@ -6,6 +6,7 @@
 
 import { X, ExternalLink, BookOpen, Bell, Eye } from 'lucide-react';
 import type { SearchResult } from '../../types/search';
+import ClaimsPanel from './ClaimsPanel';
 
 interface ResultDetailsDrawerProps {
   result: SearchResult;
@@ -75,6 +76,15 @@ export default function ResultDetailsDrawer({
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Claims Panel - PRIORITÉ PRODUIT #1 */}
+          {result.claims && result.claims.length > 0 && (
+            <ClaimsPanel
+              claims={result.claims}
+              resultTitle={result.title}
+              resultDate={result.publishedAt}
+            />
           )}
 
           {/* Key Facts */}

@@ -72,6 +72,17 @@ async function runCycle(config: OrchestratorConfig) {
       // Don't fail the whole cycle if Discover collection fails
     }
 
+    // Step 1D: Track Perplexity Discover
+    console.log('\n[Orchestrator] Step 1D: Tracking Perplexity Discover...');
+    try {
+      const { trackPerplexityDiscover } = await import('./perplexity-discover-tracker.js');
+      const perplexityResult = await trackPerplexityDiscover();
+      console.log(`[Orchestrator] Perplexity: ${perplexityResult.topicsFound} topics found, ${perplexityResult.inserted} inserted, ${perplexityResult.skipped} skipped`);
+    } catch (error: any) {
+      console.warn('[Orchestrator] Perplexity tracking failed:', error.message);
+      // Don't fail the whole cycle if Perplexity tracking fails
+    }
+
     // Step 2: Process pending events
     console.log('\n[Orchestrator] Step 2: Processing pending events...');
     const processingResult = await processPendingEvents(config.processingBatchSize);

@@ -38,7 +38,7 @@ import { DiscoverErrorBoundary } from '../components/discover/DiscoverErrorBound
 import SkeletonCard from '../components/ui/SkeletonCard';
 import { Loader2, Filter } from 'lucide-react';
 import { getOrCreateSupabaseUserId } from '../lib/supabase';
-import { trackPageView, trackItemView, trackItemSave, trackItemShare, trackFilterChange, trackSearchQuery, trackViewModeChange } from '../lib/analytics';
+import { trackPageView, trackItemView, trackItemSave, trackItemShare, trackFilterChange, trackSearchQuery, trackViewModeChange, trackAdvancedFilterApply, trackSectorFilter, trackRegionFilter, trackEntityFilter, trackPredictionView, trackVirtualScrollEnabled } from '../lib/analytics';
 
 // Wrapper component for DiscoverDetailModal to handle async userId
 function DiscoverDetailModalWrapper({
@@ -744,7 +744,28 @@ function DiscoverContent() {
         isOpen={isAdvancedFiltersOpen}
         onClose={() => setIsAdvancedFiltersOpen(false)}
         filters={advancedFilters}
-        onFiltersChange={setAdvancedFilters}
+        onFiltersChange={(newFilters) => {
+          setAdvancedFilters(newFilters);
+          // Track filter changes
+          if (newFilters.sectors && newFilters.sectors.length > 0) {
+            trackSectorFilter(newFilters.sectors);
+          }
+          if (newFilters.regions && newFilters.regions.length > 0) {
+            trackRegionFilter(newFilters.regions);
+          }
+          if (newFilters.entities && newFilters.entities.length > 0) {
+            trackEntityFilter(newFilters.entities);
+          }
+          if (newFilters.tags && newFilters.tags.length > 0) {
+            trackAdvancedFilterApply('tag', newFilters.tags);
+          }
+          if (newFilters.consensus && newFilters.consensus.length > 0) {
+            trackAdvancedFilterApply('consensus', newFilters.consensus);
+          }
+          if (newFilters.tier && newFilters.tier.length > 0) {
+            trackAdvancedFilterApply('tier', newFilters.tier);
+          }
+        }}
         availableTags={Array.from(new Set(items.flatMap(item => item.tags)))}
       />
     </AppShell>

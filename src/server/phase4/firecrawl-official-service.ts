@@ -162,7 +162,9 @@ export async function scrapeOfficialDocument(
     const response = await firecrawlApp.scrapeUrl(url, {
       formats: ['markdown', 'html'],
       onlyMainContent: true,
-      timeout: 30000,
+      timeout: 60000, // Increased timeout for JavaScript-heavy pages
+      waitFor: 3000, // Wait 3 seconds for JavaScript to render
+      // Note: Firecrawl should handle JavaScript automatically, but we increase wait time
     });
 
     // Check if response is an error

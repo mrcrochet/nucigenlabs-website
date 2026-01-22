@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { X, Filter, Tag, CheckCircle2, AlertTriangle, AlertCircle, TrendingUp, Layers, Sliders } from 'lucide-react';
+import { X, Filter, Tag, CheckCircle2, AlertTriangle, AlertCircle, TrendingUp, Layers, Sliders, MapPin, Building2, Users } from 'lucide-react';
 import Badge from '../ui/Badge';
 
 export interface AdvancedFilters {
@@ -16,6 +16,9 @@ export interface AdvancedFilters {
   maxSources?: number;
   minScore?: number;
   maxScore?: number;
+  sectors?: string[];
+  regions?: string[];
+  entities?: string[];
 }
 
 interface AdvancedFiltersProps {
@@ -53,6 +56,9 @@ export default function AdvancedFilters({
     (localFilters.tags && localFilters.tags.length > 0) ||
     (localFilters.consensus && localFilters.consensus.length > 0) ||
     (localFilters.tier && localFilters.tier.length > 0) ||
+    (localFilters.sectors && localFilters.sectors.length > 0) ||
+    (localFilters.regions && localFilters.regions.length > 0) ||
+    (localFilters.entities && localFilters.entities.length > 0) ||
     localFilters.minSources !== undefined ||
     localFilters.maxSources !== undefined ||
     localFilters.minScore !== undefined ||
@@ -84,6 +90,38 @@ export default function AdvancedFilters({
         : [...(prev.tier || []), tier],
     }));
   };
+
+  const toggleSector = (sector: string) => {
+    setLocalFilters(prev => ({
+      ...prev,
+      sectors: prev.sectors?.includes(sector)
+        ? prev.sectors.filter(s => s !== sector)
+        : [...(prev.sectors || []), sector],
+    }));
+  };
+
+  const toggleRegion = (region: string) => {
+    setLocalFilters(prev => ({
+      ...prev,
+      regions: prev.regions?.includes(region)
+        ? prev.regions.filter(r => r !== region)
+        : [...(prev.regions || []), region],
+    }));
+  };
+
+  const toggleEntity = (entity: string) => {
+    setLocalFilters(prev => ({
+      ...prev,
+      entities: prev.entities?.includes(entity)
+        ? prev.entities.filter(e => e !== entity)
+        : [...(prev.entities || []), entity],
+    }));
+  };
+
+  // Common sectors, regions, and entities (can be made dynamic later)
+  const commonSectors = ['Technology', 'Finance', 'Energy', 'Healthcare', 'Manufacturing', 'Supply Chain', 'Geopolitics', 'Defense'];
+  const commonRegions = ['North America', 'Europe', 'Asia', 'Middle East', 'Latin America', 'Africa', 'Oceania'];
+  const commonEntities = ['United States', 'China', 'Russia', 'European Union', 'OPEC', 'NATO', 'G7', 'G20'];
 
   return (
     <>
@@ -271,6 +309,75 @@ export default function AdvancedFilters({
                     className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white font-light focus:outline-none focus:border-white/20"
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* Sectors Filter */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-light text-white mb-3">
+                <Building2 className="w-4 h-4 text-slate-400" />
+                Sectors
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {commonSectors.map(sector => (
+                  <button
+                    key={sector}
+                    onClick={() => toggleSector(sector)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-light transition-colors ${
+                      localFilters.sectors?.includes(sector)
+                        ? 'bg-[#E1463E]/20 border border-[#E1463E]/40 text-[#E1463E]'
+                        : 'bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10'
+                    }`}
+                  >
+                    {sector}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Regions Filter */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-light text-white mb-3">
+                <MapPin className="w-4 h-4 text-slate-400" />
+                Regions
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {commonRegions.map(region => (
+                  <button
+                    key={region}
+                    onClick={() => toggleRegion(region)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-light transition-colors ${
+                      localFilters.regions?.includes(region)
+                        ? 'bg-[#E1463E]/20 border border-[#E1463E]/40 text-[#E1463E]'
+                        : 'bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10'
+                    }`}
+                  >
+                    {region}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Entities Filter */}
+            <div>
+              <label className="flex items-center gap-2 text-sm font-light text-white mb-3">
+                <Users className="w-4 h-4 text-slate-400" />
+                Entities
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {commonEntities.map(entity => (
+                  <button
+                    key={entity}
+                    onClick={() => toggleEntity(entity)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-light transition-colors ${
+                      localFilters.entities?.includes(entity)
+                        ? 'bg-[#E1463E]/20 border border-[#E1463E]/40 text-[#E1463E]'
+                        : 'bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10'
+                    }`}
+                  >
+                    {entity}
+                  </button>
+                ))}
               </div>
             </div>
           </div>

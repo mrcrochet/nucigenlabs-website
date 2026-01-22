@@ -16,6 +16,7 @@ import { calculateImpactScore, type ImpactScore } from './impact-scorer';
 import { resolveCanonicalEvents } from './canonical-event-resolver';
 import { extractClaimsFromResults, type Claim } from './claims-extractor';
 import { getSearchMemory, updateSearchMemory, getRelevantEntitiesFromMemory, getRelevantRelationshipsFromMemory } from './search-memory';
+import { generateScenarioOutlook, type ScenarioOutlook } from './scenario-generator';
 
 export type SearchMode = 'fast' | 'standard' | 'deep';
 
@@ -137,11 +138,29 @@ export async function search(
   const relevantEntities = userId ? await getRelevantEntitiesFromMemory(userId, query, 20) : [];
   const relevantRelationships = userId ? await getRelevantRelationshipsFromMemory(userId, undefined, 50) : [];
   
-  if (memory && (relevantEntities.length > 0 || relevantRelationships.length > 0)) {
-    console.log(`[SearchOrchestrator] Using search memory: ${relevantEntities.length} entities, ${relevantRelationships.length} relationships`);
+  // Enrich query with memory context (PRIORITÉ ABSOLUE #2)
+  let enrichedQuery = query;
+  if (relevantEntities.length > 0 || relevantRelationships.length > 0) {
+    console.log(`[SearchOrchestrator] Enriching query with memory: ${relevantEntities.length} entities, ${relevantRelationships.length} relationships`);
+    
+    // Build enriched query: original + top entities + key relationships
+    const topEntities = relevantEntities
+      .slice(0, 5) // Top 5 most relevant entities
+      .map(e => e.name)
+      .filter((name, idx, arr) => arr.indexOf(name) === idx); // Deduplicate
+    
+    // Add entities to query if they're not already mentioned
+    const queryLower = query.toLowerCase();
+    const missingEntities = topEntities.filter(e => !queryLower.includes(e.toLowerCase()));
+    
+    if (missingEntities.length > 0) {
+      // Append missing entities (but keep original query first for relevance)
+      enrichedQuery = `${query} ${missingEntities.slice(0, 3).join(' ')}`;
+      console.log(`[SearchOrchestrator] Enriched query: "${enrichedQuery}" (added: ${missingEntities.slice(0, 3).join(', ')})`);
+    }
   }
 
-  // Step 1: Search with Tavily
+  // Step 1: Search with Tavily (using enriched query)
   const tavilyOptions: TavilySearchOptions = {
     searchDepth: mode === 'deep' ? 'advanced' : 'basic',
     maxResults: mode === 'deep' ? 50 : mode === 'standard' ? 30 : 20,
@@ -156,7 +175,7 @@ export async function search(
     tavilyOptions.days = days;
   }
 
-  const tavilyResult = await searchTavily(query, 'news', tavilyOptions);
+  const tavilyResult = await searchTavily(enrichedQuery, 'news', tavilyOptions);
 
   // Step 2: Convert Tavily results to SearchResult format
   let results: SearchResult[] = tavilyResult.articles.map((article, index) => ({
@@ -292,7 +311,19 @@ export async function search(
   // Claims are actionable predictions/statements/implications that inform decisions
   if (mode !== 'fast') {
     console.log(`[SearchOrchestrator] Extracting claims from ${results.length} results...`);
-    const allClaims = await extractClaimsFromResults(results, 5); // Max 5 claims per result
+    // Prepare results with all necessary fields for evidence enrichment
+    const resultsForClaims = results.map(r => ({
+      id: r.id,
+      title: r.title,
+      summary: r.summary,
+      content: r.content,
+      source: r.source,
+      url: r.url,
+      publishedAt: r.publishedAt,
+      relevanceScore: r.relevanceScore,
+      entities: r.entities,
+    }));
+    const allClaims = await extractClaimsFromResults(resultsForClaims, 5); // Max 5 claims per result
     
     // Attach claims to relevant results
     const claimsByResult = new Map<string, Claim[]>();
@@ -319,6 +350,46 @@ export async function search(
     }));
     
     console.log(`[SearchOrchestrator] Extracted ${allClaims.length} total claims`);
+    
+    // Step 6.5: Generate scenario outlooks for prediction-type claims (deep mode only)
+    if (mode === 'deep') {
+      const predictionClaims = allClaims.filter(c => c.type === 'prediction' && c.certainty >= 0.6);
+      
+      if (predictionClaims.length > 0) {
+        console.log(`[SearchOrchestrator] Generating scenario outlooks for ${predictionClaims.length} high-certainty predictions...`);
+        
+        // Generate scenarios for top prediction claims (limit to avoid too many API calls)
+        const topPredictions = predictionClaims
+          .sort((a, b) => b.certainty - a.certainty)
+          .slice(0, 5); // Max 5 scenario outlooks per search
+        
+        const scenarioPromises = topPredictions.map(async (claim) => {
+          try {
+            const outlook = await generateScenarioOutlook(claim.text, {
+              entities: claim.entities,
+              sectors: claim.sectors,
+              regions: claim.regions,
+              existingEvidence: claim.evidence,
+            });
+            
+            // Attach scenarios and insights to the claim
+            claim.scenarios = outlook.scenarios;
+            claim.currentState = outlook.currentState;
+            claim.mechanisms = outlook.mechanisms;
+            claim.crossScenarioInsights = outlook.crossScenarioInsights;
+            claim.type = 'scenario_outlook' as any; // Mark as scenario outlook
+            
+            return { claimId: claim.id, outlook };
+          } catch (error: any) {
+            console.error(`[SearchOrchestrator] Error generating scenarios for claim ${claim.id}:`, error.message);
+            return null;
+          }
+        });
+        
+        await Promise.allSettled(scenarioPromises);
+        console.log(`[SearchOrchestrator] Generated scenario outlooks for ${topPredictions.length} predictions`);
+      }
+    }
   }
 
   // Step 7: Extract relationships (for standard and deep modes)

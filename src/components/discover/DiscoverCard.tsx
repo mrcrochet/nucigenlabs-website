@@ -7,9 +7,11 @@
 import { useState } from 'react';
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
-import { Bookmark, ExternalLink, TrendingUp, Eye, HelpCircle, Clock, Flame, AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Bookmark, ExternalLink, TrendingUp, Eye, HelpCircle, Clock, Flame, AlertCircle, CheckCircle2, AlertTriangle, Brain } from 'lucide-react';
 import SourceIcon from './SourceIcon';
 import ShareMenu from './ShareMenu';
+import { trackPredictionView } from '../../lib/analytics';
 
 export interface DiscoverItem {
   id: string;
@@ -50,6 +52,7 @@ interface DiscoverCardProps {
 }
 
 export default function DiscoverCard({ item, onSave, onView, onShare }: DiscoverCardProps) {
+  const navigate = useNavigate();
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -359,6 +362,20 @@ export default function DiscoverCard({ item, onSave, onView, onShare }: Discover
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* View Predictions Button (only for topic/event type items) */}
+          {(item.type === 'topic' || item.type === 'trend') && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                trackPredictionView(item.id, { source: 'discover_card', item_type: item.type });
+                navigate(`/events/${item.id}/predictions`);
+              }}
+              className="p-2 rounded-lg bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-500/30 transition-colors"
+              title="View scenario predictions"
+            >
+              <Brain className="w-4 h-4" />
+            </button>
+          )}
           <ShareMenu
             item={{
               id: item.id,
