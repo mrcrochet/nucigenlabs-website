@@ -4262,6 +4262,289 @@ app.get('/api/account/export',
   })
 );
 
+// ============================================
+// MARKET INTELLIGENCE ENDPOINTS
+// ============================================
+
+// GET /api/market/insights - Get market insights with filters
+app.get('/api/market/insights',
+  asyncHandler(async (req: express.Request, res: express.Response) => {
+    const userId = (req as any).user?.id || req.headers['x-user-id'] || null;
+    
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'SERVICE_UNAVAILABLE',
+        message: 'Database not configured',
+      });
+    }
+
+    // Get user plan (default to 'free' if not authenticated)
+    let userPlan: 'free' | 'analyst' | 'pro' | 'enterprise' = 'free';
+    if (userId) {
+      const { data: user } = await supabase
+        .from('users')
+        .select('plan')
+        .eq('id', userId)
+        .maybeSingle();
+      userPlan = (user?.plan as any) || 'free';
+    }
+
+    // Check feature flags
+    const { getMarketFeatureFlags } = await import('./services/marketFeatureFlags.js');
+    const flags = getMarketFeatureFlags({ plan: userPlan });
+
+    if (!flags.canAccessMarket) {
+      return res.status(403).json({
+        success: false,
+        error: 'UPGRADE_REQUIRED',
+        message: 'Market insights require a paid plan',
+      });
+    }
+
+    // Parse query parameters
+    const {
+      direction,
+      sector,
+      time_horizon,
+      min_probability,
+      max_probability,
+      limit = 20,
+      offset = 0,
+    } = req.query;
+
+    // Build query
+    let query = supabase
+      .from('market_insights')
+      .select(`
+        *,
+        events (
+          id,
+          headline,
+          description,
+          published_at,
+          discover_regions,
+          discover_sectors
+        )
+      `)
+      .order('generated_at', { ascending: false })
+      .range(offset as number, (offset as number) + (limit as number) - 1);
+
+    // Apply filters
+    if (direction && (direction === 'up' || direction === 'down')) {
+      query = query.eq('direction', direction);
+    }
+    if (sector) {
+      query = query.eq('company_sector', sector);
+    }
+    if (time_horizon && ['short', 'medium', 'long'].includes(time_horizon as string)) {
+      query = query.eq('time_horizon', time_horizon);
+    }
+    if (min_probability) {
+      query = query.gte('probability', parseFloat(min_probability as string));
+    }
+    if (max_probability) {
+      query = query.lte('probability', parseFloat(max_probability as string));
+    }
+
+    // Filter out expired insights
+    query = query.or(`ttl_expires_at.is.null,ttl_expires_at.gt.${new Date().toISOString()}`);
+
+    const { data: insights, error } = await query;
+
+    if (error) {
+      console.error('[API Market] Error fetching insights:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'DATABASE_ERROR',
+        message: error.message,
+      });
+    }
+
+    // Apply feature flag restrictions to response
+    const filteredInsights = (insights || []).map((insight: any) => {
+      const filtered: any = {
+        id: insight.id,
+        event_id: insight.event_id,
+        company: {
+          name: insight.company_name,
+          ticker: insight.company_ticker,
+          exchange: insight.company_exchange,
+          sector: insight.company_sector,
+        },
+        direction: insight.direction,
+        time_horizon: insight.time_horizon,
+        event: insight.events ? {
+          id: insight.events.id,
+          headline: insight.events.headline,
+          published_at: insight.events.published_at,
+        } : null,
+      };
+
+      // Add premium fields based on flags
+      if (flags.canViewConfidence) {
+        filtered.confidence = insight.confidence;
+        filtered.probability = insight.probability;
+      }
+      if (flags.canViewFullThesis) {
+        filtered.thesis = insight.thesis;
+      } else {
+        filtered.thesis = 'Upgrade to unlock full thesis';
+      }
+      if (flags.canViewSupportingEvidence) {
+        filtered.supporting_evidence = insight.supporting_evidence;
+      }
+      if (flags.canViewHistoricalPatterns) {
+        // Historical patterns are in supporting_evidence, already handled above
+      }
+
+      return filtered;
+    });
+
+    res.json({
+      success: true,
+      insights: filteredInsights,
+      metadata: {
+        total: filteredInsights.length,
+        limit: limit as number,
+        offset: offset as number,
+        plan: userPlan,
+        flags,
+      },
+    });
+  }, {
+    timeout: 10000,
+    context: (req) => ({ endpoint: '/api/market/insights' }),
+  })
+);
+
+// GET /api/market/insights/:eventId - Get insights for a specific event
+app.get('/api/market/insights/:eventId',
+  asyncHandler(async (req: express.Request, res: express.Response) => {
+    const { eventId } = req.params;
+    const userId = (req as any).user?.id || req.headers['x-user-id'] || null;
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'SERVICE_UNAVAILABLE',
+        message: 'Database not configured',
+      });
+    }
+
+    // Get user plan
+    let userPlan: 'free' | 'analyst' | 'pro' | 'enterprise' = 'free';
+    if (userId) {
+      const { data: user } = await supabase
+        .from('users')
+        .select('plan')
+        .eq('id', userId)
+        .maybeSingle();
+      userPlan = (user?.plan as any) || 'free';
+    }
+
+    const { getMarketFeatureFlags } = await import('./services/marketFeatureFlags.js');
+    const flags = getMarketFeatureFlags({ plan: userPlan });
+
+    if (!flags.canAccessMarket) {
+      return res.status(403).json({
+        success: false,
+        error: 'UPGRADE_REQUIRED',
+        message: 'Market insights require a paid plan',
+      });
+    }
+
+    // Check cache first, or generate if needed
+    const { generateMarketInsightsForEvent } = await import('./services/market-intelligence.js');
+    const result = await generateMarketInsightsForEvent(eventId, {
+      force_refresh: false,
+    });
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error || 'Failed to generate insights',
+      });
+    }
+
+    // Apply feature flags to response
+    const filteredInsights = (result.insights || []).map((insight: any) => {
+      const filtered: any = {
+        company: insight.company,
+        direction: insight.direction,
+        time_horizon: insight.time_horizon,
+      };
+
+      if (flags.canViewConfidence) {
+        filtered.confidence = insight.confidence;
+        filtered.probability = insight.probability;
+      }
+      if (flags.canViewFullThesis) {
+        filtered.thesis = insight.thesis;
+      } else {
+        filtered.thesis = 'Upgrade to unlock full thesis';
+      }
+      if (flags.canViewSupportingEvidence) {
+        filtered.supporting_evidence = insight.supporting_evidence;
+      }
+
+      return filtered;
+    });
+
+    res.json({
+      success: true,
+      insights: filteredInsights,
+      metadata: {
+        from_cache: result.metadata?.from_cache || false,
+        plan: userPlan,
+        flags,
+      },
+    });
+  }, {
+    timeout: 30000,
+    context: (req) => ({ endpoint: '/api/market/insights/:eventId' }),
+  })
+);
+
+// POST /api/admin/market/generate - Generate insights for an event (admin only)
+app.post('/api/admin/market/generate',
+  asyncHandler(async (req: express.Request, res: express.Response) => {
+    const { eventId, force_refresh } = req.body;
+
+    if (!eventId) {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'eventId is required',
+      });
+    }
+
+    // TODO: Add admin authentication check here
+    // For now, allow any authenticated user (can be restricted later)
+
+    const { generateMarketInsightsForEvent } = await import('./services/market-intelligence.js');
+    const result = await generateMarketInsightsForEvent(eventId, {
+      force_refresh: force_refresh || false,
+    });
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error || 'Failed to generate insights',
+      });
+    }
+
+    res.json({
+      success: true,
+      insights: result.insights,
+      metadata: result.metadata,
+    });
+  }, {
+    timeout: 60000,
+    context: (req) => ({ endpoint: '/api/admin/market/generate' }),
+  })
+);
+
 const server = app.listen(PORT, () => {
   console.log(`🚀 API Server running on http://localhost:${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/health`);
