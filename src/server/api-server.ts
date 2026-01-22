@@ -2681,6 +2681,65 @@ app.get('/api/markets/asset/:symbol/attribution', async (req, res) => {
   }
 });
 
+// GET /api/cron/track-perplexity - Vercel Cron Job endpoint (automatic tracking every 2 hours)
+app.get('/api/cron/track-perplexity', async (req: express.Request, res: express.Response) => {
+  try {
+    // Verify cron secret (Vercel sends this header)
+    const authHeader = req.headers['authorization'];
+    const cronSecret = process.env.CRON_SECRET || process.env.VERCEL_CRON_SECRET;
+    
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      // In production, require auth. In dev, allow for testing
+      if (process.env.NODE_ENV === 'production' && !authHeader) {
+        return res.status(401).json({
+          success: false,
+          error: 'Unauthorized - cron secret required',
+        });
+      }
+    }
+
+    console.log('[API Cron] Starting Perplexity Discover tracking...');
+    const { trackPerplexityDiscover } = await import('./workers/perplexity-discover-tracker.js');
+    const result = await trackPerplexityDiscover();
+    
+    console.log('[API Cron] Tracking complete:', result);
+    
+    res.json({
+      success: true,
+      result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('[API Cron] Error tracking Perplexity:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to track Perplexity Discover',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// POST /api/admin/track-perplexity - Manually trigger Perplexity Discover tracking
+app.post('/api/admin/track-perplexity', async (req: express.Request, res: express.Response) => {
+  try {
+    // TODO: Add admin authentication check here
+    // For now, allow any authenticated user (can be restricted later)
+    const { trackPerplexityDiscover } = await import('./workers/perplexity-discover-tracker.js');
+    const result = await trackPerplexityDiscover();
+    
+    res.json({
+      success: true,
+      result,
+    });
+  } catch (error: any) {
+    console.error('[API] Error tracking Perplexity:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to track Perplexity Discover',
+    });
+  }
+});
+
 // GET /api/discover - Discover feed
 // Also available as /discover (for Vite proxy which removes /api prefix)
 const discoverHandler = async (req: any, res: any) => {
@@ -3606,6 +3665,96 @@ Return the questions in this JSON format:
   }
 });
 
+// POST /api/search/validate-claim - Validate a claim using Tavily follow-up
+app.post('/api/search/validate-claim', async (req, res) => {
+  try {
+    const { claim, timeRange = '7d' } = req.body;
+
+    if (!claim || typeof claim !== 'string' || !claim.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Claim is required',
+      });
+    }
+
+    console.log(`[API] Validating claim: "${claim.substring(0, 100)}..."`);
+
+    try {
+      const { validateClaim } = await import('./services/tavily-followup.js');
+      console.log('[API] validateClaim imported successfully');
+      
+      const result = await validateClaim(claim.trim(), timeRange);
+      console.log('[API] Validation result:', {
+        validated: result.validated,
+        confidence: result.confidence,
+        supportingSources: result.supportingSources,
+        contradictingSources: result.contradictingSources,
+        evidenceCount: result.evidence.length,
+      });
+
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (importError: any) {
+      console.error('[API] Import or validation error:', importError);
+      throw importError;
+    }
+  } catch (error: any) {
+    console.error('[API] Validate claim error:', error);
+    console.error('[API] Error stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    });
+  }
+});
+
+// POST /api/search/check-updates - Check for updates to an event
+app.post('/api/search/check-updates', async (req, res) => {
+  try {
+    const { eventTitle, originalDate, timeRange = '7d' } = req.body;
+
+    if (!eventTitle || !originalDate) {
+      return res.status(400).json({
+        success: false,
+        error: 'eventTitle and originalDate are required',
+      });
+    }
+
+    console.log(`[API] Checking updates for: "${eventTitle}" since ${originalDate}`);
+
+    try {
+      const { findUpdates } = await import('./services/tavily-followup.js');
+      console.log('[API] findUpdates imported successfully');
+      
+      const result = await findUpdates(eventTitle, originalDate, timeRange);
+      console.log('[API] Updates result:', {
+        totalUpdates: result.totalUpdates,
+        timeRange: result.timeRange,
+        updatesCount: result.updates.length,
+      });
+
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (importError: any) {
+      console.error('[API] Import or updates error:', importError);
+      throw importError;
+    }
+  } catch (error: any) {
+    console.error('[API] Check updates error:', error);
+    console.error('[API] Error stack:', error.stack);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+    });
+  }
+});
+
 // POST /api/enrich - Enrich a result or URL
 app.post('/api/enrich', async (req, res) => {
   try {
@@ -4135,6 +4284,7 @@ const server = app.listen(PORT, () => {
   console.log(`   Triggered Alerts: GET http://localhost:${PORT}/api/alerts/triggered`);
   console.log(`   Events List: GET http://localhost:${PORT}/api/events`);
   console.log(`   Event Context: GET http://localhost:${PORT}/api/events/:id/context`);
+  console.log(`   Event Predictions: GET http://localhost:${PORT}/api/events/:eventId/predictions`);
   console.log(`   Signals List: GET http://localhost:${PORT}/api/signals`);
   console.log(`   Signal Detail: GET http://localhost:${PORT}/api/signals/:id`);
   console.log(`   Markets Overview: GET http://localhost:${PORT}/api/markets/overview`);
