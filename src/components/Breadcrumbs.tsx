@@ -40,11 +40,18 @@ export default function Breadcrumbs() {
     'terms': 'Terms',
     'privacy': 'Privacy',
     'faq': 'FAQ',
+    'corporate-impact': 'Corporate Impact',
+    'events-feed': 'Events',
+    'signals-feed': 'Signals',
+    'discover': 'Discover',
+    'search': 'Search',
+    'overview': 'Overview',
+    'impacts': 'Impacts',
   };
 
   // Build breadcrumbs from path
   let currentPath = '';
-  pathSegments.forEach((segment, index) => {
+  pathSegments.forEach((segment) => {
     currentPath += `/${segment}`;
     // Use friendly name if available, otherwise format the segment
     const name = routeNames[segment] || segment
@@ -62,32 +69,32 @@ export default function Breadcrumbs() {
     <>
       <StructuredData type="BreadcrumbList" breadcrumbs={breadcrumbs} />
       <nav 
-        className="px-4 sm:px-6 py-3 sm:py-4 border-b border-white/[0.08] bg-black/20 backdrop-blur-sm"
+        className="px-4 sm:px-6 py-3 sm:py-4 border-b border-borders-subtle bg-background-overlay/50 backdrop-blur-sm"
         aria-label="Breadcrumb"
       >
-        <div className="max-w-7xl mx-auto">
-          <ol className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm overflow-x-auto">
+        <div className="max-w-[1280px] mx-auto">
+          <ol className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm overflow-x-auto scrollbar-hide">
             {breadcrumbs.map((crumb, index) => {
               const isLast = index === breadcrumbs.length - 1;
               return (
-                <li key={crumb.url} className="flex items-center gap-2">
+                <li key={crumb.url} className="flex items-center gap-2 flex-shrink-0">
                   {index === 0 ? (
                     <Link
                       to={crumb.url}
-                      className="flex items-center gap-1 text-slate-400 hover:text-white transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                      className="flex items-center gap-1 text-text-secondary hover:text-text-primary transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center flex-shrink-0"
                       aria-label="Home"
                     >
                       <Home size={16} className="flex-shrink-0" />
                     </Link>
                   ) : (
                     <>
-                      <ChevronRight size={14} className="text-slate-600 flex-shrink-0" />
+                      <ChevronRight size={14} className="text-text-tertiary flex-shrink-0" />
                       {isLast ? (
-                        <span className="text-white font-light whitespace-nowrap">{crumb.name}</span>
+                        <span className="text-text-primary font-light whitespace-nowrap flex-shrink-0">{crumb.name}</span>
                       ) : (
                         <Link
                           to={crumb.url}
-                          className="text-slate-400 hover:text-white transition-colors font-light whitespace-nowrap min-h-[44px] flex items-center"
+                          className="text-text-secondary hover:text-text-primary transition-colors font-light whitespace-nowrap min-h-[44px] flex items-center flex-shrink-0"
                         >
                           {crumb.name}
                         </Link>

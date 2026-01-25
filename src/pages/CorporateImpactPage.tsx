@@ -6,14 +6,17 @@
  */
 
 import { useState, useEffect } from 'react';
-import { Sparkles, Activity, Info, ArrowRight, AlertTriangle } from 'lucide-react';
+import { Sparkles, Activity, Info, AlertTriangle } from 'lucide-react';
+import AppShell from '../components/layout/AppShell';
+import SEO from '../components/SEO';
+import ProtectedRoute from '../components/ProtectedRoute';
 import CorporateImpactHeader from '../components/corporate-impact/CorporateImpactHeader';
 import CorporateImpactFilters from '../components/corporate-impact/CorporateImpactFilters';
 import SignalCard from '../components/corporate-impact/SignalCard';
 import EmptyState from '../components/corporate-impact/EmptyState';
 import type { MarketSignal, MarketSignalStats } from '../types/corporate-impact';
 
-export default function CorporateImpactPage() {
+function CorporateImpactPageContent() {
   const [signals, setSignals] = useState<MarketSignal[]>([]);
   const [stats, setStats] = useState<MarketSignalStats>({
     total_signals: 0,
@@ -29,7 +32,6 @@ export default function CorporateImpactPage() {
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showHowItWorks, setShowHowItWorks] = useState(false);
 
   useEffect(() => {
     loadSignals();
@@ -103,7 +105,7 @@ export default function CorporateImpactPage() {
   const filteredSignals = signals;
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A]">
+    <div className="col-span-1 sm:col-span-12">
       <CorporateImpactHeader stats={stats} />
 
       <CorporateImpactFilters
@@ -123,7 +125,7 @@ export default function CorporateImpactPage() {
       />
 
       {/* Activity Indicator */}
-      <div className="max-w-6xl mx-auto px-6 py-3">
+      <div className="px-6 py-3">
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-2 text-slate-400">
             <Activity className="w-4 h-4" />
@@ -139,7 +141,7 @@ export default function CorporateImpactPage() {
       </div>
 
       {/* Info Banner - Improved */}
-      <div className="max-w-6xl mx-auto px-6 py-4">
+      <div className="px-6 py-4">
         <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-2xl p-6">
           <div className="flex items-start gap-4">
             <div className="p-2 bg-gradient-to-br from-[#E1463E]/20 to-[#E1463E]/10 border border-[#E1463E]/20 rounded-lg">
@@ -185,7 +187,7 @@ export default function CorporateImpactPage() {
 
       {/* Low Noise Mode Indicator (when few signals) */}
       {!loading && filteredSignals.length > 0 && filteredSignals.length < 5 && (
-        <div className="max-w-6xl mx-auto px-6 py-2">
+        <div className="px-6 py-2">
           <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded-lg p-3">
             <div className="flex items-center gap-2 text-sm text-slate-400">
               <Info className="w-4 h-4" />
@@ -198,7 +200,7 @@ export default function CorporateImpactPage() {
       )}
 
       {/* Signals Feed */}
-      <div className="max-w-6xl mx-auto px-6 pb-8">
+      <div className="px-6 pb-8">
         {loading ? (
           <div className="text-center py-12">
             <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
@@ -230,9 +232,23 @@ export default function CorporateImpactPage() {
         )}
 
         {!loading && !error && filteredSignals.length === 0 && (
-          <EmptyState onShowHowItWorks={() => setShowHowItWorks(true)} />
+          <EmptyState />
         )}
       </div>
     </div>
+  );
+}
+
+export default function CorporateImpactPage() {
+  return (
+    <ProtectedRoute>
+      <SEO 
+        title="Corporate Impact — Nucigen"
+        description="How real-world events are likely to affect companies"
+      />
+      <AppShell>
+        <CorporateImpactPageContent />
+      </AppShell>
+    </ProtectedRoute>
   );
 }

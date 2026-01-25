@@ -131,7 +131,7 @@ function App() {
     '/app', '/dashboard', '/overview',
     '/events', '/events-feed',
     '/signals', '/signals-feed',
-    '/impacts',
+    '/impacts', '/corporate-impact',
     '/alerts', '/research', '/discover', '/search', '/recommendations', '/quality',  // App Research, NOT /papers (marketing)
     '/profile', '/settings', '/onboarding'
   ];

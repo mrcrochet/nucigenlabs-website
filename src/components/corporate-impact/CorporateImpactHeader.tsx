@@ -12,8 +12,11 @@ interface CorporateImpactHeaderProps {
 
 export default function CorporateImpactHeader({ stats }: CorporateImpactHeaderProps) {
   return (
-    <div className="backdrop-blur-xl bg-gradient-to-br from-[#0A0A0A] to-[#0F0F0F] border-b border-white/[0.08] sticky top-0 z-50">
-      <div className="max-w-6xl mx-auto px-6 py-6">
+    <div 
+      data-corporate-impact-header
+      className="backdrop-blur-xl bg-gradient-to-br from-background-overlay to-background-glass-subtle border-b border-borders-subtle sticky top-16 z-30"
+    >
+      <div className="px-6 py-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-3xl font-light text-white mb-2">Corporate Impact</h1>

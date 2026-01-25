@@ -61,7 +61,7 @@ export default function AppNavMenu({ isOpen, onClose }: AppNavMenuProps) {
       {/* Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-background-overlay/80 backdrop-blur-sm z-40"
+          className="fixed inset-0 bg-background-overlay/80 backdrop-blur-sm z-[60]"
           onClick={onClose}
         />
       )}
@@ -69,7 +69,7 @@ export default function AppNavMenu({ isOpen, onClose }: AppNavMenuProps) {
       {/* Menu Drawer */}
       <aside
         className={`
-          fixed inset-y-0 left-0 z-50
+          fixed inset-y-0 left-0 z-[70]
           bg-background-overlay backdrop-blur-xl border-r border-borders-subtle
           w-64 transform transition-transform duration-300 ease-in-out
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}

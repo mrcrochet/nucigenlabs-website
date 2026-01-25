@@ -6,7 +6,7 @@
  */
 
 import { Filter, Search, X } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface CorporateImpactFiltersProps {
   selectedFilter: 'all' | 'opportunity' | 'risk';
@@ -40,6 +40,25 @@ export default function CorporateImpactFilters({
   availableCategories = [],
 }: CorporateImpactFiltersProps) {
   const [showSearch, setShowSearch] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(244); // Default: TopNav (64) + Header (~180)
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // Calculate header height dynamically
+  useEffect(() => {
+    const calculateHeaderHeight = () => {
+      // TopNav: 64px (h-16)
+      const topNavHeight = 64;
+      // Header: measure actual height
+      const headerElement = document.querySelector('[data-corporate-impact-header]');
+      const headerActualHeight = headerElement?.getBoundingClientRect().height || 180;
+      
+      setHeaderHeight(topNavHeight + headerActualHeight);
+    };
+
+    calculateHeaderHeight();
+    window.addEventListener('resize', calculateHeaderHeight);
+    return () => window.removeEventListener('resize', calculateHeaderHeight);
+  }, []);
 
   // Use available sectors from API, fallback to defaults
   const sectors = availableSectors.length > 0 
@@ -64,8 +83,12 @@ export default function CorporateImpactFilters({
   ];
 
   return (
-    <div className="backdrop-blur-xl bg-gradient-to-br from-[#0A0A0A] to-[#0F0F0F] border-b border-white/[0.08] sticky top-[172px] z-40">
-      <div className="max-w-6xl mx-auto px-6 py-4">
+    <div 
+      ref={headerRef}
+      className="col-span-1 sm:col-span-12 backdrop-blur-xl bg-gradient-to-br from-background-overlay to-background-glass-subtle border-b border-borders-subtle sticky z-50"
+      style={{ top: `${headerHeight}px` }}
+    >
+      <div className="px-6 py-4">
         {/* Main Filters Row */}
         <div className="flex items-center gap-3 flex-wrap">
           <Filter className="w-5 h-5 text-slate-400 flex-shrink-0" />
