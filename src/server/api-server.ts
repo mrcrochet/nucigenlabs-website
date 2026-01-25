@@ -4400,6 +4400,651 @@ Return JSON object with "comparisons" array (max 5 events, sorted by similarity_
   }
 });
 
+// ============================================
+// Watchlist Endpoints (MVP)
+// ============================================
+
+// GET /api/watchlists - Get user's watchlist
+app.get('/api/watchlists', asyncHandler(async (req: express.Request, res: express.Response) => {
+  if (!supabase) {
+    return res.status(503).json({
+      success: false,
+      error: 'Supabase not configured',
+    });
+  }
+
+  const clerkUserId = req.headers['x-clerk-user-id'] as string;
+  const supabaseUserId = await getSupabaseUserId(clerkUserId || null, supabase);
+
+  if (!supabaseUserId) {
+    return res.status(401).json({
+      success: false,
+      error: 'User not authenticated',
+    });
+  }
+
+  const { data, error } = await supabase
+    .from('watchlists')
+    .select('*')
+    .eq('user_id', supabaseUserId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('[Watchlist] Error fetching watchlist:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+
+  res.json({
+    success: true,
+    data: data || [],
+  });
+}));
+
+// POST /api/watchlists - Add entity to watchlist
+app.post('/api/watchlists', asyncHandler(async (req: express.Request, res: express.Response) => {
+  if (!supabase) {
+    return res.status(503).json({
+      success: false,
+      error: 'Supabase not configured',
+    });
+  }
+
+  const clerkUserId = req.headers['x-clerk-user-id'] as string;
+  const supabaseUserId = await getSupabaseUserId(clerkUserId || null, supabase);
+
+  if (!supabaseUserId) {
+    return res.status(401).json({
+      success: false,
+      error: 'User not authenticated',
+    });
+  }
+
+  const { entity_type, entity_id, entity_name, entity_metadata, notify_on_signal, notify_on_event, notify_on_scenario } = req.body;
+
+  if (!entity_type || !entity_id || !entity_name) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required fields: entity_type, entity_id, entity_name',
+    });
+  }
+
+  const { data, error } = await supabase
+    .from('watchlists')
+    .insert({
+      user_id: supabaseUserId,
+      entity_type,
+      entity_id,
+      entity_name,
+      entity_metadata: entity_metadata || {},
+      notify_on_signal: notify_on_signal !== undefined ? notify_on_signal : true,
+      notify_on_event: notify_on_event !== undefined ? notify_on_event : true,
+      notify_on_scenario: notify_on_scenario !== undefined ? notify_on_scenario : false,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    // If duplicate, return existing entry
+    if (error.code === '23505') {
+      const { data: existing } = await supabase
+        .from('watchlists')
+        .select('*')
+        .eq('user_id', supabaseUserId)
+        .eq('entity_type', entity_type)
+        .eq('entity_id', entity_id)
+        .single();
+
+      return res.json({
+        success: true,
+        data: existing,
+        message: 'Entity already in watchlist',
+      });
+    }
+
+    console.error('[Watchlist] Error adding to watchlist:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+
+  res.json({
+    success: true,
+    data,
+  });
+}));
+
+// DELETE /api/watchlists/:id - Remove entity from watchlist
+app.delete('/api/watchlists/:id', asyncHandler(async (req: express.Request, res: express.Response) => {
+  if (!supabase) {
+    return res.status(503).json({
+      success: false,
+      error: 'Supabase not configured',
+    });
+  }
+
+  const clerkUserId = req.headers['x-clerk-user-id'] as string;
+  const supabaseUserId = await getSupabaseUserId(clerkUserId || null, supabase);
+
+  if (!supabaseUserId) {
+    return res.status(401).json({
+      success: false,
+      error: 'User not authenticated',
+    });
+  }
+
+  const { id } = req.params;
+
+  const { error } = await supabase
+    .from('watchlists')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', supabaseUserId); // Ensure user can only delete their own
+
+  if (error) {
+    console.error('[Watchlist] Error removing from watchlist:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+
+  res.json({
+    success: true,
+    message: 'Entity removed from watchlist',
+  });
+}));
+
+// DELETE /api/watchlists - Remove by entity_type and entity_id
+app.delete('/api/watchlists', asyncHandler(async (req: express.Request, res: express.Response) => {
+  if (!supabase) {
+    return res.status(503).json({
+      success: false,
+      error: 'Supabase not configured',
+    });
+  }
+
+  const clerkUserId = req.headers['x-clerk-user-id'] as string;
+  const supabaseUserId = await getSupabaseUserId(clerkUserId || null, supabase);
+
+  if (!supabaseUserId) {
+    return res.status(401).json({
+      success: false,
+      error: 'User not authenticated',
+    });
+  }
+
+  const { entity_type, entity_id } = req.query;
+
+  if (!entity_type || !entity_id) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required query params: entity_type, entity_id',
+    });
+  }
+
+  const { error } = await supabase
+    .from('watchlists')
+    .delete()
+    .eq('user_id', supabaseUserId)
+    .eq('entity_type', entity_type as string)
+    .eq('entity_id', entity_id as string);
+
+  if (error) {
+    console.error('[Watchlist] Error removing from watchlist:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+
+  res.json({
+    success: true,
+    message: 'Entity removed from watchlist',
+  });
+}));
+
+// GET /api/watchlists/check - Check if entity is in watchlist
+app.get('/api/watchlists/check', asyncHandler(async (req: express.Request, res: express.Response) => {
+  if (!supabase) {
+    return res.status(503).json({
+      success: false,
+      error: 'Supabase not configured',
+    });
+  }
+
+  const clerkUserId = req.headers['x-clerk-user-id'] as string;
+  const supabaseUserId = await getSupabaseUserId(clerkUserId || null, supabase);
+
+  if (!supabaseUserId) {
+    return res.status(401).json({
+      success: false,
+      error: 'User not authenticated',
+    });
+  }
+
+  const { entity_type, entity_id } = req.query;
+
+  if (!entity_type || !entity_id) {
+    return res.status(400).json({
+      success: false,
+      error: 'Missing required query params: entity_type, entity_id',
+    });
+  }
+
+  const { data, error } = await supabase
+    .from('watchlists')
+    .select('*')
+    .eq('user_id', supabaseUserId)
+    .eq('entity_type', entity_type as string)
+    .eq('entity_id', entity_id as string)
+    .single();
+
+  if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+    console.error('[Watchlist] Error checking watchlist:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+
+  res.json({
+    success: true,
+    data: {
+      is_watched: !!data,
+      watchlist_item: data || null,
+    },
+  });
+}));
+
+// ============================================
+// Decision Points Endpoints
+// ============================================
+
+// GET /api/decision-points - Get decision points for scenarios/signals
+app.get('/api/decision-points', asyncHandler(async (req: express.Request, res: express.Response) => {
+  if (!supabase) {
+    return res.status(503).json({
+      success: false,
+      error: 'Supabase not configured',
+    });
+  }
+
+  const { scenario_id, signal_id, event_id, type, priority, status } = req.query;
+
+  let query = supabase
+    .from('decision_points')
+    .select('*')
+    .order('priority', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (scenario_id) {
+    query = query.eq('scenario_id', scenario_id as string);
+  }
+  if (signal_id) {
+    query = query.eq('signal_id', signal_id as string);
+  }
+  if (event_id) {
+    query = query.eq('event_id', event_id as string);
+  }
+  if (type) {
+    query = query.eq('type', type as string);
+  }
+  if (priority) {
+    query = query.eq('priority', priority as string);
+  }
+  if (status) {
+    query = query.eq('status', status as string);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('[Decision Points] Error fetching decision points:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+
+  res.json({
+    success: true,
+    data: data || [],
+  });
+}));
+
+// ============================================
+// Watchlist Changes Analysis Endpoints
+// ============================================
+
+// GET /api/watchlists/changes - Get changes for watchlist entities
+app.get('/api/watchlists/changes', asyncHandler(async (req: express.Request, res: express.Response) => {
+  if (!supabase) {
+    return res.status(503).json({
+      success: false,
+      error: 'Supabase not configured',
+    });
+  }
+
+  const clerkUserId = req.headers['x-clerk-user-id'] as string;
+  const supabaseUserId = await getSupabaseUserId(clerkUserId || null, supabase);
+
+  if (!supabaseUserId) {
+    return res.status(401).json({
+      success: false,
+      error: 'User not authenticated',
+    });
+  }
+
+  // Get user's watchlist
+  const { data: watchlist, error: watchlistError } = await supabase
+    .from('watchlists')
+    .select('*')
+    .eq('user_id', supabaseUserId)
+    .order('created_at', { ascending: false });
+
+  if (watchlistError) {
+    console.error('[Watchlist Changes] Error fetching watchlist:', watchlistError);
+    return res.status(500).json({
+      success: false,
+      error: watchlistError.message,
+    });
+  }
+
+  if (!watchlist || watchlist.length === 0) {
+    return res.json({
+      success: true,
+      data: [],
+      message: 'No items in watchlist',
+    });
+  }
+
+  // Analyze changes for each watchlist item
+  const changes: any[] = [];
+  const limit = parseInt(req.query.limit as string) || 10;
+  const hoursBack = parseInt(req.query.hours_back as string) || 24;
+
+  for (const item of watchlist.slice(0, limit)) {
+    try {
+      // Find recent signals/events related to this entity
+      let relatedSignals: any[] = [];
+      let relatedEvents: any[] = [];
+
+      if (item.entity_type === 'company') {
+        // Search for signals/events mentioning this company
+        const { data: signals } = await supabase
+          .from('market_signals')
+          .select('*')
+          .or(`title.ilike.%${item.entity_name}%,summary.ilike.%${item.entity_name}%`)
+          .gte('created_at', new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString())
+          .limit(3);
+
+        relatedSignals = signals || [];
+      } else if (item.entity_type === 'country' || item.entity_type === 'sector') {
+        // Search for events in this country/sector
+        const { data: events } = await supabase
+          .from('nucigen_events')
+          .select('*')
+          .or(`country.ilike.%${item.entity_name}%,sector.ilike.%${item.entity_name}%,region.ilike.%${item.entity_name}%`)
+          .gte('created_at', new Date(Date.now() - hoursBack * 60 * 60 * 1000).toISOString())
+          .limit(3);
+
+        relatedEvents = events || [];
+      }
+
+      // Create change entry if there are related items
+      if (relatedSignals.length > 0 || relatedEvents.length > 0) {
+        const latestItem = relatedSignals[0] || relatedEvents[0];
+        const impactScore = latestItem?.impact_score || latestItem?.confidence || 50;
+
+        changes.push({
+          id: `change-${item.id}`,
+          watchlist_item_id: item.id,
+          entity_type: item.entity_type,
+          entity_name: item.entity_name,
+          change_type: impactScore > 70 ? 'positive' : impactScore < 40 ? 'negative' : 'neutral',
+          change_description: latestItem?.summary || latestItem?.title || `Recent activity detected for ${item.entity_name}`,
+          impact_score: Math.round(impactScore),
+          related_signal_id: relatedSignals[0]?.id,
+          related_event_id: relatedEvents[0]?.id,
+          timestamp: latestItem?.created_at || new Date().toISOString(),
+        });
+      }
+    } catch (error: any) {
+      console.error(`[Watchlist Changes] Error analyzing changes for ${item.entity_name}:`, error);
+      // Continue with other items
+    }
+  }
+
+  res.json({
+    success: true,
+    data: changes,
+    watchlist_count: watchlist.length,
+  });
+}));
+
+// ============================================
+// Watchlist Notifications Endpoints
+// ============================================
+
+// GET /api/watchlists/notifications - Get user's watchlist notifications
+app.get('/api/watchlists/notifications', asyncHandler(async (req: express.Request, res: express.Response) => {
+  if (!supabase) {
+    return res.status(503).json({
+      success: false,
+      error: 'Supabase not configured',
+    });
+  }
+
+  const clerkUserId = req.headers['x-clerk-user-id'] as string;
+  const supabaseUserId = await getSupabaseUserId(clerkUserId || null, supabase);
+
+  if (!supabaseUserId) {
+    return res.status(401).json({
+      success: false,
+      error: 'User not authenticated',
+    });
+  }
+
+  const { unread_only, limit } = req.query;
+  const limitNum = limit ? parseInt(limit as string) : 50;
+
+  let query = supabase
+    .from('watchlist_notifications')
+    .select('*')
+    .eq('user_id', supabaseUserId)
+    .order('created_at', { ascending: false })
+    .limit(limitNum);
+
+  if (unread_only === 'true') {
+    query = query.eq('read', false);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error('[Watchlist Notifications] Error fetching notifications:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+
+  res.json({
+    success: true,
+    data: data || [],
+    unread_count: data?.filter((n: any) => !n.read).length || 0,
+  });
+}));
+
+// POST /api/watchlists/notifications/:id/read - Mark notification as read
+app.post('/api/watchlists/notifications/:id/read', asyncHandler(async (req: express.Request, res: express.Response) => {
+  if (!supabase) {
+    return res.status(503).json({
+      success: false,
+      error: 'Supabase not configured',
+    });
+  }
+
+  const clerkUserId = req.headers['x-clerk-user-id'] as string;
+  const supabaseUserId = await getSupabaseUserId(clerkUserId || null, supabase);
+
+  if (!supabaseUserId) {
+    return res.status(401).json({
+      success: false,
+      error: 'User not authenticated',
+    });
+  }
+
+  const { id } = req.params;
+
+  const { error } = await supabase
+    .from('watchlist_notifications')
+    .update({
+      read: true,
+      read_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('user_id', supabaseUserId); // Ensure user can only update their own
+
+  if (error) {
+    console.error('[Watchlist Notifications] Error marking as read:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+
+  res.json({
+    success: true,
+    message: 'Notification marked as read',
+  });
+}));
+
+// POST /api/watchlists/notifications/read-all - Mark all notifications as read
+app.post('/api/watchlists/notifications/read-all', asyncHandler(async (req: express.Request, res: express.Response) => {
+  if (!supabase) {
+    return res.status(503).json({
+      success: false,
+      error: 'Supabase not configured',
+    });
+  }
+
+  const clerkUserId = req.headers['x-clerk-user-id'] as string;
+  const supabaseUserId = await getSupabaseUserId(clerkUserId || null, supabase);
+
+  if (!supabaseUserId) {
+    return res.status(401).json({
+      success: false,
+      error: 'User not authenticated',
+    });
+  }
+
+  const { error } = await supabase
+    .from('watchlist_notifications')
+    .update({
+      read: true,
+      read_at: new Date().toISOString(),
+    })
+    .eq('user_id', supabaseUserId)
+    .eq('read', false);
+
+  if (error) {
+    console.error('[Watchlist Notifications] Error marking all as read:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+
+  res.json({
+    success: true,
+    message: 'All notifications marked as read',
+  });
+}));
+
+// GET /api/cron/decision-points - Vercel Cron Job endpoint (automatic decision points generation)
+app.get('/api/cron/decision-points', async (req: express.Request, res: express.Response) => {
+  try {
+    // Verify cron secret (Vercel sends this header)
+    const authHeader = req.headers['authorization'];
+    const cronSecret = process.env.CRON_SECRET || process.env.VERCEL_CRON_SECRET;
+
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      if (process.env.NODE_ENV === 'production' && !authHeader) {
+        return res.status(401).json({
+          success: false,
+          error: 'Unauthorized - cron secret required',
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+
+    console.log('[API Cron] Starting Decision Points generation...');
+
+    const { processDecisionPoints } = await import('./workers/decision-points-worker.js');
+    const result = await processDecisionPoints(20); // Process top 20 scenarios
+
+    console.log('[API Cron] Decision Points generation complete:', result);
+
+    res.json({
+      success: true,
+      result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('[API Cron] Error generating Decision Points:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate Decision Points',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// GET /api/cron/watchlist-notifications - Vercel Cron Job endpoint (automatic watchlist notifications)
+app.get('/api/cron/watchlist-notifications', async (req: express.Request, res: express.Response) => {
+  try {
+    // Verify cron secret (Vercel sends this header)
+    const authHeader = req.headers['authorization'];
+    const cronSecret = process.env.CRON_SECRET || process.env.VERCEL_CRON_SECRET;
+
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      if (process.env.NODE_ENV === 'production' && !authHeader) {
+        return res.status(401).json({
+          success: false,
+          error: 'Unauthorized - cron secret required',
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+
+    console.log('[API Cron] Starting Watchlist Notifications generation...');
+
+    const { processWatchlistNotifications } = await import('./workers/watchlist-notifications-worker.js');
+    const hoursBack = parseInt(req.query.hours_back as string) || 24;
+    const result = await processWatchlistNotifications(hoursBack);
+
+    console.log('[API Cron] Watchlist Notifications generation complete:', result);
+
+    res.json({
+      success: true,
+      result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('[API Cron] Error generating Watchlist Notifications:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate Watchlist Notifications',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 // GET /api/cron/corporate-impact - Vercel Cron Job endpoint (automatic signal generation every hour)
 app.get('/api/cron/corporate-impact', async (req: express.Request, res: express.Response) => {
   try {

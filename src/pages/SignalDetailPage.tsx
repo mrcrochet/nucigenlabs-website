@@ -23,12 +23,14 @@ import MarketValidationCard from '../components/signals/MarketValidationCard';
 import NextActionsBar from '../components/signals/NextActionsBar';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
-import { getSignalsFromEvents, getNormalizedEventById, getOrCreateSupabaseUserId, getUserPreferences } from '../lib/supabase';
+import { getSignalsFromEvents, getNormalizedEventById, getOrCreateSupabaseUserId, getUserPreferences, getEventById, type CausalChain } from '../lib/supabase';
 import type { Signal } from '../types/intelligence';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import SignalEnrichment from '../components/signals/SignalEnrichment';
 import SignalExplanation from '../components/signals/SignalExplanation';
 import AlphaSignalsPanel from '../components/alpha/AlphaSignalsPanel';
+import CausalChainVisualization from '../components/signals/CausalChainVisualization';
+import WatchlistButton from '../components/watchlist/WatchlistButton';
 import type { Event } from '../types/intelligence';
 
 function SignalDetailContent() {
@@ -41,6 +43,7 @@ function SignalDetailContent() {
   const [error, setError] = useState<string | null>(null);
   const [relatedEvents, setRelatedEvents] = useState<Event[]>([]);
   const [symbols, setSymbols] = useState<string[]>([]);
+  const [causalChains, setCausalChains] = useState<CausalChain[]>([]);
 
   useEffect(() => {
     if (!id) {
@@ -154,11 +157,40 @@ function SignalDetailContent() {
 
       {/* Header: SignalHeader */}
       <div className="col-span-1 sm:col-span-12">
-        <SignalHeader signal={signal} />
+        <div className="flex items-center justify-between mb-4">
+          <SignalHeader signal={signal} />
+          <WatchlistButton
+            entityType="signal"
+            entityId={signal.id}
+            entityName={signal.title}
+            variant="icon"
+          />
+        </div>
       </div>
 
       {/* Row 2: Left (8) + Right (4) */}
       <div className="col-span-1 sm:col-span-8 space-y-6">
+        {/* Causal Chain Visualization */}
+        {causalChains.length > 0 && (
+          <CausalChainVisualization
+            nodes={causalChains.map((chain, index) => ({
+              id: chain.id || `chain-${index}`,
+              type: 'event' as const,
+              title: chain.cause,
+              description: `${chain.first_order_effect}${chain.second_order_effect ? ` → ${chain.second_order_effect}` : ''}`,
+              confidence: chain.confidence,
+            })).concat([
+              {
+                id: signal.id,
+                type: 'signal' as const,
+                title: signal.title,
+                description: signal.summary,
+                confidence: signal.confidence_score / 100,
+              },
+            ])}
+            signalId={signal.id}
+          />
+        )}
         <SignalEvidenceGraph signal={signal} />
         <EventStack signal={signal} />
         {/* Signal Explanation - Why significant, precedents, invalidation */}

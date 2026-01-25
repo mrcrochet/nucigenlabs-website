@@ -13,7 +13,6 @@ import Breadcrumbs from './components/Breadcrumbs';
 import { prefetchCriticalRoutes } from './utils/prefetch';
 import ProtectedRoute from './components/ProtectedRoute';
 import PublicRoute from './components/PublicRoute';
-import OnboardingGuard from './components/OnboardingGuard';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useSentryUser } from './hooks/useSentryUser';
 import Home from './pages/Home';
@@ -25,7 +24,8 @@ const PartnerProgram = lazy(() => import('./pages/PartnerProgram'));
 const Intelligence = lazy(() => import('./pages/Intelligence'));
 const CaseStudies = lazy(() => import('./pages/CaseStudies'));
 const Papers = lazy(() => import('./pages/Papers'));
-// Auth routes - Preload critical auth routes for smooth transitions
+
+// Auth routes
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const ConfirmEmail = lazy(() => import('./pages/ConfirmEmail'));
@@ -33,48 +33,39 @@ const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Onboarding = lazy(() => import('./pages/Onboarding'));
 const AuthCallback = lazy(() => import('./pages/AuthCallback'));
-// Application core routes (PHASE 2D)
-// Legacy pages - now redirected to /overview
-// const Dashboard = lazy(() => import('./pages/Dashboard'));
-const IntelligenceFeed = lazy(() => import('./pages/IntelligenceFeed'));
-const Events = lazy(() => import('./pages/Events'));
-const EventDetail = lazy(() => import('./pages/EventDetail'));
-// New Dashboard UI (UI Spec compliant)
+
+// NEW ARCHITECTURE: Core 5 Pillars
 const Overview = lazy(() => import('./pages/Overview'));
+const SignalsPage = lazy(() => import('./pages/SignalsPage')); // Unified Signals
 const EventsFeed = lazy(() => import('./pages/EventsFeed'));
 const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
-const SignalsFeed = lazy(() => import('./pages/SignalsFeed'));
-const SignalDetailPage = lazy(() => import('./pages/SignalDetailPage'));
-const ImpactsPage = lazy(() => import('./pages/ImpactsPage'));
-const ImpactDetailPage = lazy(() => import('./pages/ImpactDetailPage'));
-// Modules (Beta / Locked)
+const ScenariosPage = lazy(() => import('./pages/ScenariosPage')); // Renamed from Impacts
 const Alerts = lazy(() => import('./pages/Alerts'));
+
+// Detail pages
+const SignalDetailPage = lazy(() => import('./pages/SignalDetailPage'));
+const ImpactDetailPage = lazy(() => import('./pages/ImpactDetailPage'));
+const PredictionPage = lazy(() => import('./pages/PredictionPage'));
+
+// Other modules (kept for now)
 const Research = lazy(() => import('./pages/Research'));
-const Discover = lazy(() => import('./pages/Discover'));
 const SearchHome = lazy(() => import('./pages/SearchHome'));
 const SearchWorkspace = lazy(() => import('./pages/SearchWorkspace'));
-// Intelligence Detail Pages
-const IntelligenceRisks = lazy(() => import('./pages/IntelligenceRisks'));
-const IntelligencePredictions = lazy(() => import('./pages/IntelligencePredictions'));
-const IntelligenceImplications = lazy(() => import('./pages/IntelligenceImplications'));
-const PredictionPage = lazy(() => import('./pages/PredictionPage'));
-const CorporateImpactPage = lazy(() => import('./pages/CorporateImpactPage'));
+const Recommendations = lazy(() => import('./pages/Recommendations'));
+
 // User / System
 const Profile = lazy(() => import('./pages/Profile'));
 const Settings = lazy(() => import('./pages/Settings'));
-// Quality (PHASE 3B)
-const QualityDashboard = lazy(() => import('./pages/QualityDashboard'));
-// Alerts (PHASE 3C)
 const AlertSettings = lazy(() => import('./pages/AlertSettings'));
-// Recommendations (PHASE 7)
-const Recommendations = lazy(() => import('./pages/Recommendations'));
+const QualityDashboard = lazy(() => import('./pages/QualityDashboard'));
+
 // Legal & Info Pages
 const Terms = lazy(() => import('./pages/Terms'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 const About = lazy(() => import('./pages/About'));
 const FAQ = lazy(() => import('./pages/FAQ'));
 
-// Loading component for Suspense fallback - smoother transition
+// Loading component for Suspense fallback
 const PageLoader = () => (
   <div 
     className="fixed inset-0 flex items-center justify-center bg-[#0A0A0A] z-50 transition-opacity duration-300"
@@ -91,17 +82,8 @@ const PageLoader = () => (
   </div>
 );
 
-// Smooth page transition wrapper
-const PageTransition = ({ children }: { children: React.ReactNode }) => {
-  return (
-    <div className="animate-in fade-in duration-200">
-      {children}
-    </div>
-  );
-};
-
 function App() {
-  const { toast, showToast, hideToast } = useToast();
+  const { toast, hideToast } = useToast();
   const [showExitModal, setShowExitModal] = useState(false);
   const location = useLocation();
 
@@ -114,7 +96,6 @@ function App() {
   }, []);
 
   useExitIntent(() => {
-    // Only show if user hasn't already submitted
     const hasSubmitted = localStorage.getItem('access-request-submitted');
     if (!hasSubmitted && !showExitModal) {
       setShowExitModal(true);
@@ -122,23 +103,21 @@ function App() {
   });
 
   // Hide navigation and marketing components on auth/app pages
-  // All app routes should hide marketing components (landing page navigation, background, etc.)
-  // NOTE: Marketing pages (/intelligence-page, /case-studies, /papers) are PUBLIC and should show marketing navigation
+  // NEW ARCHITECTURE: Updated paths for 5 core pillars
   const hideMarketingPaths = [
     // Auth routes
     '/login', '/register', '/auth', '/confirm-email', '/forgot-password', '/reset-password',
-    // App routes (all protected routes)
+    // Core 5 pillars
     '/app', '/dashboard', '/overview',
-    '/events', '/events-feed',
-    '/signals', '/signals-feed',
-    '/impacts', '/corporate-impact',
-    '/alerts', '/research', '/discover', '/search', '/recommendations', '/quality',  // App Research, NOT /papers (marketing)
+    '/signals', '/events', '/scenarios', '/alerts',
+    // Legacy routes (redirected)
+    '/intelligence', '/signals-feed', '/corporate-impact', '/discover', '/impacts',
+    // Other app routes
+    '/research', '/search', '/recommendations', '/quality',
     '/profile', '/settings', '/onboarding'
   ];
   
   // Special handling for /intelligence vs /intelligence-page
-  // /intelligence = app route (hide marketing), /intelligence-page = marketing route (show marketing)
-  // We need exact match or starts with /intelligence/ but NOT /intelligence-page
   const isAppIntelligence = (location.pathname === '/intelligence' || location.pathname.startsWith('/intelligence/')) && 
                             !location.pathname.startsWith('/intelligence-page');
   const shouldHideMarketing = hideMarketingPaths.some(path => location.pathname.startsWith(path)) || isAppIntelligence;
@@ -169,13 +148,13 @@ function App() {
 
       <Suspense fallback={<PageLoader />}>
       <Routes>
-        {/* Public Marketing Routes - Accessible without authentication */}
+        {/* Public Marketing Routes */}
         <Route path="/" element={<Home />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/partners" element={<PartnerProgram />} />
-        <Route path="/intelligence-page" element={<Intelligence />} /> {/* Marketing Intelligence - Public */}
-        <Route path="/case-studies" element={<CaseStudies />} /> {/* Marketing Case Studies - Public */}
-        <Route path="/papers" element={<Papers />} /> {/* Marketing Research - Public */}
+        <Route path="/intelligence-page" element={<Intelligence />} />
+        <Route path="/case-studies" element={<CaseStudies />} />
+        <Route path="/papers" element={<Papers />} />
         <Route path="/about" element={<About />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
@@ -189,47 +168,46 @@ function App() {
         <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         
-        {/* Protected App Routes - PHASE 2D SITEMAP */}
-        {/* Level 1 - Application Core */}
-        {/* Note: Onboarding is now optional. Users can access all features and complete onboarding when ready via the banner */}
-        {/* Legacy redirect: /dashboard → /overview (new UI spec compliant page) */}
-        <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
-        <Route path="/app" element={<Navigate to="/overview" replace />} /> {/* Legacy redirect */}
-        <Route path="/intelligence" element={<ProtectedRoute><IntelligenceFeed /></ProtectedRoute>} /> {/* App Intelligence - Protected, different from /intelligence-page */}
-        <Route path="/intelligence/risks" element={<ProtectedRoute><IntelligenceRisks /></ProtectedRoute>} /> {/* Top Risks Detail Page */}
-        <Route path="/intelligence/predictions" element={<ProtectedRoute><IntelligencePredictions /></ProtectedRoute>} /> {/* Top Predictions Detail Page */}
-        <Route path="/intelligence/implications" element={<ProtectedRoute><IntelligenceImplications /></ProtectedRoute>} /> {/* Key Implications Detail Page */}
-        <Route path="/events/:eventId/predictions" element={<ProtectedRoute><PredictionPage /></ProtectedRoute>} /> {/* Event Prediction Page */}
-        
-        {/* Legacy redirect: /events → /events-feed (new UI spec compliant page) */}
-        <Route path="/events" element={<Navigate to="/events-feed" replace />} />
-        <Route path="/events/:event_id" element={<Navigate to="/events-feed/:id" replace />} />
-        
-        {/* New Dashboard UI (UI Spec compliant) */}
+        {/* NEW ARCHITECTURE: Core 5 Pillars */}
         <Route path="/overview" element={<ProtectedRoute><Overview /></ProtectedRoute>} />
-        <Route path="/events-feed" element={<ProtectedRoute><EventsFeed /></ProtectedRoute>} />
-        <Route path="/events-feed/:id" element={<ProtectedRoute><EventDetailPage /></ProtectedRoute>} />
-        <Route path="/signals-feed" element={<ProtectedRoute><SignalsFeed /></ProtectedRoute>} />
+        <Route path="/signals" element={<ProtectedRoute><SignalsPage /></ProtectedRoute>} />
         <Route path="/signals/:id" element={<ProtectedRoute><SignalDetailPage /></ProtectedRoute>} />
-        <Route path="/impacts" element={<ProtectedRoute><ImpactsPage /></ProtectedRoute>} />
-        <Route path="/impacts/:id" element={<ProtectedRoute><ImpactDetailPage /></ProtectedRoute>} />
-        
-        {/* Level 2 - Modules (Beta / Locked) */}
+        <Route path="/events" element={<ProtectedRoute><EventsFeed /></ProtectedRoute>} />
+        <Route path="/events/:id" element={<ProtectedRoute><EventDetailPage /></ProtectedRoute>} />
+        <Route path="/scenarios" element={<ProtectedRoute><ScenariosPage /></ProtectedRoute>} />
+        <Route path="/scenarios/:id" element={<ProtectedRoute><ImpactDetailPage /></ProtectedRoute>} />
         <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
-        <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} /> {/* App Research - Protected, different from /papers (marketing) */}
-        <Route path="/discover" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
-        <Route path="/corporate-impact" element={<ProtectedRoute><CorporateImpactPage /></ProtectedRoute>} />
-        <Route path="/search" element={<ProtectedRoute><SearchHome /></ProtectedRoute>} /> {/* Search Home - Simple entry point */}
-        <Route path="/search/session/:sessionId" element={<ProtectedRoute><SearchWorkspace /></ProtectedRoute>} /> {/* Search Workspace - Results page */}
-        {/* Recommendations (PHASE 7) */}
+        
+        {/* Legacy Redirects */}
+        <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
+        <Route path="/app" element={<Navigate to="/overview" replace />} />
+        
+        {/* Legacy Intelligence/Corporate Impact/Discover → Signals */}
+        <Route path="/intelligence" element={<Navigate to="/signals" replace />} />
+        <Route path="/intelligence/*" element={<Navigate to="/signals" replace />} />
+        <Route path="/signals-feed" element={<Navigate to="/signals" replace />} />
+        <Route path="/corporate-impact" element={<Navigate to="/signals" replace />} />
+        <Route path="/discover" element={<Navigate to="/signals" replace />} />
+        
+        {/* Legacy Impacts → Scenarios */}
+        <Route path="/impacts" element={<Navigate to="/scenarios" replace />} />
+        <Route path="/impacts/:id" element={<Navigate to="/scenarios/:id" replace />} />
+        
+        {/* Legacy Events → Events (simplified) */}
+        <Route path="/events-feed" element={<Navigate to="/events" replace />} />
+        <Route path="/events-feed/:id" element={<Navigate to="/events/:id" replace />} />
+        <Route path="/events/:eventId/predictions" element={<ProtectedRoute><PredictionPage /></ProtectedRoute>} />
+        
+        {/* Other Modules */}
+        <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} />
+        <Route path="/search" element={<ProtectedRoute><SearchHome /></ProtectedRoute>} />
+        <Route path="/search/session/:sessionId" element={<ProtectedRoute><SearchWorkspace /></ProtectedRoute>} />
         <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
         
-        {/* Level 3 - User / System */}
-        {/* Profile and Settings */}
+        {/* User / System */}
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/settings/alerts" element={<ProtectedRoute><AlertSettings /></ProtectedRoute>} />
-        {/* Quality (PHASE 3B) */}
         <Route path="/quality" element={<ProtectedRoute><QualityDashboard /></ProtectedRoute>} />
         
         {/* Onboarding */}

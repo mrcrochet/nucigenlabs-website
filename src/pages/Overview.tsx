@@ -1,14 +1,15 @@
 /**
- * Overview Page (Home)
+ * Overview Page - Command Center
  * 
- * Purpose: Give situation + drivers + market reaction in 30 seconds
+ * NEW ARCHITECTURE: "My World Changed"
  * 
- * Layout (12 columns):
- * - Row 1 (12): HeaderBar
- * - Row 2 (12): KPIGrid (4 cards)
- * - Row 3: Left (8): NarrativeCard + TimelineCard | Right (4): MarketMoversCard
- * - Row 4 (12): TopSignalsTable
- * - Row 5: Left (6): RecentEventsFeed | Right (6): TriggeredAlertsFeed
+ * This page must shock positively. Required content:
+ * - Alertes déclenchées (top)
+ * - Impacts sur MA watchlist
+ * - 3 Decision Points clairs
+ * - Exposition qui change
+ * 
+ * If a user arrives here and doesn't know what to do, it's failed.
  */
 
 import { useState, useEffect } from 'react';
@@ -16,6 +17,9 @@ import { useNavigate } from 'react-router-dom';
 import AppShell from '../components/layout/AppShell';
 import HeaderBar from '../components/overview/HeaderBar';
 import KPIGrid from '../components/overview/KPIGrid';
+import TriggeredAlertsFeed from '../components/overview/TriggeredAlertsFeed';
+import ActionItemsCard from '../components/overview/ActionItemsCard';
+import WatchlistChangesCard from '../components/overview/WatchlistChangesCard';
 import NarrativeCard from '../components/overview/NarrativeCard';
 import TimelineCard from '../components/overview/TimelineCard';
 import MarketMoversCard from '../components/overview/MarketMoversCard';
@@ -23,9 +27,10 @@ import TopSignalsTable from '../components/overview/TopSignalsTable';
 import TopRisksCard from '../components/overview/TopRisksCard';
 import OpportunitiesCard from '../components/overview/OpportunitiesCard';
 import RecentEventsFeed from '../components/overview/RecentEventsFeed';
-import TriggeredAlertsFeed from '../components/overview/TriggeredAlertsFeed';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
+import { Bell, AlertCircle } from 'lucide-react';
+import Badge from '../components/ui/Badge';
 
 function OverviewContent() {
   const navigate = useNavigate();
@@ -50,12 +55,43 @@ function OverviewContent() {
     <AppShell>
       <SEO 
         title="Overview — Nucigen"
-        description="Intelligence dashboard overview"
+        description="Command Center: What changed and what to do"
       />
 
       {/* Row 1: HeaderBar */}
       <div className="col-span-1 sm:col-span-12">
         <HeaderBar />
+      </div>
+
+      {/* NEW: Command Center Section - Top Priority */}
+      <div className="col-span-1 sm:col-span-12 mb-6">
+        <div className="backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/10 to-[#E1463E]/5 border border-[#E1463E]/20 rounded-2xl p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Bell className="w-5 h-5 text-[#E1463E]" />
+            <h2 className="text-xl font-semibold text-text-primary">My World Changed</h2>
+          </div>
+          <p className="text-sm text-text-secondary mb-6">
+            Here's what changed for you, now, and what you need to do.
+          </p>
+          
+          {/* Command Center Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Alertes déclenchées */}
+            <div className="lg:col-span-1">
+              <TriggeredAlertsFeed />
+            </div>
+            
+            {/* Decision Points */}
+            <div className="lg:col-span-1">
+              <ActionItemsCard />
+            </div>
+            
+            {/* Watchlist Changes */}
+            <div className="lg:col-span-1">
+              <WatchlistChangesCard />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Row 2: KPIGrid (4 cards) */}
@@ -84,7 +120,7 @@ function OverviewContent() {
         <RecentEventsFeed />
       </div>
       <div className="col-span-1 sm:col-span-6">
-        <TriggeredAlertsFeed />
+        {/* Additional context can go here */}
       </div>
     </AppShell>
   );

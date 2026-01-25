@@ -1,8 +1,15 @@
 /**
  * App Navigation Menu
  * 
- * Hamburger menu drawer for all app pages
- * Replaces the always-visible SideNav for better space and clarity
+ * NEW ARCHITECTURE: 5 Core Pillars for $10M ARR Product
+ * 1. Overview → Command Center ("My World Changed")
+ * 2. Signals → Core intelligence (merged Intelligence + Signals Feed + Corporate Impact)
+ * 3. Events → Factual base
+ * 4. Scenarios → Future possibilities (renamed from Impacts)
+ * 5. Alerts → Daily monitoring
+ * 
+ * Settings → menu profil (not in main nav)
+ * Search → accessible via navigation
  */
 
 import { Link, useLocation } from 'react-router-dom';
@@ -12,26 +19,18 @@ import {
   Calendar, 
   TrendingUp, 
   Target, 
-  BarChart3,
-  FileText,
   Bell,
-  Settings,
-  Sparkles,
-  Search as SearchIcon
+  Search
 } from 'lucide-react';
 
+// Core navigation: 5 pillars + Search
 const navItems = [
   { path: '/overview', label: 'Overview', icon: LayoutDashboard },
-  { path: '/discover', label: 'Discover', icon: Sparkles },
-  { path: '/search', label: 'Search', icon: SearchIcon },
-  { path: '/intelligence', label: 'Intelligence', icon: TrendingUp },
-  { path: '/events-feed', label: 'Events', icon: Calendar },
-  { path: '/signals-feed', label: 'Signals', icon: TrendingUp },
-  { path: '/impacts', label: 'Impacts', icon: Target },
-  { path: '/corporate-impact', label: 'Corporate Impact', icon: BarChart3 },
-  { path: '/research', label: 'Research', icon: FileText },
+  { path: '/signals', label: 'Signals', icon: TrendingUp },
+  { path: '/events', label: 'Events', icon: Calendar },
+  { path: '/scenarios', label: 'Scenarios', icon: Target },
   { path: '/alerts', label: 'Alerts', icon: Bell },
-  { path: '/settings', label: 'Settings', icon: Settings },
+  { path: '/search', label: 'Search', icon: Search },
 ];
 
 interface AppNavMenuProps {
@@ -42,15 +41,38 @@ interface AppNavMenuProps {
 export default function AppNavMenu({ isOpen, onClose }: AppNavMenuProps) {
   const location = useLocation();
 
-  // Normalize path to handle legacy routes
-  const normalizedPath = 
-    location.pathname === '/dashboard' || location.pathname === '/app'
-      ? '/overview'
-      : location.pathname.startsWith('/events/') && !location.pathname.startsWith('/events-feed')
-      ? location.pathname.replace('/events', '/events-feed')
-      : location.pathname === '/events'
-      ? '/events-feed'
-      : location.pathname;
+  // Normalize path to handle legacy routes and new architecture
+  const normalizedPath = (() => {
+    const path = location.pathname;
+    
+    // Legacy dashboard/app → overview
+    if (path === '/dashboard' || path === '/app') {
+      return '/overview';
+    }
+    
+    // Legacy Intelligence/Corporate Impact/Signals Feed → Signals
+    if (
+      path === '/intelligence' || 
+      path.startsWith('/intelligence/') ||
+      path === '/signals-feed' ||
+      path === '/corporate-impact' ||
+      path === '/discover'
+    ) {
+      return '/signals';
+    }
+    
+    // Legacy Impacts → Scenarios
+    if (path === '/impacts' || path.startsWith('/impacts/')) {
+      return '/scenarios';
+    }
+    
+    // Events: normalize /events-feed to /events
+    if (path === '/events-feed' || path.startsWith('/events-feed/')) {
+      return path.replace('/events-feed', '/events');
+    }
+    
+    return path;
+  })();
 
   const handleLinkClick = () => {
     onClose();
