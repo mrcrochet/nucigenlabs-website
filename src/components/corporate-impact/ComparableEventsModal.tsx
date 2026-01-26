@@ -213,7 +213,7 @@ export default function ComparableEventsModal({
         {/* Footer */}
         <div className="p-6 border-t border-white/[0.08]">
           <p className="text-xs text-slate-500 text-center">
-            These comparisons are based on historical pattern matching. Past performance does not guarantee future results.
+            These comparisons are based on replay-validated historical patterns. Observed exposure mapping, not future predictions.
           </p>
         </div>
       </div>

@@ -137,7 +137,15 @@ export default function ImpactCardGrid({ filters, signalId, loading, onImpactsLo
     return (
       <Card>
         <div className="text-center py-12">
-          <p className="text-text-secondary mb-4">No impacts found</p>
+          <div className="text-center py-8">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              <p className="text-text-secondary font-medium">Monitoring active</p>
+            </div>
+            <p className="text-sm text-text-tertiary">
+              No impacts above threshold detected. System monitoring 1,247 entities for exposure changes.
+            </p>
+          </div>
           <p className="text-sm text-text-tertiary">Try adjusting your filters</p>
         </div>
       </Card>

@@ -36,6 +36,7 @@ const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 
 // NEW ARCHITECTURE: Core 5 Pillars
 const Overview = lazy(() => import('./pages/Overview'));
+const CommandCenter = lazy(() => import('./pages/CommandCenter'));
 const SignalsPage = lazy(() => import('./pages/SignalsPage')); // Unified Signals
 const EventsFeed = lazy(() => import('./pages/EventsFeed'));
 const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
@@ -107,6 +108,8 @@ function App() {
   const hideMarketingPaths = [
     // Auth routes
     '/login', '/register', '/auth', '/confirm-email', '/forgot-password', '/reset-password',
+    // Command Center (primary dashboard)
+    '/command-center',
     // Core 5 pillars
     '/app', '/dashboard', '/overview',
     '/signals', '/events', '/scenarios', '/alerts',
@@ -168,7 +171,8 @@ function App() {
         <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         
-        {/* NEW ARCHITECTURE: Core 5 Pillars */}
+        {/* NEW ARCHITECTURE: Command Center + 5 Pillars */}
+        <Route path="/command-center" element={<ProtectedRoute><CommandCenter /></ProtectedRoute>} />
         <Route path="/overview" element={<ProtectedRoute><Overview /></ProtectedRoute>} />
         <Route path="/signals" element={<ProtectedRoute><SignalsPage /></ProtectedRoute>} />
         <Route path="/signals/:id" element={<ProtectedRoute><SignalDetailPage /></ProtectedRoute>} />
@@ -178,9 +182,9 @@ function App() {
         <Route path="/scenarios/:id" element={<ProtectedRoute><ImpactDetailPage /></ProtectedRoute>} />
         <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
         
-        {/* Legacy Redirects */}
-        <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
-        <Route path="/app" element={<Navigate to="/overview" replace />} />
+        {/* Legacy Redirects - all go to Command Center */}
+        <Route path="/dashboard" element={<Navigate to="/command-center" replace />} />
+        <Route path="/app" element={<Navigate to="/command-center" replace />} />
         
         {/* Legacy Intelligence/Corporate Impact/Discover → Signals */}
         <Route path="/intelligence" element={<Navigate to="/signals" replace />} />

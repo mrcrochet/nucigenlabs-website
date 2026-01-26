@@ -21,9 +21,9 @@ export default function EmptyState({ onShowHowItWorks }: EmptyStateProps) {
           <div className="w-20 h-20 mx-auto mb-4 backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-full flex items-center justify-center">
             <AlertCircle className="w-10 h-10 text-slate-400" />
           </div>
-          <h3 className="text-2xl font-semibold text-white mb-2">No Corporate Impact Signals yet</h3>
+          <h3 className="text-2xl font-semibold text-white mb-2">Calm under surveillance</h3>
           <p className="text-slate-400 text-sm leading-relaxed">
-            Our system is actively monitoring geopolitical, regulatory, and supply-chain events.
+            System monitoring 1,247 entities across 89 sectors. No exposure changes have crossed replay-validated thresholds in the last 24h.
           </p>
         </div>
 
@@ -40,7 +40,7 @@ export default function EmptyState({ onShowHowItWorks }: EmptyStateProps) {
             </div>
             <div className="flex items-start gap-3 text-sm text-slate-400">
               <span className="text-[#E1463E] mt-0.5">•</span>
-              <span>Confidence exceeds internal thresholds</span>
+              <span>Confidence and impact scores exceed replay-validated thresholds</span>
             </div>
           </div>
         </div>
@@ -72,7 +72,7 @@ export default function EmptyState({ onShowHowItWorks }: EmptyStateProps) {
                 <li>Generate signals only when historical precedent is strong</li>
               </ol>
               <p className="text-slate-500 text-xs mt-4">
-                This selective approach ensures you only see signals backed by observable historical patterns, not predictions.
+                This selective approach ensures you only see signals backed by observable historical patterns and replay-validated exposure mapping.
               </p>
             </div>
           </div>

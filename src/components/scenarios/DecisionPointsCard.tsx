@@ -10,7 +10,7 @@
 import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import { Link } from 'react-router-dom';
-import { AlertCircle, TrendingUp, Zap, ArrowRight, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { AlertCircle, TrendingUp, Zap, ArrowRight, CheckCircle2, XCircle, Clock, Target } from 'lucide-react';
 import Card from '../ui/Card';
 import SectionHeader from '../ui/SectionHeader';
 import Badge from '../ui/Badge';
@@ -25,6 +25,7 @@ interface DecisionPoint {
   relatedSignalId?: string;
   deadline?: string;
   status?: 'pending' | 'in-progress' | 'completed';
+  roleContext?: string; // Role-based context (e.g., "For portfolio exposure")
 }
 
 interface DecisionPointsCardProps {
@@ -67,6 +68,7 @@ export default function DecisionPointsCard({ scenarioId, signalId }: DecisionPoi
             relatedSignalId: dp.signal_id,
             deadline: dp.deadline,
             status: dp.status || 'pending',
+            roleContext: dp.metadata?.role_context || undefined,
           }));
           setDecisionPoints(mappedPoints);
         } else {
@@ -172,8 +174,22 @@ export default function DecisionPointsCard({ scenarioId, signalId }: DecisionPoi
       
       <div className="mt-4 space-y-3">
         {decisionPoints.length === 0 ? (
-          <div className="text-center py-8 text-text-secondary text-sm">
-            <p>No decision points for this scenario</p>
+          <div className="text-center py-8 px-4">
+            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.15] rounded-xl p-6 max-w-md mx-auto">
+              <div className="w-12 h-12 mx-auto mb-4 backdrop-blur-xl bg-gradient-to-br from-blue-500/20 to-blue-500/10 border border-blue-500/30 rounded-full flex items-center justify-center">
+                <Target className="w-6 h-6 text-blue-400" />
+              </div>
+              <h4 className="text-sm font-semibold text-text-primary mb-2">No decision points generated yet</h4>
+              <p className="text-xs text-text-secondary leading-relaxed mb-3">
+                {scenarioId 
+                  ? 'Decision points are generated automatically from scenario analysis. They will appear when actionable insights are identified.'
+                  : 'Decision points appear when scenarios or signals indicate actionable exposure. System is analyzing patterns.'}
+              </p>
+              <div className="flex items-center justify-center gap-4 text-xs text-text-tertiary pt-3 border-t border-borders-subtle">
+                <span>Analysis in progress</span>
+                <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse"></span>
+              </div>
+            </div>
           </div>
         ) : (
           decisionPoints.map((point) => (
@@ -196,6 +212,13 @@ export default function DecisionPointsCard({ scenarioId, signalId }: DecisionPoi
                       </Badge>
                       {point.status && getStatusIcon(point.status)}
                     </div>
+                    {point.roleContext && (
+                      <div className="mb-2">
+                        <span className="text-xs font-medium text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded">
+                          {point.roleContext}
+                        </span>
+                      </div>
+                    )}
                     <p className="text-xs text-text-secondary leading-relaxed mb-2">
                       {point.description}
                     </p>

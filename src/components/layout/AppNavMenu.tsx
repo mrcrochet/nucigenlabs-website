@@ -12,7 +12,9 @@
  * Search → accessible via navigation
  */
 
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useUser } from '@clerk/clerk-react';
 import { 
   X,
   LayoutDashboard, 
@@ -20,11 +22,13 @@ import {
   TrendingUp, 
   Target, 
   Bell,
-  Search
+  Search,
+  Radio
 } from 'lucide-react';
 
-// Core navigation: 5 pillars + Search
+// Core navigation: Command Center + 5 pillars + Search
 const navItems = [
+  { path: '/command-center', label: 'Command Center', icon: Radio },
   { path: '/overview', label: 'Overview', icon: LayoutDashboard },
   { path: '/signals', label: 'Signals', icon: TrendingUp },
   { path: '/events', label: 'Events', icon: Calendar },
@@ -40,6 +44,38 @@ interface AppNavMenuProps {
 
 export default function AppNavMenu({ isOpen, onClose }: AppNavMenuProps) {
   const location = useLocation();
+  const { user } = useUser();
+  const [unreadAlertsCount, setUnreadAlertsCount] = useState(0);
+
+  // Fetch unread alerts count
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      if (!user?.id) return;
+
+      try {
+        const response = await fetch('/api/alerts/triggered?range=7d&limit=100', {
+          headers: {
+            'x-clerk-user-id': user.id,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data?.alerts) {
+            const unread = data.data.alerts.filter((alert: any) => !alert.read).length;
+            setUnreadAlertsCount(unread);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching unread alerts count:', error);
+      }
+    };
+
+    fetchUnreadCount();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   // Normalize path to handle legacy routes and new architecture
   const normalizedPath = (() => {
@@ -120,14 +156,21 @@ export default function AppNavMenu({ isOpen, onClose }: AppNavMenuProps) {
                 key={item.path}
                 to={item.path}
                 onClick={handleLinkClick}
-                className={`flex items-center gap-3 px-4 py-2 mx-2 mb-1 rounded-lg transition-colors ${
+                className={`flex items-center justify-between px-4 py-2 mx-2 mb-1 rounded-lg transition-colors ${
                   isActive
                     ? 'bg-background-glass-medium text-text-primary border border-borders-medium'
                     : 'text-text-secondary hover:text-text-primary hover:bg-background-glass-subtle'
                 }`}
               >
-                <Icon className="w-5 h-5 flex-shrink-0" />
-                <span className="text-sm font-medium">{item.label}</span>
+                <div className="flex items-center gap-3">
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  <span className="text-sm font-medium">{item.label}</span>
+                </div>
+                {item.path === '/alerts' && unreadAlertsCount > 0 && (
+                  <span className="px-2 py-0.5 text-xs font-semibold bg-[#E1463E] text-white rounded-full min-w-[20px] text-center">
+                    {unreadAlertsCount > 99 ? '99+' : unreadAlertsCount}
+                  </span>
+                )}
               </Link>
             );
           })}

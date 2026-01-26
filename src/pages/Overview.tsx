@@ -74,20 +74,20 @@ function OverviewContent() {
             Here's what changed for you, now, and what you need to do.
           </p>
           
-          {/* Command Center Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Alertes déclenchées */}
-            <div className="lg:col-span-1">
+          {/* Command Center Grid - Improved hierarchy */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            {/* Triggered Alerts - Priority 1 (col-span-3) */}
+            <div className="lg:col-span-3">
               <TriggeredAlertsFeed />
             </div>
             
-            {/* Decision Points */}
-            <div className="lg:col-span-1">
+            {/* Decision Points - Priority 2, larger (col-span-6) */}
+            <div className="lg:col-span-6">
               <ActionItemsCard />
             </div>
             
-            {/* Watchlist Changes */}
-            <div className="lg:col-span-1">
+            {/* Watchlist Changes - Priority 3 (col-span-3) */}
+            <div className="lg:col-span-3">
               <WatchlistChangesCard />
             </div>
           </div>
@@ -99,12 +99,16 @@ function OverviewContent() {
         <KPIGrid />
       </div>
 
-      {/* Row 3: Left (8) + Right (4) */}
-      <div className="col-span-1 sm:col-span-8 space-y-6">
+      {/* Row 3: Narrative (moved down, transformed) */}
+      <div className="col-span-1 sm:col-span-12">
         <NarrativeCard />
+      </div>
+
+      {/* Row 4: Left (8) + Right (4) - Reduced prominence */}
+      <div className="col-span-1 sm:col-span-8 space-y-4">
         <TimelineCard />
       </div>
-      <div className="col-span-1 sm:col-span-4 space-y-6">
+      <div className="col-span-1 sm:col-span-4 space-y-4">
         <MarketMoversCard />
         <TopRisksCard />
         <OpportunitiesCard />

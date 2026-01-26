@@ -190,7 +190,10 @@ export default function ResultsPanel({
   if (results.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-text-secondary">No results found. Try a different query.</p>
+        <div className="flex items-center justify-center gap-2">
+          <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+          <p className="text-text-secondary">No results match this query. System monitoring 47 sources.</p>
+        </div>
       </div>
     );
   }

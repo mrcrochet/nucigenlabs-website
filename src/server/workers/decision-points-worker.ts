@@ -116,6 +116,7 @@ Generate decision points that are:
 2. Prioritized (high/medium/low based on urgency and impact)
 3. Categorized as: "monitor" (watch and track), "prepare" (get ready), or "act" (take immediate action)
 4. Include deadline if time-sensitive (based on time_horizon)
+5. Include role context indicating who should act (e.g., "For portfolio exposure", "For supply chain risk management", "For capital allocation", "For policy monitoring")
 
 Return JSON array with format:
 [
@@ -124,7 +125,8 @@ Return JSON array with format:
     "title": "Short actionable title",
     "description": "Detailed description of what to do",
     "priority": "low|medium|high",
-    "deadline": "ISO date string or null"
+    "deadline": "ISO date string or null",
+    "role_context": "For [portfolio exposure|supply chain risk|capital allocation|policy monitoring|operational readiness]"
   }
 ]`;
 
@@ -175,6 +177,7 @@ Return JSON array with format:
         description: dp.description,
         priority: dp.priority as DecisionPoint['priority'],
         deadline: dp.deadline || undefined,
+        roleContext: dp.role_context || dp.roleContext || undefined,
       }));
   } catch (error: any) {
     console.error('[Decision Points] Error generating with AI:', error);
@@ -244,6 +247,10 @@ async function storeDecisionPoints(
         priority: point.priority,
         deadline: point.deadline,
         status: 'pending',
+        metadata: {
+          role_context: (point as any).roleContext || undefined,
+          why: point.description?.split('.')[0] || undefined,
+        },
       } as any);
 
       if (error) {

@@ -50,6 +50,8 @@
     "live:search": "npx tsx src/server/services/live-search-api.ts",
     "discover:check": "npx tsx src/server/scripts/check-discover-setup.ts",
     "discover:collect": "npx tsx src/server/scripts/collect-discover-items.ts",
+    "worker:decision-points": "npx tsx src/server/workers/decision-points-worker.ts",
+    "worker:watchlist-notifications": "npx tsx src/server/workers/watchlist-notifications-worker.ts",
     "test": "npx --yes vitest run",
     "test:watch": "npx --yes vitest",
     "test:ui": "npx --yes vitest --ui",

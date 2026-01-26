@@ -30,7 +30,7 @@ import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SectionHeader from '../components/ui/SectionHeader';
 import SkeletonSignal from '../components/ui/SkeletonSignal';
-import { Search, MapPin, TrendingUp, Clock, Sparkles, ArrowRight, BarChart3, Activity, Building2, Table2, List } from 'lucide-react';
+import { Search, MapPin, TrendingUp, Clock, Sparkles, ArrowRight, BarChart3, Activity, Building2, Table2, List, Zap } from 'lucide-react';
 import SignalFilters from '../components/signals/SignalFilters';
 import SignalsTable from '../components/signals/SignalsTable';
 import SignalPreviewDrawer from '../components/signals/SignalPreviewDrawer';
@@ -40,6 +40,7 @@ import SignalCard from '../components/corporate-impact/SignalCard';
 import EmptyState from '../components/corporate-impact/EmptyState';
 import WatchlistButton from '../components/watchlist/WatchlistButton';
 import { AlertTriangle, Info } from 'lucide-react';
+import { getSignalPosture, getPostureBadgeColor } from '../lib/signal-posture';
 
 type ViewMode = 'general' | 'companies' | 'table';
 
@@ -293,8 +294,8 @@ function SignalsPageContent() {
 
       <div className="col-span-1 sm:col-span-12">
         {/* Header with View Toggle */}
-        <header className="mb-6">
-          <div className="flex items-center justify-between mb-4">
+        <header className="mb-4">
+          <div className="flex items-center justify-between mb-2">
             <SectionHeader
               title="Signals"
               subtitle="What changed and what to do"
@@ -389,8 +390,20 @@ function SignalsPageContent() {
                 </div>
               </div>
             ) : filteredGeneralSignals.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-slate-400">No signals found</p>
+              <div className="text-center py-12 px-4">
+                <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.15] rounded-xl p-8 max-w-md mx-auto">
+                  <div className="w-12 h-12 mx-auto mb-4 backdrop-blur-xl bg-gradient-to-br from-slate-500/20 to-slate-500/10 border border-slate-500/30 rounded-full flex items-center justify-center">
+                    <TrendingUp className="w-6 h-6 text-slate-400" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-text-primary mb-2">Signal activity below thresholds</h4>
+                  <p className="text-xs text-text-secondary leading-relaxed mb-3">
+                    System is monitoring events for actionable patterns. Signals appear when confidence and impact scores exceed internal thresholds.
+                  </p>
+                  <div className="flex items-center justify-center gap-4 text-xs text-text-tertiary pt-3 border-t border-borders-subtle">
+                    <span>Low-noise mode active</span>
+                    <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="space-y-4">
@@ -407,6 +420,14 @@ function SignalsPageContent() {
                           {signal.title}
                         </h3>
                         <div className="flex items-center gap-2 flex-wrap mb-3">
+                          {(() => {
+                            const posture = getSignalPosture(signal);
+                            return (
+                              <Badge className={`text-xs font-semibold border ${getPostureBadgeColor(posture.posture)}`}>
+                                {posture.posture}
+                              </Badge>
+                            );
+                          })()}
                           <Badge variant={getImpactBadgeVariant(signal.impact_score)} className="text-xs">
                             {signal.impact_score}% impact
                           </Badge>

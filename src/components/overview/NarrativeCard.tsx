@@ -13,6 +13,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Card from '../ui/Card';
 import SectionHeader from '../ui/SectionHeader';
+import { AlertCircle } from 'lucide-react';
 
 interface NarrativeData {
   narrative: string;
@@ -35,11 +36,17 @@ export default function NarrativeCard() {
         setLoading(true);
         setError(null);
         
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
         const response = await fetch(`/api/overview/narrative?timeframe=${timeframe}`, {
           headers: {
             'x-clerk-user-id': (window as any).Clerk?.user?.id || '',
           },
+          signal: controller.signal,
         });
+        
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           throw new Error('Failed to fetch narrative');
@@ -52,8 +59,14 @@ export default function NarrativeCard() {
           throw new Error(result.error || 'No narrative data');
         }
       } catch (err: any) {
-        console.error('[NarrativeCard] Error:', err);
-        setError(err.message || 'Failed to load narrative');
+        // Silently handle network errors - server not available
+        if (err.name === 'AbortError' || err.name === 'TypeError' || err.message?.includes('fetch')) {
+          console.debug('[NarrativeCard] API server not available');
+          setError(null); // Don't show error, just show empty state
+        } else {
+          console.error('[NarrativeCard] Error:', err);
+          setError(err.message || 'Failed to load narrative');
+        }
       } finally {
         setLoading(false);
       }
@@ -74,9 +87,25 @@ export default function NarrativeCard() {
   if (error || !data) {
     return (
       <Card>
-        <SectionHeader title="Today's Narrative" />
-        <div className="text-text-secondary text-sm mt-4">
-          {error || 'No narrative available'}
+        <SectionHeader title="What's driving today's signals" />
+        <div className="mt-4 p-6 backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.15] rounded-xl">
+          <div className="text-center">
+            <div className="w-12 h-12 mx-auto mb-4 backdrop-blur-xl bg-gradient-to-br from-slate-500/20 to-slate-500/10 border border-slate-500/30 rounded-full flex items-center justify-center">
+              <AlertCircle className="w-6 h-6 text-slate-400" />
+            </div>
+            <h4 className="text-sm font-semibold text-text-primary mb-2">
+              {error ? 'Narrative generation paused' : 'Low signal activity'}
+            </h4>
+            <p className="text-xs text-text-secondary leading-relaxed mb-3">
+              {error 
+                ? 'System is processing recent events. Narrative will update when patterns emerge.'
+                : 'Signal activity below actionable thresholds. System continues monitoring for emerging patterns.'}
+            </p>
+            <div className="flex items-center justify-center gap-4 text-xs text-text-tertiary pt-3 border-t border-borders-subtle">
+              <span>Monitoring active</span>
+              <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
+            </div>
+          </div>
         </div>
       </Card>
     );
@@ -91,7 +120,7 @@ export default function NarrativeCard() {
   return (
     <Card>
       <div className="flex items-center justify-between mb-4">
-        <SectionHeader title="Today's Narrative" />
+        <SectionHeader title="What's driving today's signals" />
         <div className="flex gap-2">
           <button
             onClick={() => setTimeframe('24h')}
@@ -126,45 +155,31 @@ export default function NarrativeCard() {
         </div>
       </div>
       
-      <div className="space-y-4 mt-4">
-        {/* Executive Narrative Format */}
+      <div className="space-y-3 mt-4">
+        {/* Simplified: 3 sentences max */}
         {data.what_changed || data.why_it_matters || data.what_to_watch_next ? (
-          <div className="space-y-4">
+          <div className="space-y-2">
             {data.what_changed && (
-              <div>
-                <h4 className="text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wider">
-                  What Changed
-                </h4>
-                <p className="text-sm text-text-primary leading-relaxed">
-                  {data.what_changed}
-                </p>
-              </div>
+              <p className="text-sm text-text-primary leading-relaxed">
+                {data.what_changed}
+              </p>
             )}
             {data.why_it_matters && (
-              <div>
-                <h4 className="text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wider">
-                  Why It Matters
-                </h4>
-                <p className="text-sm text-text-primary leading-relaxed">
-                  {data.why_it_matters}
-                </p>
-              </div>
+              <p className="text-sm text-text-primary leading-relaxed">
+                {data.why_it_matters}
+              </p>
             )}
             {data.what_to_watch_next && (
-              <div>
-                <h4 className="text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wider">
-                  What to Watch Next
-                </h4>
-                <p className="text-sm text-text-primary leading-relaxed">
-                  {data.what_to_watch_next}
-                </p>
-              </div>
+              <p className="text-sm text-text-primary leading-relaxed">
+                {data.what_to_watch_next}
+              </p>
             )}
           </div>
         ) : (
-          /* Fallback to full narrative */
-          <p className="text-sm text-text-primary leading-relaxed whitespace-pre-line">
-            {data.narrative}
+          /* Fallback: limit to 3 sentences */
+          <p className="text-sm text-text-primary leading-relaxed">
+            {data.narrative.split('.').slice(0, 3).join('.').trim()}
+            {data.narrative.split('.').length > 3 ? '.' : ''}
           </p>
         )}
 

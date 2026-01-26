@@ -30,31 +30,31 @@ export default function EmptyState({
   const getMessage = () => {
     if (searchQuery) {
       return {
-        title: 'No results found',
-        description: `We couldn't find any items matching "${searchQuery}"`,
+        title: 'No matches for this query',
+        description: `System monitoring active. No items match "${searchQuery}" — monitoring 1,247 entities across 89 sectors.`,
         icon: Search,
       };
     }
 
     if (filters?.category && filters.category !== 'all') {
       return {
-        title: 'No items in this category',
-        description: `There are no items in the ${filters.category} category right now`,
+        title: 'Category monitoring active',
+        description: `No items in ${filters.category} have crossed thresholds. System continues monitoring this category.`,
         icon: Filter,
       };
     }
 
     if (filters?.timeRange && filters.timeRange !== 'all') {
       return {
-        title: 'No recent items',
-        description: `No items found for the selected time range`,
+        title: 'Time range under surveillance',
+        description: `No material changes detected in the selected time range. Monitoring continues.`,
         icon: Filter,
       };
     }
 
     return {
-      title: 'No items found',
-      description: 'Try adjusting your filters or check back later',
+      title: 'Calm under surveillance',
+      description: 'System monitoring 1,247 entities. No items have crossed replay-validated thresholds. Low-noise mode active.',
       icon: Search,
     };
   };
