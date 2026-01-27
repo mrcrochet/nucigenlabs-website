@@ -58,13 +58,13 @@ function OverviewContent() {
         description="Command Center: What changed and what to do"
       />
 
-      {/* Row 1: HeaderBar */}
+      {/* Row 1: HeaderBar - Starts immediately after TopNav, no top spacing */}
       <div className="col-span-1 sm:col-span-12">
         <HeaderBar />
       </div>
 
       {/* NEW: Command Center Section - Top Priority */}
-      <div className="col-span-1 sm:col-span-12 mb-6">
+      <div className="col-span-1 sm:col-span-12 mb-2">
         <div className="backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/10 to-[#E1463E]/5 border border-[#E1463E]/20 rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <Bell className="w-5 h-5 text-[#E1463E]" />

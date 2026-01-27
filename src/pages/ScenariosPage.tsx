@@ -56,7 +56,7 @@ function ScenariosPageContent() {
       </div>
 
       {/* Decision Points - NEW ARCHITECTURE */}
-      <div className="col-span-1 sm:col-span-12 mb-6">
+      <div className="col-span-1 sm:col-span-12 mb-2">
         <DecisionPointsCard scenarioId={undefined} signalId={signalId || undefined} />
       </div>
 

@@ -293,9 +293,9 @@ function SignalsPageContent() {
       />
 
       <div className="col-span-1 sm:col-span-12">
-        {/* Header with View Toggle */}
-        <header className="mb-4">
-          <div className="flex items-center justify-between mb-2">
+        {/* Header with View Toggle - Starts immediately, no top spacing */}
+        <header className="mb-1">
+          <div className="flex items-center justify-between mb-1">
             <SectionHeader
               title="Signals"
               subtitle="What changed and what to do"
@@ -344,7 +344,7 @@ function SignalsPageContent() {
         {viewMode === 'general' && (
           <>
             {/* Search and Tabs */}
-            <div className="mb-6 space-y-4">
+            <div className="mb-2 space-y-2">
               <div className="flex items-center gap-4">
                 <div className="relative flex-1">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />

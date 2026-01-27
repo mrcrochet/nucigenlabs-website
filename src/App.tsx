@@ -105,6 +105,7 @@ function App() {
 
   // Hide navigation and marketing components on auth/app pages
   // NEW ARCHITECTURE: Updated paths for 5 core pillars
+  // All routes that use AppShell should be in this list
   const hideMarketingPaths = [
     // Auth routes
     '/login', '/register', '/auth', '/confirm-email', '/forgot-password', '/reset-password',
@@ -123,33 +124,14 @@ function App() {
   // Special handling for /intelligence vs /intelligence-page
   const isAppIntelligence = (location.pathname === '/intelligence' || location.pathname.startsWith('/intelligence/')) && 
                             !location.pathname.startsWith('/intelligence-page');
+  
+  // Check if current path is an app page (uses AppShell)
+  // This covers all routes including dynamic ones (e.g., /signals/:id, /events/:id, etc.)
   const shouldHideMarketing = hideMarketingPaths.some(path => location.pathname.startsWith(path)) || isAppIntelligence;
 
-  return (
-    <div className="relative min-h-screen">
-      <StructuredData type="Organization" />
-      <StructuredData type="WebSite" />
-      {!shouldHideMarketing && <AnimatedBackground />}
-      {!shouldHideMarketing && <PremiumNavigation />}
-      {!shouldHideMarketing && <Breadcrumbs />}
-      {!shouldHideMarketing && <StickyCTA />}
-
-      {toast.isVisible && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={hideToast}
-        />
-      )}
-
-      <ExitIntentModal
-        isOpen={showExitModal}
-        onClose={() => setShowExitModal(false)}
-      />
-
-      <Toaster />
-
-      <Suspense fallback={<PageLoader />}>
+  // Define all routes once
+  const routes = (
+    <Suspense fallback={<PageLoader />}>
       <Routes>
         {/* Public Marketing Routes */}
         <Route path="/" element={<Home />} />
@@ -217,7 +199,52 @@ function App() {
         {/* Onboarding */}
         <Route path="/onboarding" element={<ProtectedRoute><ErrorBoundary><Onboarding /></ErrorBoundary></ProtectedRoute>} />
       </Routes>
-      </Suspense>
+    </Suspense>
+  );
+
+  // Common components
+  const commonComponents = (
+    <>
+      <StructuredData type="Organization" />
+      <StructuredData type="WebSite" />
+
+      {toast.isVisible && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={hideToast}
+        />
+      )}
+
+      <ExitIntentModal
+        isOpen={showExitModal}
+        onClose={() => setShowExitModal(false)}
+      />
+
+      <Toaster />
+    </>
+  );
+
+  // For app pages, render without the wrapper to avoid extra spacing
+  // AppShell already has min-h-screen and handles its own layout
+  if (shouldHideMarketing) {
+    return (
+      <>
+        {commonComponents}
+        {routes}
+      </>
+    );
+  }
+
+  // For marketing pages, use the wrapper
+  return (
+    <div className="relative min-h-screen">
+      {commonComponents}
+      {!shouldHideMarketing && <AnimatedBackground />}
+      {!shouldHideMarketing && <PremiumNavigation />}
+      {!shouldHideMarketing && <Breadcrumbs />}
+      {!shouldHideMarketing && <StickyCTA />}
+      {routes}
     </div>
   );
 }

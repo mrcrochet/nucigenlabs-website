@@ -11,6 +11,8 @@
  * - SideNav becomes a drawer on mobile (< 1024px)
  * - RightInspector becomes a drawer/modal on mobile
  * - Layout stacks vertically on mobile
+ * 
+ * Palantir-style: No hero spacing for operational pages
  */
 
 import { useState, useEffect } from 'react';
@@ -55,8 +57,10 @@ export default function AppShell({
         />
       )}
 
-      <div className="flex flex-1 overflow-hidden relative">
+      {/* Main content area - starts immediately after TopNav */}
+      <div className="flex flex-1 overflow-hidden relative min-h-0">
         {/* MainContent - Full width (no sidebar taking space) */}
+        {/* Content starts immediately after TopNav - no hero spacing */}
         <MainContent>
           {children}
         </MainContent>
