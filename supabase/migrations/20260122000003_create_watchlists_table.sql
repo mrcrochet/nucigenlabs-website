@@ -40,59 +40,49 @@ CREATE INDEX IF NOT EXISTS idx_watchlists_created_at ON public.watchlists(create
 ALTER TABLE public.watchlists ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policy: Users can only view their own watchlists
--- Note: With Clerk, authentication is handled via service role or API middleware
--- This policy allows authenticated users to view their own watchlists
-DO $$
-BEGIN
-  DROP POLICY IF EXISTS "Users can view their own watchlists" ON public.watchlists;
-EXCEPTION WHEN undefined_table THEN
-  NULL;
-END $$;
 CREATE POLICY "Users can view their own watchlists"
   ON public.watchlists
   FOR SELECT
-  TO authenticated, anon
-  USING (true); -- API middleware will filter by user_id
+  USING (
+    user_id IN (
+      SELECT id FROM public.users WHERE clerk_user_id = auth.uid()::text
+    )
+  );
 
 -- RLS Policy: Users can insert their own watchlists
-DO $$
-BEGIN
-  DROP POLICY IF EXISTS "Users can insert their own watchlists" ON public.watchlists;
-EXCEPTION WHEN undefined_table THEN
-  NULL;
-END $$;
 CREATE POLICY "Users can insert their own watchlists"
   ON public.watchlists
   FOR INSERT
-  TO authenticated, anon
-  WITH CHECK (true); -- API middleware will validate user_id
+  WITH CHECK (
+    user_id IN (
+      SELECT id FROM public.users WHERE clerk_user_id = auth.uid()::text
+    )
+  );
 
 -- RLS Policy: Users can update their own watchlists
-DO $$
-BEGIN
-  DROP POLICY IF EXISTS "Users can update their own watchlists" ON public.watchlists;
-EXCEPTION WHEN undefined_table THEN
-  NULL;
-END $$;
 CREATE POLICY "Users can update their own watchlists"
   ON public.watchlists
   FOR UPDATE
-  TO authenticated, anon
-  USING (true)
-  WITH CHECK (true); -- API middleware will validate user_id
+  USING (
+    user_id IN (
+      SELECT id FROM public.users WHERE clerk_user_id = auth.uid()::text
+    )
+  )
+  WITH CHECK (
+    user_id IN (
+      SELECT id FROM public.users WHERE clerk_user_id = auth.uid()::text
+    )
+  );
 
 -- RLS Policy: Users can delete their own watchlists
-DO $$
-BEGIN
-  DROP POLICY IF EXISTS "Users can delete their own watchlists" ON public.watchlists;
-EXCEPTION WHEN undefined_table THEN
-  NULL;
-END $$;
 CREATE POLICY "Users can delete their own watchlists"
   ON public.watchlists
   FOR DELETE
-  TO authenticated, anon
-  USING (true); -- API middleware will validate user_id
+  USING (
+    user_id IN (
+      SELECT id FROM public.users WHERE clerk_user_id = auth.uid()::text
+    )
+  );
 
 -- Function to automatically update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_watchlists_updated_at()

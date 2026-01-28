@@ -26,8 +26,6 @@ import type { MarketSignal } from '../../types/corporate-impact';
 import ConfidenceBreakdown from './ConfidenceBreakdown';
 import ComparableEventsModal from './ComparableEventsModal';
 import ExposureBreakdownModal from './ExposureBreakdownModal';
-import { getMarketSignalPosture, getPostureBadgeColor } from '../../lib/signal-posture';
-import Badge from '../ui/Badge';
 
 // Helper component for expandable evidence source sections
 function EvidenceSourceSection({ 
@@ -230,14 +228,6 @@ export default function SignalCard({ signal }: SignalCardProps) {
           {/* Signal Type Badge */}
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-2 flex-wrap">
-              {(() => {
-                const posture = getMarketSignalPosture(signal);
-                return (
-                  <Badge className={`text-xs font-semibold border ${getPostureBadgeColor(posture.posture)}`}>
-                    {posture.posture}
-                  </Badge>
-                );
-              })()}
               {isOpportunity ? (
                 <div className="flex items-center gap-2 px-3 py-1.5 backdrop-blur-xl bg-gradient-to-br from-green-500/20 to-green-500/10 border border-green-500/30 rounded-full">
                   <TrendingUp className="w-4 h-4 text-green-400" />

@@ -39,15 +39,7 @@ export default function EventsList({ events, loading, onEventClick }: EventsList
     return (
       <Card>
         <div className="text-center py-12">
-          <div className="text-center py-8">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-              <p className="text-text-secondary font-medium">Event processing active</p>
-            </div>
-            <p className="text-sm text-text-tertiary">
-              No events match these filters. System ingesting from 47 sources.
-            </p>
-          </div>
+          <p className="text-text-secondary mb-4">No events found</p>
           <p className="text-sm text-text-tertiary">Try adjusting your filters</p>
         </div>
       </Card>

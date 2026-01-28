@@ -241,13 +241,7 @@ function AlertsContent() {
               <Bell className="w-16 h-16 text-slate-600 mx-auto mb-4" />
               <h3 className="text-lg text-white font-light mb-2">All clear</h3>
               <p className="text-sm text-slate-400 font-light mb-6">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                  <span className="font-medium text-text-secondary">Monitoring active</span>
-                </div>
-                <p className="text-sm text-text-tertiary">
-                  No critical alerts in the last 24h. System monitoring 1,247 entities for threshold breaches. All metrics within replay-validated thresholds.
-                </p>
+                No alerts at this time. Alerts will appear here when critical thresholds are exceeded based on your preferences.
               </p>
               <div className="flex gap-3 justify-center">
                 <button

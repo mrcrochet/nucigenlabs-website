@@ -19,7 +19,6 @@ import SectionHeader from '../ui/SectionHeader';
 import Badge from '../ui/Badge';
 import SkeletonCard from '../ui/SkeletonCard';
 import type { Signal } from '../../types/intelligence';
-import { getSignalPosture, getPostureBadgeColor } from '../../lib/signal-posture';
 
 interface SignalsTableProps {
   signals: Signal[];
@@ -45,16 +44,8 @@ export default function SignalsTable({ signals, loading, onSignalClick }: Signal
       <Card>
         <SectionHeader title="Signals" />
         <div className="mt-4 text-center py-12">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <p className="text-text-secondary font-medium">Monitoring active</p>
-          </div>
-          <p className="text-sm text-text-tertiary mb-2">
-            No signals above threshold detected. System monitoring 1,247 entities for exposure changes.
-          </p>
-          <p className="text-xs text-text-tertiary">
-            Signal activity below actionable levels — low-noise mode active.
-          </p>
+          <p className="text-text-secondary mb-4">No signals found</p>
+          <p className="text-sm text-text-tertiary">Try adjusting your filters</p>
         </div>
       </Card>
     );
@@ -69,7 +60,6 @@ export default function SignalsTable({ signals, loading, onSignalClick }: Signal
           <thead>
             <tr className="border-b border-borders-subtle">
               <th className="text-left py-3 px-4 text-sm font-medium text-text-secondary">Signal</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-text-secondary">Posture</th>
               <th className="text-left py-3 px-4 text-sm font-medium text-text-secondary">Theme</th>
               <th className="text-left py-3 px-4 text-sm font-medium text-text-secondary">Strength</th>
               <th className="text-left py-3 px-4 text-sm font-medium text-text-secondary">Confidence</th>
@@ -93,16 +83,6 @@ export default function SignalsTable({ signals, loading, onSignalClick }: Signal
                   >
                     {signal.title}
                   </Link>
-                </td>
-                <td className="py-3 px-4">
-                  {(() => {
-                    const posture = getSignalPosture(signal);
-                    return (
-                      <Badge className={`text-xs font-semibold border ${getPostureBadgeColor(posture.posture)}`}>
-                        {posture.posture}
-                      </Badge>
-                    );
-                  })()}
                 </td>
                 <td className="py-3 px-4">
                   <Badge variant="neutral">

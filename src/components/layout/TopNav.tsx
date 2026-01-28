@@ -13,7 +13,7 @@ interface TopNavProps {
 
 export default function TopNav({ onMenuClick, mobileMenuOpen }: TopNavProps) {
   return (
-    <nav className="h-12 bg-background-overlay/95 backdrop-blur-xl border-b border-borders-subtle/50 flex items-center justify-between px-4 sm:px-6">
+    <nav className="h-16 bg-background-overlay backdrop-blur-xl border-b border-borders-subtle flex items-center justify-between px-4 sm:px-6">
       {/* Left: Menu Button + Logo/Brand */}
       <div className="flex items-center gap-3 sm:gap-4">
         {/* Menu Button - Always visible (hamburger menu for all screens) */}

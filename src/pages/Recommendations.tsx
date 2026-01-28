@@ -237,9 +237,9 @@ function RecommendationsContent() {
             <div className="text-center py-20">
               <div className="max-w-md mx-auto">
                 <Target className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                <h3 className="text-lg text-white font-light mb-2">No actionable recommendations</h3>
+                <h3 className="text-lg text-white font-light mb-2">No recommendations yet</h3>
                 <p className="text-sm text-slate-400 font-light mb-6">
-                  System monitoring 1,247 entities. No decision points generated — current signals remain below actionable thresholds. Monitoring continues.
+                  Recommendations will appear here once we detect high-impact signals relevant to your preferences. Complete your onboarding to receive personalized recommendations.
                 </p>
                 <div className="flex gap-3 justify-center">
                   <button

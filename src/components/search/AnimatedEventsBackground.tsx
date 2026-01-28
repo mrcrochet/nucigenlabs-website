@@ -3,7 +3,6 @@
  * 
  * Displays scrolling events in the background, similar to LiveNewsFeed
  * Used on SearchHome page for visual appeal
- * ALWAYS displays background - never returns null
  */
 
 import { useState, useEffect } from 'react';
@@ -19,51 +18,7 @@ interface NewsItem {
   confidence?: string;
 }
 
-// Default sample items - always available
-const DEFAULT_SAMPLE_ITEMS: NewsItem[] = [
-  {
-    news: 'Global markets react to geopolitical tensions',
-    prediction: 'Geopolitical escalation → Defense sector demand up, energy volatility',
-    timing: 'Before volatility spike',
-    tickers: 'ITA, XAR, PPA',
-    confidence: 'High',
-    source: 'Financial Times'
-  },
-  {
-    news: 'Supply chain disruptions impact commodity prices',
-    prediction: 'Logistics bottleneck → Container rates spike, retail inventory stress',
-    timing: '2-3 days before price movement',
-    tickers: 'XRT, FDX, UPS',
-    confidence: 'Medium-High',
-    source: 'Reuters'
-  },
-  {
-    news: 'Tech sector faces semiconductor shortage concerns',
-    prediction: 'Tech supply disruption → Hardware prices up, manufacturing margins compress',
-    timing: '6-18 hours before repricing',
-    tickers: 'SOXX, SMH, NVDA',
-    confidence: 'High',
-    source: 'Bloomberg'
-  },
-  {
-    news: 'Energy markets volatile amid production changes',
-    prediction: 'Energy supply constraint → Oil prices up, transportation costs increase',
-    timing: '12-24 hours before market reaction',
-    tickers: 'WTI, XLE, OIL',
-    confidence: 'High',
-    source: 'WSJ'
-  },
-  {
-    news: 'Central bank policy shifts affect currency markets',
-    prediction: 'Monetary policy impact → Asset repricing, sector rotation expected',
-    timing: 'Before futures repositioning',
-    tickers: 'TLT, TIP, DJP',
-    confidence: 'Medium',
-    source: 'FT'
-  },
-];
-
-// Generate exposure mapping based on news content (replay-validated)
+// Generate a market prediction based on news content
 function generatePrediction(newsTitle: string, newsDescription: string = ''): { prediction: string; timing: string; tickers?: string; confidence?: string } {
   const title = newsTitle.toLowerCase();
   const desc = (newsDescription || '').toLowerCase();
@@ -135,11 +90,11 @@ function generatePrediction(newsTitle: string, newsDescription: string = ''): { 
     };
   }
 
-  // Default generic exposure mapping
+  // Default generic prediction
   return {
-    prediction: 'Exposure detected → Sector impact mapping in progress',
-    timing: 'Mapping pending',
-    confidence: 'Replay-validated'
+    prediction: 'Market-moving event detected → Sector impact analysis in progress',
+    timing: 'Analysis pending',
+    confidence: 'Analyzing'
   };
 }
 
@@ -185,7 +140,7 @@ function NewsCard({ item }: { item: NewsItem }) {
   };
 
   return (
-    <div className="flex-shrink-0 w-[800px] flex items-center gap-4 backdrop-blur-xl bg-gradient-to-br from-white/[0.12] to-white/[0.06] border border-white/[0.2] rounded-xl p-5 opacity-90 hover:opacity-100 transition-all duration-300 group shadow-lg">
+    <div className="flex-shrink-0 w-[800px] flex items-center gap-4 backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/[0.08] rounded-xl p-5 opacity-70 hover:opacity-90 transition-all duration-300 group">
       {/* NEWS DETECTED Section */}
       <div className="flex-1 flex items-start gap-3">
         <div className="w-10 h-10 rounded-lg bg-[#E1463E]/20 border border-[#E1463E]/30 flex items-center justify-center flex-shrink-0 group-hover:bg-[#E1463E]/30 transition-colors">
@@ -202,7 +157,7 @@ function NewsCard({ item }: { item: NewsItem }) {
             </p>
           </div>
           <p className="text-[10px] text-slate-500 font-medium mb-1 tracking-wider uppercase">NEWS DETECTED</p>
-          <p className="text-sm text-white font-light leading-relaxed line-clamp-2 group-hover:text-slate-100 transition-colors" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+          <p className="text-sm text-white font-light leading-relaxed line-clamp-2 group-hover:text-slate-200 transition-colors">
             {item.news}
           </p>
         </div>
@@ -213,23 +168,23 @@ function NewsCard({ item }: { item: NewsItem }) {
         <ArrowRight size={22} className="text-[#E1463E]" />
       </div>
 
-      {/* EXPOSURE MAPPED Section */}
+      {/* PREDICTION GENERATED Section */}
       <div className="flex-1 flex items-start gap-3">
         <div className="w-10 h-10 rounded-lg bg-emerald-950/40 border border-emerald-800/40 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-950/60 transition-colors">
           <CheckCircle2 size={18} className="text-emerald-400" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] text-slate-500 font-medium mb-1 tracking-wider uppercase">EXPOSURE MAPPED</p>
-          <p className="text-sm text-white font-light mb-1.5 leading-relaxed line-clamp-2" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+          <p className="text-[10px] text-slate-500 font-medium mb-1 tracking-wider uppercase">PREDICTION GENERATED</p>
+          <p className="text-sm text-white font-light mb-1.5 leading-relaxed line-clamp-2">
             {item.prediction}
           </p>
           <div className="flex items-center gap-3 flex-wrap">
             {item.tickers && (
               <p className="text-[10px] text-emerald-400 font-medium">Watch: {item.tickers}</p>
             )}
-            <p className="text-[10px] text-[#E1463E] font-light">Observed impact: {item.timing}</p>
+            <p className="text-[10px] text-[#E1463E] font-light">Expected impact: {item.timing}</p>
             {item.confidence && (
-              <p className="text-[10px] text-slate-500 font-light">Threshold: {item.confidence}</p>
+              <p className="text-[10px] text-slate-500 font-light">Confidence: {item.confidence}</p>
             )}
           </div>
         </div>
@@ -239,8 +194,7 @@ function NewsCard({ item }: { item: NewsItem }) {
 }
 
 export default function AnimatedEventsBackground() {
-  // Start with default sample items immediately - background is ALWAYS visible
-  const [newsItems, setNewsItems] = useState<NewsItem[]>(DEFAULT_SAMPLE_ITEMS);
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -251,7 +205,7 @@ export default function AnimatedEventsBackground() {
         
         if (response.ok) {
           const data = await response.json();
-          if (data.success && data.data?.events && data.data.events.length > 0) {
+          if (data.success && data.data?.events) {
             // Transform events to NewsItems with predictions
             const items: NewsItem[] = data.data.events
               .slice(0, 15) // Limit to 15 events
@@ -279,20 +233,62 @@ export default function AnimatedEventsBackground() {
         console.error('[AnimatedEventsBackground] Error fetching events:', error);
       }
 
-      // If API fails, keep default sample items (already set in useState)
+      // Fallback to sample events if API fails
+      const sampleItems: NewsItem[] = [
+        {
+          news: 'Global markets react to geopolitical tensions',
+          prediction: 'Geopolitical escalation → Defense sector demand up, energy volatility',
+          timing: 'Before volatility spike',
+          tickers: 'ITA, XAR, PPA',
+          confidence: 'High',
+          source: 'Financial Times'
+        },
+        {
+          news: 'Supply chain disruptions impact commodity prices',
+          prediction: 'Logistics bottleneck → Container rates spike, retail inventory stress',
+          timing: '2-3 days before price movement',
+          tickers: 'XRT, FDX, UPS',
+          confidence: 'Medium-High',
+          source: 'Reuters'
+        },
+        {
+          news: 'Tech sector faces semiconductor shortage concerns',
+          prediction: 'Tech supply disruption → Hardware prices up, manufacturing margins compress',
+          timing: '6-18 hours before repricing',
+          tickers: 'SOXX, SMH, NVDA',
+          confidence: 'High',
+          source: 'Bloomberg'
+        },
+        {
+          news: 'Energy markets volatile amid production changes',
+          prediction: 'Energy supply constraint → Oil prices up, transportation costs increase',
+          timing: '12-24 hours before market reaction',
+          tickers: 'WTI, XLE, OIL',
+          confidence: 'High',
+          source: 'WSJ'
+        },
+        {
+          news: 'Central bank policy shifts affect currency markets',
+          prediction: 'Monetary policy impact → Asset repricing, sector rotation expected',
+          timing: 'Before futures repositioning',
+          tickers: 'TLT, TIP, DJP',
+          confidence: 'Medium',
+          source: 'FT'
+        },
+      ];
+      setNewsItems(sampleItems);
       setIsLoading(false);
     };
 
     fetchEvents();
   }, []);
 
-  // Create lanes from news items - always returns at least 5 lanes
+  // Create lanes from news items
   const createLanes = (items: NewsItem[]): NewsItem[][] => {
-    // Always use items (which starts with DEFAULT_SAMPLE_ITEMS)
-    const itemsToUse = items.length > 0 ? items : DEFAULT_SAMPLE_ITEMS;
+    if (items.length === 0) return [];
     
     const lanes: NewsItem[][] = [[], [], [], [], []];
-    itemsToUse.forEach((item, index) => {
+    items.forEach((item, index) => {
       lanes[index % 5].push(item);
     });
     
@@ -300,31 +296,25 @@ export default function AnimatedEventsBackground() {
     return lanes.map(lane => lane.length >= 2 ? lane : [...lane, ...lane]);
   };
 
-  // ALWAYS render background - never return null
   const lanes = createLanes(newsItems);
 
-  // Ensure we always have lanes (fallback to defaults if empty)
-  const displayLanes = lanes.length > 0 ? lanes : createLanes(DEFAULT_SAMPLE_ITEMS);
+  if (isLoading || lanes.length === 0) {
+    return null;
+  }
 
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-red-950/5 to-transparent"></div>
       
-      <div className="absolute inset-0 flex flex-col justify-center space-y-5 py-20">
-        {displayLanes.map((laneData, laneIndex) => {
-          // Ensure each lane has items
-          if (laneData.length === 0) {
-            return null;
-          }
-          return (
-            <ScrollingLane 
-              key={`lane-${laneIndex}`} 
-              items={laneData} 
-              speed={35 + laneIndex * 3} 
-              delay={laneIndex * 2} 
-            />
-          );
-        })}
+      <div className="absolute inset-0 flex flex-col justify-center space-y-5">
+        {lanes.map((laneData, laneIndex) => (
+          <ScrollingLane 
+            key={laneIndex} 
+            items={laneData} 
+            speed={35 + laneIndex * 3} 
+            delay={laneIndex * 2} 
+          />
+        ))}
       </div>
     </div>
   );

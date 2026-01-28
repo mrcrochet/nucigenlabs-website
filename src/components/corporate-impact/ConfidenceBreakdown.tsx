@@ -75,7 +75,7 @@ export default function ConfidenceBreakdown({ confidence, onClose }: ConfidenceB
 
         <div className="pt-4 border-t border-white/[0.08]">
           <p className="text-xs text-slate-500 italic">
-            Confidence reflects pattern match quality with historical cases. Based on observed exposure, not predictions.
+            Confidence reflects pattern match quality with historical cases. Not a price prediction.
           </p>
         </div>
       </div>

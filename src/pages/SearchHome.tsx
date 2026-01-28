@@ -9,7 +9,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
-import { Search, Loader2, Link as LinkIcon, Map } from 'lucide-react';
+import { Search, Loader2, Link as LinkIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
@@ -188,25 +188,21 @@ function SearchHomeContent() {
   }, [handleSearch]);
 
   return (
-    <div className="min-h-screen bg-background-base bg-grain relative overflow-hidden">
+    <div className="min-h-screen bg-background-base relative overflow-hidden">
       <SEO title="Search | Nucigen Labs" description="Search events, actors, assets, and sources with AI-powered intelligence" />
-      
-      {/* Animated Events Background - Must be first to be behind everything */}
-      <AnimatedEventsBackground />
       
       {/* Navigation Menu */}
       <SearchNavMenu />
       
+      {/* Animated Events Background */}
+      <AnimatedEventsBackground />
+      
       {/* Centered Search Bar */}
-      <div className="relative z-20 flex items-center justify-center min-h-screen pointer-events-none">
-        <div className="w-full max-w-2xl px-4 pointer-events-auto relative z-30">
+      <div className="fixed inset-0 flex items-center justify-center z-20 pointer-events-none">
+        <div className="w-full max-w-2xl px-4 pointer-events-auto">
           {/* Logo */}
-          <div className="mb-6 text-center">
-            <h1 className="text-3xl sm:text-4xl font-light text-text-primary mb-2">Nucigen</h1>
-            <div className="flex items-center justify-center gap-2 text-sm text-text-secondary">
-              <Map className="w-4 h-4 text-[#E1463E]" />
-              <span>Search any event, entity, sector — Nucigen will map exposure</span>
-            </div>
+          <div className="mb-8 text-center">
+            <h1 className="text-3xl sm:text-4xl font-light text-text-primary">Nucigen</h1>
           </div>
           
           <form onSubmit={handleSearch} className="relative">
@@ -218,7 +214,7 @@ function SearchHomeContent() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onPaste={handlePaste}
-                placeholder="Search any event, entity, sector, or paste a link"
+                placeholder="Search anything, or paste a link"
                 disabled={isProcessing}
                 className="w-full pl-12 pr-28 py-3 text-base bg-background-glass-subtle/90 backdrop-blur-sm border border-borders-subtle rounded-xl text-text-primary placeholder-text-secondary focus:outline-none focus:border-[#E1463E]/50 focus:bg-background-glass-medium transition-all disabled:opacity-50"
               />
@@ -249,7 +245,7 @@ function SearchHomeContent() {
 
           {/* Helper text */}
           <p className="mt-3 text-center text-xs text-text-tertiary">
-            Nucigen maps exposure to real-world pressure — not predictions
+            Search events, actors, sectors, risks, or paste a URL to analyze
           </p>
         </div>
       </div>

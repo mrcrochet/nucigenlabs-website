@@ -36,7 +36,6 @@ const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 
 // NEW ARCHITECTURE: Core 5 Pillars
 const Overview = lazy(() => import('./pages/Overview'));
-const CommandCenter = lazy(() => import('./pages/CommandCenter'));
 const SignalsPage = lazy(() => import('./pages/SignalsPage')); // Unified Signals
 const EventsFeed = lazy(() => import('./pages/EventsFeed'));
 const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
@@ -105,12 +104,9 @@ function App() {
 
   // Hide navigation and marketing components on auth/app pages
   // NEW ARCHITECTURE: Updated paths for 5 core pillars
-  // All routes that use AppShell should be in this list
   const hideMarketingPaths = [
     // Auth routes
     '/login', '/register', '/auth', '/confirm-email', '/forgot-password', '/reset-password',
-    // Command Center (primary dashboard)
-    '/command-center',
     // Core 5 pillars
     '/app', '/dashboard', '/overview',
     '/signals', '/events', '/scenarios', '/alerts',
@@ -124,14 +120,33 @@ function App() {
   // Special handling for /intelligence vs /intelligence-page
   const isAppIntelligence = (location.pathname === '/intelligence' || location.pathname.startsWith('/intelligence/')) && 
                             !location.pathname.startsWith('/intelligence-page');
-  
-  // Check if current path is an app page (uses AppShell)
-  // This covers all routes including dynamic ones (e.g., /signals/:id, /events/:id, etc.)
   const shouldHideMarketing = hideMarketingPaths.some(path => location.pathname.startsWith(path)) || isAppIntelligence;
 
-  // Define all routes once
-  const routes = (
-    <Suspense fallback={<PageLoader />}>
+  return (
+    <div className="relative min-h-screen">
+      <StructuredData type="Organization" />
+      <StructuredData type="WebSite" />
+      {!shouldHideMarketing && <AnimatedBackground />}
+      {!shouldHideMarketing && <PremiumNavigation />}
+      {!shouldHideMarketing && <Breadcrumbs />}
+      {!shouldHideMarketing && <StickyCTA />}
+
+      {toast.isVisible && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={hideToast}
+        />
+      )}
+
+      <ExitIntentModal
+        isOpen={showExitModal}
+        onClose={() => setShowExitModal(false)}
+      />
+
+      <Toaster />
+
+      <Suspense fallback={<PageLoader />}>
       <Routes>
         {/* Public Marketing Routes */}
         <Route path="/" element={<Home />} />
@@ -153,8 +168,7 @@ function App() {
         <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
         <Route path="/auth/callback" element={<AuthCallback />} />
         
-        {/* NEW ARCHITECTURE: Command Center + 5 Pillars */}
-        <Route path="/command-center" element={<ProtectedRoute><CommandCenter /></ProtectedRoute>} />
+        {/* NEW ARCHITECTURE: Core 5 Pillars */}
         <Route path="/overview" element={<ProtectedRoute><Overview /></ProtectedRoute>} />
         <Route path="/signals" element={<ProtectedRoute><SignalsPage /></ProtectedRoute>} />
         <Route path="/signals/:id" element={<ProtectedRoute><SignalDetailPage /></ProtectedRoute>} />
@@ -164,9 +178,9 @@ function App() {
         <Route path="/scenarios/:id" element={<ProtectedRoute><ImpactDetailPage /></ProtectedRoute>} />
         <Route path="/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
         
-        {/* Legacy Redirects - all go to Command Center */}
-        <Route path="/dashboard" element={<Navigate to="/command-center" replace />} />
-        <Route path="/app" element={<Navigate to="/command-center" replace />} />
+        {/* Legacy Redirects */}
+        <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
+        <Route path="/app" element={<Navigate to="/overview" replace />} />
         
         {/* Legacy Intelligence/Corporate Impact/Discover → Signals */}
         <Route path="/intelligence" element={<Navigate to="/signals" replace />} />
@@ -199,52 +213,7 @@ function App() {
         {/* Onboarding */}
         <Route path="/onboarding" element={<ProtectedRoute><ErrorBoundary><Onboarding /></ErrorBoundary></ProtectedRoute>} />
       </Routes>
-    </Suspense>
-  );
-
-  // Common components
-  const commonComponents = (
-    <>
-      <StructuredData type="Organization" />
-      <StructuredData type="WebSite" />
-
-      {toast.isVisible && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={hideToast}
-        />
-      )}
-
-      <ExitIntentModal
-        isOpen={showExitModal}
-        onClose={() => setShowExitModal(false)}
-      />
-
-      <Toaster />
-    </>
-  );
-
-  // For app pages, render without the wrapper to avoid extra spacing
-  // AppShell already has min-h-screen and handles its own layout
-  if (shouldHideMarketing) {
-    return (
-      <>
-        {commonComponents}
-        {routes}
-      </>
-    );
-  }
-
-  // For marketing pages, use the wrapper
-  return (
-    <div className="relative min-h-screen">
-      {commonComponents}
-      {!shouldHideMarketing && <AnimatedBackground />}
-      {!shouldHideMarketing && <PremiumNavigation />}
-      {!shouldHideMarketing && <Breadcrumbs />}
-      {!shouldHideMarketing && <StickyCTA />}
-      {routes}
+      </Suspense>
     </div>
   );
 }

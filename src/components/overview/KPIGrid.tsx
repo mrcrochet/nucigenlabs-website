@@ -98,39 +98,30 @@ export default function KPIGrid() {
           ? ((signals24h.length - signalsPrev24h.length) / signalsPrev24h.length) * 100
           : 0;
 
-        // Calculate interpretations
-        const eventsInterpretation = events24h.length > 40 ? 'Above average' : events24h.length > 20 ? 'Normal activity' : 'Below average';
-        const signalsInterpretation = signals24h.length > 15 ? 'Elevated signal activity' : signals24h.length > 5 ? 'Normal activity' : 'Low activity';
-        const impactsInterpretation = impacts7d.length > 20 ? 'Elevated risk environment' : impacts7d.length > 10 ? 'Moderate risk' : 'Low risk';
-
         setKpis([
           {
             label: 'Events (24h)',
             value: events24h.length.toString(),
             delta: deltaEvents,
             trendData: trendDataEvents,
-            interpretation: eventsInterpretation,
           },
           {
             label: 'Signals (24h)',
             value: signals24h.length.toString(),
             delta: deltaSignals,
             trendData: trendDataSignals,
-            interpretation: signalsInterpretation,
           },
           {
             label: 'High-Impact Impacts (7d)',
             value: impacts7d.length.toString(),
             delta: 0, // TODO: Calculate when impacts are implemented
             trendData: Array.from({ length: 7 }, () => Math.floor(Math.random() * 5)),
-            interpretation: impactsInterpretation,
           },
           {
             label: 'Watchlist Volatility',
             value: '0%', // TODO: Calculate from watchlist
             delta: 0,
             trendData: Array.from({ length: 7 }, () => Math.floor(Math.random() * 25) + 10),
-            interpretation: 'Stable',
           },
         ]);
       } catch (error) {
@@ -142,28 +133,24 @@ export default function KPIGrid() {
             value: '0',
             delta: 0,
             trendData: [10, 15, 12, 18, 20, 16, 14],
-            interpretation: 'Normal activity',
           },
           {
             label: 'Signals (24h)',
             value: '0',
             delta: 0,
             trendData: [5, 8, 6, 10, 12, 9, 7],
-            interpretation: 'Normal activity',
           },
           {
             label: 'High-Impact Impacts (7d)',
             value: '0',
             delta: 0,
             trendData: [2, 3, 2, 4, 5, 3, 2],
-            interpretation: 'Low risk',
           },
           {
             label: 'Watchlist Volatility',
             value: '0%',
             delta: 0,
             trendData: [15, 18, 16, 20, 22, 19, 17],
-            interpretation: 'Stable',
           },
         ]);
       } finally {

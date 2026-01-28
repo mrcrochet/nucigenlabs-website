@@ -12,7 +12,6 @@ export interface KPIData {
   delta?: number; // percentage change
   trendData?: number[]; // for sparkline
   trendDirection?: 'up' | 'down' | 'neutral';
-  interpretation?: string; // Interpretation text (e.g., "Above average", "Normal activity")
 }
 
 interface KPIStatCardProps {
@@ -40,12 +39,9 @@ export default function KPIStatCard({ data, className = '' }: KPIStatCardProps) 
   return (
     <div className={`bg-background-glass-subtle border border-borders-subtle rounded-xl p-5 ${className}`}>
       <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
+        <div>
           <p className="text-sm text-text-secondary font-medium mb-1">{label}</p>
           <p className="text-2xl font-semibold text-text-primary">{value}</p>
-          {data.interpretation && (
-            <p className="text-xs text-text-tertiary mt-1 italic">{data.interpretation}</p>
-          )}
         </div>
         {trendData && trendData.length > 0 && (
           <div className="w-16 h-8">

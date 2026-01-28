@@ -81,56 +81,48 @@ export default function OpportunitiesCard() {
 
   if (opportunities.length === 0) {
     return (
-      <Card className="max-h-64 overflow-y-auto">
-        <SectionHeader title="Opportunities" subtitle="Positive scenarios" />
-        <div className="mt-3 p-4 backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.15] rounded-xl">
-          <div className="text-center">
-            <div className="w-10 h-10 mx-auto mb-3 backdrop-blur-xl bg-gradient-to-br from-slate-500/20 to-slate-500/10 border border-slate-500/30 rounded-full flex items-center justify-center">
-              <Lightbulb className="w-5 h-5 text-slate-400" />
-            </div>
-            <h4 className="text-xs font-semibold text-text-primary mb-1.5">Monitoring for opportunities</h4>
-            <p className="text-xs text-text-secondary leading-relaxed">
-              No clear opportunities identified at this time. System analyzes signals for positive scenarios with high confidence.
-            </p>
-          </div>
+      <Card>
+        <SectionHeader title="Opportunities" />
+        <div className="text-text-secondary text-sm mt-4">
+          No clear opportunities identified at this time.
         </div>
       </Card>
     );
   }
 
   return (
-    <Card className="max-h-64 overflow-y-auto">
-      <SectionHeader title="Opportunities" subtitle="Positive scenarios" />
+    <Card>
+      <SectionHeader title="Opportunities" />
       
-      <div className="space-y-2 mt-3">
-        {opportunities.slice(0, 2).map((opp) => (
+      <div className="space-y-4 mt-4">
+        {opportunities.map((opp) => (
           <div
             key={opp.id}
-            className="p-3 bg-background-glass-subtle rounded-lg border border-borders-subtle hover:border-borders-medium transition-colors"
+            className="p-4 bg-background-glass-subtle rounded-lg border border-borders-subtle hover:border-borders-medium transition-colors"
           >
-            <div className="flex items-start justify-between mb-1.5">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex items-center gap-2">
                 {opp.type === 'opportunity' ? (
-                  <TrendingUp className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                  <TrendingUp className="w-4 h-4 text-green-500" />
                 ) : (
-                  <Lightbulb className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                  <Lightbulb className="w-4 h-4 text-blue-500" />
                 )}
                 <Link
                   to={`/signals/${opp.signal_id}`}
-                  className="text-xs font-medium text-text-primary hover:text-primary-red transition-colors truncate"
+                  className="text-sm font-medium text-text-primary hover:text-primary-red transition-colors"
                 >
                   {opp.title}
                 </Link>
               </div>
             </div>
             
-            <p className="text-xs text-text-secondary mb-2 leading-relaxed line-clamp-2">
+            <p className="text-xs text-text-secondary mb-3 leading-relaxed">
               {opp.description}
             </p>
             
-            <div className="flex items-center gap-3 text-xs text-text-tertiary">
-              <span>{opp.time_horizon}</span>
-              <span>{opp.confidence}%</span>
+            <div className="flex items-center gap-4 text-xs text-text-tertiary">
+              <span>Horizon: {opp.time_horizon}</span>
+              <span>Confidence: {opp.confidence}%</span>
             </div>
           </div>
         ))}

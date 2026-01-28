@@ -8,7 +8,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { ArrowRight, Zap, TrendingUp, Target, AlertCircle, Download, FileImage, FileText, GitBranch } from 'lucide-react';
+import { ArrowRight, Zap, TrendingUp, Target, AlertCircle, Download, FileImage, FileText } from 'lucide-react';
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
 
@@ -250,20 +250,8 @@ export default function CausalChainVisualization({ nodes, signalId }: CausalChai
       </div>
 
       {nodes.length === 0 && (
-        <div className="text-center py-8 px-4">
-          <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.15] rounded-xl p-6 max-w-md mx-auto">
-            <div className="w-12 h-12 mx-auto mb-4 backdrop-blur-xl bg-gradient-to-br from-slate-500/20 to-slate-500/10 border border-slate-500/30 rounded-full flex items-center justify-center">
-              <GitBranch className="w-6 h-6 text-slate-400" />
-            </div>
-            <h4 className="text-sm font-semibold text-text-primary mb-2">Causal chain analysis pending</h4>
-            <p className="text-xs text-text-secondary leading-relaxed mb-3">
-              Causal chains map relationships between events, signals, and scenarios. They appear when related events with causal data are detected.
-            </p>
-            <div className="flex items-center justify-center gap-4 text-xs text-text-tertiary pt-3 border-t border-borders-subtle">
-              <span>Mapping relationships</span>
-              <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse"></span>
-            </div>
-          </div>
+        <div className="text-center py-8 text-text-secondary text-sm">
+          <p>No causal chain data available</p>
         </div>
       )}
     </Card>

@@ -36,11 +36,7 @@ import MetaRow from '../components/ui/MetaRow';
 import EventCardExpanded from '../components/EventCardExpanded';
 import MarketDataPanel from '../components/market/MarketDataPanel';
 import MarketMetricsCompact from '../components/market/MarketMetricsCompact';
-import EventsTimelineView from '../components/events/EventsTimelineView';
-import EventsMapView from '../components/events/EventsMapView';
-import { MapPin, Building2, TrendingUp, Clock, Search, Filter, X, ChevronLeft, ChevronRight, Sparkles, Loader2, List, Calendar, Globe } from 'lucide-react';
-
-type ViewMode = 'feed' | 'timeline' | 'map';
+import { MapPin, Building2, TrendingUp, Clock, Search, Filter, X, ChevronLeft, ChevronRight, Sparkles, Loader2 } from 'lucide-react';
 
 function EventsContent() {
   const { user, isLoaded: userLoaded } = useUser();
@@ -53,9 +49,6 @@ function EventsContent() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
-  // View mode state
-  const [viewMode, setViewMode] = useState<ViewMode>('feed');
   const [totalCount, setTotalCount] = useState(0);
   
   // Filter states
@@ -441,53 +434,16 @@ function EventsContent() {
       />
 
       <div className="col-span-1 sm:col-span-12">
-        {/* Header with View Toggle */}
-        <header className="mb-4">
-          <div className="flex items-center justify-between mb-3">
+        {/* Header */}
+        <header className="mb-6">
+          <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-light text-white leading-tight mb-0.5">
+              <h1 className="text-3xl sm:text-4xl font-light text-white leading-tight mb-1">
                 Events
               </h1>
-              <p className="text-xs text-slate-500 font-light">
-                {events.length} of {totalCount} event{totalCount !== 1 ? 's' : ''} • Source of truth
+              <p className="text-sm text-slate-600 font-light">
+                {events.length} of {totalCount} event{totalCount !== 1 ? 's' : ''} shown
               </p>
-            </div>
-
-            {/* View Mode Toggle */}
-            <div className="flex items-center gap-1 p-1 bg-white/[0.02] border border-white/[0.05] rounded-lg">
-              <button
-                onClick={() => setViewMode('feed')}
-                className={`px-3 py-1.5 rounded-md transition-all text-xs font-light flex items-center gap-1.5 ${
-                  viewMode === 'feed'
-                    ? 'bg-[#E1463E] text-white'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <List className="w-3.5 h-3.5" />
-                Feed
-              </button>
-              <button
-                onClick={() => setViewMode('timeline')}
-                className={`px-3 py-1.5 rounded-md transition-all text-xs font-light flex items-center gap-1.5 ${
-                  viewMode === 'timeline'
-                    ? 'bg-[#E1463E] text-white'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <Calendar className="w-3.5 h-3.5" />
-                Timeline
-              </button>
-              <button
-                onClick={() => setViewMode('map')}
-                className={`px-3 py-1.5 rounded-md transition-all text-xs font-light flex items-center gap-1.5 ${
-                  viewMode === 'map'
-                    ? 'bg-[#E1463E] text-white'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                <Globe className="w-3.5 h-3.5" />
-                Map
-              </button>
             </div>
           </div>
         </header>
@@ -694,24 +650,7 @@ function EventsContent() {
           )}
         </div>
 
-        {/* Timeline View */}
-        {viewMode === 'timeline' && (
-          <EventsTimelineView 
-            events={events} 
-            onEventClick={(id) => navigate(`/events/${id}`)}
-          />
-        )}
-
-        {/* Map View */}
-        {viewMode === 'map' && (
-          <EventsMapView 
-            events={events} 
-            onEventClick={(id) => navigate(`/events/${id}`)}
-          />
-        )}
-
-        {/* Feed View (default) */}
-        {viewMode === 'feed' && events.length === 0 ? (
+        {events.length === 0 ? (
           <div className="text-center py-20">
             <div className="max-w-md mx-auto">
               {hasActiveFilters ? (
@@ -731,9 +670,9 @@ function EventsContent() {
               ) : (
                 <>
                   <TrendingUp className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                  <h3 className="text-lg text-white font-light mb-2">Event processing queue active</h3>
+                  <h3 className="text-lg text-white font-light mb-2">No events available yet</h3>
                   <p className="text-sm text-slate-400 font-light mb-6">
-                    System is ingesting and processing events from 47 sources. No events have completed causal chain generation in the last 24h. Monitoring continues.
+                    Events will appear here once they have been processed and causal chains have been generated. Try using live search to find current events.
                   </p>
                   <div className="flex gap-3 justify-center">
                     <button
@@ -760,7 +699,7 @@ function EventsContent() {
               )}
             </div>
           </div>
-        ) : viewMode === 'feed' ? (
+        ) : (
           <>
             <div className="space-y-8">
               {paginatedEvents.map((event) => {
@@ -1011,7 +950,7 @@ function EventsContent() {
               </div>
             )}
           </>
-        ) : null}
+        )}
       </div>
     </AppShell>
   );

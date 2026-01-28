@@ -92,18 +92,10 @@ export default function TopRisksCard() {
 
   if (risks.length === 0) {
     return (
-      <Card className="max-h-80 overflow-y-auto">
-        <SectionHeader title="Top Risks" subtitle="Emerging threats" />
-        <div className="mt-3 p-4 backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.15] rounded-xl">
-          <div className="text-center">
-            <div className="w-10 h-10 mx-auto mb-3 backdrop-blur-xl bg-gradient-to-br from-green-500/20 to-green-500/10 border border-green-500/30 rounded-full flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-green-400" />
-            </div>
-            <h4 className="text-xs font-semibold text-text-primary mb-1.5">Risk environment stable</h4>
-            <p className="text-xs text-text-secondary leading-relaxed">
-              No significant risks detected in the last 7 days. System continues monitoring for threshold breaches.
-            </p>
-          </div>
+      <Card>
+        <SectionHeader title="Top Risks" />
+        <div className="text-text-secondary text-sm mt-4">
+          No significant risks detected in the last 7 days.
         </div>
       </Card>
     );
@@ -124,40 +116,40 @@ export default function TopRisksCard() {
   };
 
   return (
-    <Card className="max-h-80 overflow-y-auto">
-      <SectionHeader title="Top Risks" subtitle="Emerging threats" />
+    <Card>
+      <SectionHeader title="Top Risks" />
       
-      <div className="space-y-2 mt-3">
-        {risks.slice(0, 3).map((risk, index) => (
+      <div className="space-y-4 mt-4">
+        {risks.map((risk, index) => (
           <div
             key={risk.id}
-            className="p-3 bg-background-glass-subtle rounded-lg border border-borders-subtle hover:border-borders-medium transition-colors"
+            className="p-4 bg-background-glass-subtle rounded-lg border border-borders-subtle hover:border-borders-medium transition-colors"
           >
-            <div className="flex items-start justify-between mb-1.5">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <AlertTriangle className="w-3.5 h-3.5 text-primary-red flex-shrink-0" />
+            <div className="flex items-start justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-primary-red" />
                 <Link
                   to={`/signals/${risk.signal_id}`}
-                  className="text-xs font-medium text-text-primary hover:text-primary-red transition-colors truncate"
+                  className="text-sm font-medium text-text-primary hover:text-primary-red transition-colors"
                 >
                   {risk.title}
                 </Link>
               </div>
               <Badge
                 variant="neutral"
-                className={`${severityColors[risk.severity]} border text-xs`}
+                className={`${severityColors[risk.severity]} border`}
               >
                 {severityLabels[risk.severity]}
               </Badge>
             </div>
             
-            <p className="text-xs text-text-secondary mb-2 leading-relaxed line-clamp-2">
+            <p className="text-xs text-text-secondary mb-3 leading-relaxed">
               {risk.description}
             </p>
             
-            <div className="flex items-center gap-3 text-xs text-text-tertiary">
-              <span>{risk.time_horizon}</span>
-              <span>{risk.impact_score}/100</span>
+            <div className="flex items-center gap-4 text-xs text-text-tertiary">
+              <span>Horizon: {risk.time_horizon}</span>
+              <span>Impact: {risk.impact_score}/100</span>
             </div>
           </div>
         ))}

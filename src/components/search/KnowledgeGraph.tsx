@@ -224,11 +224,8 @@ export default function KnowledgeGraph({ graph, onNodeClick, onNodeExplore, heig
         style={{ minHeight: `${height}px` }}
       >
         <div className="text-center p-8">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-            <p className="text-text-secondary text-sm">Graph processing active</p>
-          </div>
-          <p className="text-text-tertiary text-xs">No relationships detected for this query. Start a search or paste a URL to build the knowledge graph.</p>
+          <p className="text-text-secondary text-sm mb-2">No graph data available</p>
+          <p className="text-text-tertiary text-xs">Start a search or paste a URL to build the knowledge graph</p>
         </div>
       </div>
     );

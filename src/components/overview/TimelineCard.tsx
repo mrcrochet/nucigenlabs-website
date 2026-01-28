@@ -44,19 +44,19 @@ export default function TimelineCard() {
   }
 
   return (
-    <Card className="max-h-64 overflow-y-auto">
-      <SectionHeader title="Event Timeline" subtitle="Recent activity" />
+    <Card>
+      <SectionHeader title="Event Timeline" />
       
-      <div className="mt-3 space-y-2">
-        {events.slice(0, 5).map((event) => (
+      <div className="mt-4 space-y-3">
+        {events.map((event) => (
           <div
             key={event.id}
-            className="flex items-start gap-2 p-2 bg-background-glass-subtle rounded-lg hover:bg-background-glass-medium transition-colors"
+            className="flex items-start gap-3 p-3 bg-background-glass-subtle rounded-lg hover:bg-background-glass-medium transition-colors"
           >
-            <div className="w-1.5 h-1.5 rounded-full bg-primary-red mt-1.5 flex-shrink-0" />
+            <div className="w-2 h-2 rounded-full bg-primary-red mt-2 flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-text-primary truncate">{event.headline}</p>
-              <p className="text-xs text-text-tertiary mt-0.5">
+              <p className="text-sm text-text-primary truncate">{event.headline}</p>
+              <p className="text-xs text-text-tertiary mt-1">
                 {new Date(event.date).toLocaleDateString()}
                 {event.symbol && ` · ${event.symbol}`}
               </p>

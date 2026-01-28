@@ -56,9 +56,8 @@ export default function RecentEventsFeed() {
     return (
       <Card>
         <SectionHeader title="Recent Events" />
-        <div className="mt-4 text-sm text-text-secondary flex items-center gap-2">
-          <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-          <span>No material events in the last 24h. System monitoring 47 sources.</span>
+        <div className="mt-4 text-sm text-text-secondary">
+          No recent events available
         </div>
       </Card>
     );

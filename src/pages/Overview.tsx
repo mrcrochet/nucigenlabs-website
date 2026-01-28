@@ -58,13 +58,13 @@ function OverviewContent() {
         description="Command Center: What changed and what to do"
       />
 
-      {/* Row 1: HeaderBar - Starts immediately after TopNav, no top spacing */}
+      {/* Row 1: HeaderBar */}
       <div className="col-span-1 sm:col-span-12">
         <HeaderBar />
       </div>
 
       {/* NEW: Command Center Section - Top Priority */}
-      <div className="col-span-1 sm:col-span-12 mb-2">
+      <div className="col-span-1 sm:col-span-12 mb-6">
         <div className="backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/10 to-[#E1463E]/5 border border-[#E1463E]/20 rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <Bell className="w-5 h-5 text-[#E1463E]" />
@@ -74,20 +74,20 @@ function OverviewContent() {
             Here's what changed for you, now, and what you need to do.
           </p>
           
-          {/* Command Center Grid - Improved hierarchy */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            {/* Triggered Alerts - Priority 1 (col-span-3) */}
-            <div className="lg:col-span-3">
+          {/* Command Center Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Alertes déclenchées */}
+            <div className="lg:col-span-1">
               <TriggeredAlertsFeed />
             </div>
             
-            {/* Decision Points - Priority 2, larger (col-span-6) */}
-            <div className="lg:col-span-6">
+            {/* Decision Points */}
+            <div className="lg:col-span-1">
               <ActionItemsCard />
             </div>
             
-            {/* Watchlist Changes - Priority 3 (col-span-3) */}
-            <div className="lg:col-span-3">
+            {/* Watchlist Changes */}
+            <div className="lg:col-span-1">
               <WatchlistChangesCard />
             </div>
           </div>
@@ -99,16 +99,12 @@ function OverviewContent() {
         <KPIGrid />
       </div>
 
-      {/* Row 3: Narrative (moved down, transformed) */}
-      <div className="col-span-1 sm:col-span-12">
+      {/* Row 3: Left (8) + Right (4) */}
+      <div className="col-span-1 sm:col-span-8 space-y-6">
         <NarrativeCard />
-      </div>
-
-      {/* Row 4: Left (8) + Right (4) - Reduced prominence */}
-      <div className="col-span-1 sm:col-span-8 space-y-4">
         <TimelineCard />
       </div>
-      <div className="col-span-1 sm:col-span-4 space-y-4">
+      <div className="col-span-1 sm:col-span-4 space-y-6">
         <MarketMoversCard />
         <TopRisksCard />
         <OpportunitiesCard />

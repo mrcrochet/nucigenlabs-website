@@ -38,17 +38,11 @@ export default function WatchlistChangesCard() {
 
       try {
         // Fetch watchlist changes analysis from API
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-        
         const response = await fetch('/api/watchlists/changes?limit=5&hours_back=24', {
           headers: {
             'x-clerk-user-id': user.id,
           },
-          signal: controller.signal,
         });
-        
-        clearTimeout(timeoutId);
 
         if (!response.ok) {
           throw new Error('Failed to fetch watchlist changes');
@@ -72,13 +66,8 @@ export default function WatchlistChangesCard() {
         } else {
           setChanges([]);
         }
-      } catch (error: any) {
-        // Silently handle network errors - server not available
-        if (error.name === 'AbortError' || error.name === 'TypeError' || error.message?.includes('fetch')) {
-          console.debug('[WatchlistChangesCard] API server not available');
-        } else {
-          console.error('Error loading watchlist changes:', error);
-        }
+      } catch (error) {
+        console.error('Error loading watchlist changes:', error);
         setChanges([]);
       } finally {
         setLoading(false);
@@ -126,10 +115,8 @@ export default function WatchlistChangesCard() {
       
       <div className="mt-4 space-y-3">
         {changes.length === 0 ? (
-          <div className="text-center py-8 text-text-secondary text-sm p-4 bg-background-glass-subtle rounded-lg">
-            <Eye className="w-5 h-5 mx-auto mb-2 text-slate-400" />
-            <p className="font-medium mb-1">No material changes detected</p>
-            <p className="text-xs text-text-tertiary">in your watchlist in the last 24h</p>
+          <div className="text-center py-8 text-text-secondary text-sm">
+            <p>No changes to your watchlist</p>
           </div>
         ) : (
           changes.map((change) => (

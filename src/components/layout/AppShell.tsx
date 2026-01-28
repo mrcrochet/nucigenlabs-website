@@ -11,8 +11,6 @@
  * - SideNav becomes a drawer on mobile (< 1024px)
  * - RightInspector becomes a drawer/modal on mobile
  * - Layout stacks vertically on mobile
- * 
- * Palantir-style: No hero spacing for operational pages
  */
 
 import { useState, useEffect } from 'react';
@@ -20,7 +18,6 @@ import TopNav from './TopNav';
 import AppNavMenu from './AppNavMenu';
 import MainContent from './MainContent';
 import RightInspector from './RightInspector';
-import DashboardSpine from './DashboardSpine';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -37,7 +34,7 @@ export default function AppShell({
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background-base bg-grain flex flex-col relative">
+    <div className="min-h-screen bg-background-base flex flex-col">
       {/* TopNav - Fixed height 64px */}
       <TopNav 
         onMenuClick={() => setMenuOpen(!menuOpen)}
@@ -57,10 +54,8 @@ export default function AppShell({
         />
       )}
 
-      {/* Main content area - starts immediately after TopNav */}
-      <div className="flex flex-1 overflow-hidden relative min-h-0">
+      <div className="flex flex-1 overflow-hidden relative">
         {/* MainContent - Full width (no sidebar taking space) */}
-        {/* Content starts immediately after TopNav - no hero spacing */}
         <MainContent>
           {children}
         </MainContent>
@@ -76,9 +71,6 @@ export default function AppShell({
           </RightInspector>
         )}
       </div>
-
-      {/* Dashboard Spine - System status indicator (visible on all pages) */}
-      <DashboardSpine />
     </div>
   );
 }

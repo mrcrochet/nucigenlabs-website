@@ -4673,7 +4673,7 @@ app.get('/api/decision-points', asyncHandler(async (req: express.Request, res: e
     });
   }
 
-  const { scenario_id, signal_id, event_id, type, priority, status, limit } = req.query;
+  const { scenario_id, signal_id, event_id, type, priority, status } = req.query;
 
   let query = supabase
     .from('decision_points')
@@ -4698,12 +4698,6 @@ app.get('/api/decision-points', asyncHandler(async (req: express.Request, res: e
   }
   if (status) {
     query = query.eq('status', status as string);
-  }
-  if (limit) {
-    const limitNum = parseInt(limit as string, 10);
-    if (!isNaN(limitNum) && limitNum > 0) {
-      query = query.limit(limitNum);
-    }
   }
 
   const { data, error } = await query;

@@ -481,9 +481,9 @@ function IntelligenceFeedContent() {
               {debouncedSearchQuery ? (
                 <>
                   <Search className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                  <h3 className="text-lg text-white font-light mb-2">No signals match this query</h3>
+                  <h3 className="text-lg text-white font-light mb-2">No signals found</h3>
                   <p className="text-sm text-slate-400 font-light mb-6">
-                    System is monitoring 1,247 entities for threshold breaches. No matches found for your search criteria.
+                    Try adjusting your search query or filters to find relevant signals.
                   </p>
                   <button
                     onClick={() => setSearchQuery('')}
@@ -495,9 +495,9 @@ function IntelligenceFeedContent() {
               ) : (
                 <>
                   <Sparkles className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-                  <h3 className="text-lg text-white font-light mb-2">Signal activity below actionable thresholds</h3>
+                  <h3 className="text-lg text-white font-light mb-2">No intelligence signals yet</h3>
                   <p className="text-sm text-slate-400 font-light mb-6">
-                    System is actively monitoring. Low-noise mode active — no signals have crossed replay-validated thresholds in the last 24h.
+                    Complete your onboarding to receive personalized intelligence signals based on your preferences.
                   </p>
                   <div className="flex gap-3 justify-center">
                     <button
