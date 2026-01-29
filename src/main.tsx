@@ -7,7 +7,21 @@ import ClerkErrorBoundary from './components/ClerkErrorBoundary';
 import App from './App.tsx';
 import { queryClient } from './lib/react-query';
 import { registerServiceWorker } from './lib/service-worker';
+import { apiUrl } from './lib/api-base';
 import './index.css';
+
+// In production, relative /api/* requests must go to the deployed backend (VITE_API_URL)
+const base = import.meta.env.VITE_API_URL ?? '';
+if (base) {
+  const origFetch = window.fetch;
+  window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
+    const url =
+      typeof input === 'string' && input.startsWith('/')
+        ? apiUrl(input)
+        : input;
+    return origFetch(url, init);
+  };
+}
 
 // Initialize Sentry as early as possible
 initSentry();

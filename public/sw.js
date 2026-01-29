@@ -4,7 +4,7 @@
  * Caches Discover page assets and API responses for offline access
  */
 
-const CACHE_NAME = 'nucigen-discover-v1';
+const CACHE_NAME = 'nucigen-discover-v2';
 const API_CACHE_NAME = 'nucigen-api-v1';
 const STATIC_ASSETS = [
   '/',
@@ -58,6 +58,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Do NOT intercept static assets - let the browser load them normally (avoids MIME/JS load errors)
+  if (url.pathname.startsWith('/assets/') || /\.(js|css|woff2?|ico|svg|png|jpg|jpeg|gif|webp)(\?|$)/i.test(url.pathname)) {
+    return;
+  }
+
   // Handle API requests
   if (url.pathname.startsWith('/api/discover')) {
     event.respondWith(
@@ -96,22 +101,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle static assets
+  // Handle HTML / navigation (SPA routes) only - cache first, then network
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       if (cachedResponse) {
         return cachedResponse;
       }
-      return fetch(request).then((response) => {
-        // Cache successful responses
-        if (response.status === 200) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseClone);
-          });
-        }
-        return response;
-      });
+      return fetch(request)
+        .then((response) => {
+          if (response.status === 200 && response.type === 'basic') {
+            try {
+              const responseClone = response.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone)).catch(() => {});
+            } catch (_) {}
+          }
+          return response;
+        })
+        .catch(() => {
+          return caches.match(request).then((cached) => cached || caches.match('/index.html'));
+        });
     })
   );
 });

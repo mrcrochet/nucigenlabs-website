@@ -15,3 +15,7 @@ Le frontend (Vite) et l’API (Express) sont deux processus séparés.
 Ouvre l’app à l’URL indiquée par Vite (ex. **http://localhost:5175/**) pour que le proxy `/api` → 3001 fonctionne.
 
 Si tu vois *« Erreur 404 / le serveur API ne répond pas ou renvoie une page HTML »*, soit l’API n’est pas lancée (démarre-la avec `npm run api:server` ou utilise `npm run dev:all`), soit tu es sur une autre URL que celle de Vite (vérifie la ligne « Local: » dans le terminal).
+
+## Production (Vercel + API)
+
+En production, le front est sur Vercel et l’API doit tourner ailleurs (Railway, Render, etc.). Déploie l’API puis dans Vercel ajoute la variable **`VITE_API_URL`** = URL de ton API (ex. `https://ton-api.railway.app`). Redéploie le front. Voir **DEPLOYMENT.md** pour le détail.

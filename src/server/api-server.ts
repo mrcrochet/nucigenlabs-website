@@ -25,7 +25,8 @@ dotenv.config({ path: join(__dirname, '../../../.env') });
 dotenv.config(); // Also try default .env in current directory
 
 const app = express();
-const PORT = process.env.API_PORT || 3001;
+// PORT: Railway/Render inject PORT; fallback API_PORT then 3001 for local
+const PORT = process.env.PORT || process.env.API_PORT || 3001;
 
 // Initialize Supabase client for personalized collection
 const supabaseUrl = process.env.SUPABASE_URL;
