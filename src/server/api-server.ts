@@ -348,8 +348,9 @@ app.post('/live-search', async (req, res) => {
   }
 });
 
-// Deep Research endpoint - comprehensive analysis in seconds (like ChatGPT Deep Research)
-app.post('/deep-research', async (req, res) => {
+// Deep Research handler (shared by /deep-research and /api/deep-research)
+// Uses Perplexity as main engine (PERPLEXITY_API_KEY); Tavily fallback (TAVILY_API_KEY). OPENAI_API_KEY required.
+async function handleDeepResearch(req: express.Request, res: express.Response) {
   try {
     const { query, focus_areas, time_horizon, max_sources } = req.body;
 
@@ -363,7 +364,7 @@ app.post('/deep-research', async (req, res) => {
     console.log(`[API] Deep research request: "${query}"`);
 
     const { deepResearchAgent } = await import('./agents/deep-research-agent.js');
-    
+
     const result = await deepResearchAgent.conductResearch({
       query: query.trim(),
       focus_areas,
@@ -386,28 +387,32 @@ app.post('/deep-research', async (req, res) => {
     });
   } catch (error: any) {
     console.error('[API] Deep research error:', error);
-    
-    // Provide more detailed error messages
+
     let errorMessage = error.message || 'Failed to conduct research';
-    
-    // Check for common issues
+
     if (error.message?.includes('API key') || error.message?.includes('required')) {
-      errorMessage = `Configuration error: ${error.message}. Please check your .env file for OPENAI_API_KEY and TAVILY_API_KEY.`;
+      errorMessage = `Configuration: ${error.message}. Set PERPLEXITY_API_KEY (recommended) or TAVILY_API_KEY, and OPENAI_API_KEY in .env.`;
+    } else if (error.message?.includes('Perplexity')) {
+      errorMessage = `Perplexity: ${error.message}. Check PERPLEXITY_API_KEY.`;
     } else if (error.message?.includes('Tavily')) {
-      errorMessage = `Tavily API error: ${error.message}. Please check your TAVILY_API_KEY.`;
+      errorMessage = `Tavily: ${error.message}. Check TAVILY_API_KEY.`;
     } else if (error.message?.includes('OpenAI')) {
-      errorMessage = `OpenAI API error: ${error.message}. Please check your OPENAI_API_KEY.`;
+      errorMessage = `OpenAI: ${error.message}. Check OPENAI_API_KEY.`;
     } else if (error.message?.includes('Supabase')) {
-      errorMessage = `Database error: ${error.message}. Please check your Supabase configuration.`;
+      errorMessage = `Database: ${error.message}. Check Supabase configuration.`;
     }
-    
+
     res.status(500).json({
       success: false,
       error: errorMessage,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     });
   }
-});
+}
+
+// Deep Research endpoints (frontend may call /api/deep-research via proxy)
+app.post('/deep-research', handleDeepResearch);
+app.post('/api/deep-research', handleDeepResearch);
 
 // Process event endpoint - automatically process an event from events table to nucigen_events
 app.post('/process-event', async (req, res) => {
@@ -3962,10 +3967,16 @@ app.get('/api/corporate-impact/signals', async (req, res) => {
   try {
     const type = req.query.type as string; // 'all', 'opportunity', 'risk'
     const sector = req.query.sector as string;
+    const sectorsParam = req.query.sectors as string; // comma-separated industries for multi-filter
     const category = req.query.category as string; // 'geopolitics', 'finance', 'energy', 'supply-chain'
     const search = req.query.search as string; // Search by company name
     const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
     const offset = req.query.offset ? parseInt(req.query.offset as string, 10) : 0;
+    const sectorsArray = sectorsParam
+      ? sectorsParam.split(',').map((s) => s.trim()).filter(Boolean)
+      : sector && sector !== 'all'
+        ? [sector]
+        : null;
 
     if (!supabase) {
       return res.status(503).json({
@@ -4013,7 +4024,9 @@ app.get('/api/corporate-impact/signals', async (req, res) => {
     if (type && type !== 'all') {
       query = query.eq('type', type);
     }
-    if (sector && sector !== 'all') {
+    if (sectorsArray && sectorsArray.length > 0) {
+      query = query.in('company_sector', sectorsArray);
+    } else if (sector && sector !== 'all') {
       query = query.eq('company_sector', sector);
     }
     if (category && category !== 'all' && eventIdsForCategory.length > 0) {
@@ -4032,14 +4045,30 @@ app.get('/api/corporate-impact/signals', async (req, res) => {
       throw new Error(error.message);
     }
 
-    // Calculate stats and get available sectors/categories
+    // Calculate stats (global) and filtered stats when sector(s) filter is applied
     const { data: allSignals } = await supabase
       .from('market_signals')
       .select('type, company_sector, event_id')
       .eq('is_active', true);
 
-    const opportunities = allSignals?.filter((s: any) => s.type === 'opportunity').length || 0;
-    const risks = allSignals?.filter((s: any) => s.type === 'risk').length || 0;
+    let opportunities = allSignals?.filter((s: any) => s.type === 'opportunity').length || 0;
+    let risks = allSignals?.filter((s: any) => s.type === 'risk').length || 0;
+    let filteredStats: { total_signals: number; opportunities: number; risks: number } | null = null;
+    if (sectorsArray && sectorsArray.length > 0) {
+      const filtered = (allSignals || []).filter((s: any) => s.company_sector && sectorsArray.includes(s.company_sector));
+      filteredStats = {
+        total_signals: filtered.length,
+        opportunities: filtered.filter((s: any) => s.type === 'opportunity').length,
+        risks: filtered.filter((s: any) => s.type === 'risk').length,
+      };
+    } else if (sector && sector !== 'all') {
+      const filtered = (allSignals || []).filter((s: any) => s.company_sector === sector);
+      filteredStats = {
+        total_signals: filtered.length,
+        opportunities: filtered.filter((s: any) => s.type === 'opportunity').length,
+        risks: filtered.filter((s: any) => s.type === 'risk').length,
+      };
+    }
 
     // Get unique sectors
     const uniqueSectors = [...new Set((allSignals || []).map((s: any) => s.company_sector).filter(Boolean))];
@@ -4133,8 +4162,9 @@ app.get('/api/corporate-impact/signals', async (req, res) => {
           total_signals: allSignals?.length || 0,
           opportunities,
           risks,
-          avg_confidence: 'Medium-High', // Could calculate from actual data
+          avg_confidence: 'Medium-High',
         },
+        filtered_stats: filteredStats || undefined,
         available_sectors: uniqueSectors,
         available_categories: uniqueCategories,
       },
@@ -4145,6 +4175,130 @@ app.get('/api/corporate-impact/signals', async (req, res) => {
       success: false,
       error: error.message || 'Internal server error',
     });
+  }
+});
+
+// GET /api/corporate-impact/event-analysis/:eventId - Event-level causal analysis (event_impact_analyses)
+app.get('/api/corporate-impact/event-analysis/:eventId', async (req, res) => {
+  try {
+    const eventId = req.params.eventId as string;
+    if (!eventId) {
+      return res.status(400).json({
+        success: false,
+        error: 'eventId is required',
+      });
+    }
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+    const { data, error } = await supabase
+      .from('event_impact_analyses')
+      .select('*')
+      .eq('event_id', eventId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[API] Event impact analysis error:', error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to fetch event analysis',
+      });
+    }
+    if (!data) {
+      return res.status(200).json({
+        success: true,
+        data: null,
+        message: 'No analysis yet for this event',
+      });
+    }
+    res.status(200).json({
+      success: true,
+      data: {
+        id: data.id,
+        event_id: data.event_id,
+        event_type: data.event_type,
+        event_scope: data.event_scope,
+        affected_sectors: data.affected_sectors || [],
+        causal_chain: data.causal_chain || [],
+        exposure_channels: data.exposure_channels || [],
+        impact_assessment: data.impact_assessment || {},
+        confidence_level: data.confidence_level,
+        confidence_rationale: data.confidence_rationale,
+        impact_score: data.impact_score,
+        created_at: data.created_at,
+      },
+    });
+  } catch (err: any) {
+    console.error('[API] Event impact analysis error:', err);
+    res.status(500).json({
+      success: false,
+      error: err?.message || 'Internal server error',
+    });
+  }
+});
+
+// POST /api/corporate-impact/event-analysis - Generate only event-level analysis (no signals)
+app.post('/api/corporate-impact/event-analysis', async (req, res) => {
+  try {
+    const { eventId } = req.body;
+    if (!eventId) {
+      return res.status(400).json({ success: false, error: 'eventId is required' });
+    }
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Supabase not configured' });
+    }
+    const { data: event, error: eventError } = await supabase
+      .from('events')
+      .select('id, title, published_at, description, content, region, sector, discover_category')
+      .eq('id', eventId)
+      .single();
+    if (eventError || !event) {
+      return res.status(404).json({ success: false, error: 'Event not found' });
+    }
+    const { runEventImpactAnalysis } = await import('./services/corporate-impact-engine.js');
+    const analysisId = await runEventImpactAnalysis({
+      id: event.id,
+      title: event.title,
+      published_at: event.published_at,
+      description: event.description,
+      content: event.content,
+      region: event.region,
+      sector: event.sector,
+      discover_category: event.discover_category,
+    });
+    if (!analysisId) {
+      return res.status(500).json({ success: false, error: 'Analysis generation failed (check OPENAI_API_KEY)' });
+    }
+    const { data: analysis } = await supabase
+      .from('event_impact_analyses')
+      .select('*')
+      .eq('event_id', eventId)
+      .single();
+    return res.status(200).json({
+      success: true,
+      data: analysis
+        ? {
+            id: analysis.id,
+            event_id: analysis.event_id,
+            event_type: analysis.event_type,
+            event_scope: analysis.event_scope,
+            affected_sectors: analysis.affected_sectors || [],
+            causal_chain: analysis.causal_chain || [],
+            exposure_channels: analysis.exposure_channels || [],
+            impact_assessment: analysis.impact_assessment || {},
+            confidence_level: analysis.confidence_level,
+            confidence_rationale: analysis.confidence_rationale,
+            impact_score: analysis.impact_score,
+            created_at: analysis.created_at,
+          }
+        : null,
+    });
+  } catch (err: any) {
+    console.error('[API] Event analysis generation error:', err);
+    return res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
   }
 });
 
@@ -4175,6 +4329,53 @@ app.post('/api/corporate-impact/generate', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// POST /api/corporate-impact/perplexity-query - Real-time Corporate Impact query via Perplexity
+app.post('/api/corporate-impact/perplexity-query', async (req, res) => {
+  try {
+    const { industries, query } = req.body;
+    const userQuery = typeof query === 'string' ? query.trim() : '';
+    if (!userQuery) {
+      return res.status(400).json({ success: false, error: 'query is required' });
+    }
+    const industryList = Array.isArray(industries)
+      ? industries.filter((i: unknown) => typeof i === 'string').map((i: string) => i.trim()).filter(Boolean)
+      : [];
+    const industryContext =
+      industryList.length > 0
+        ? `Focus your answer on these industries/sectors: ${industryList.join(', ')}. `
+        : '';
+
+    const { chatCompletions } = await import('./services/perplexity-service.js');
+    const response = await chatCompletions({
+      model: 'sonar-pro',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a corporate impact and geopolitical risk analyst. ${industryContext}Answer the user's question with a focus on how events affect companies, sectors, and supply chains. Cite sources. Be concise and factual. Do not give investment advice or buy/sell recommendations.`,
+        },
+        { role: 'user', content: userQuery },
+      ],
+      return_citations: true,
+      return_related_questions: true,
+    });
+
+    const content = response.choices?.[0]?.message?.content || '';
+    const citations = response.choices?.[0]?.message?.citations || response.citations || [];
+    const relatedQuestions = response.related_questions || [];
+
+    res.status(200).json({
+      success: true,
+      data: { answer: content, citations, related_questions: relatedQuestions },
+    });
+  } catch (error: any) {
+    console.error('[API] Corporate Impact Perplexity query error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Perplexity query failed (check PERPLEXITY_API_KEY)',
     });
   }
 });

@@ -1,13 +1,15 @@
 /**
  * Deep Research Agent
- * 
- * Similar to ChatGPT's Deep Research feature
- * Orchestrates multiple agents in parallel to generate comprehensive analysis in seconds
- * 
+ *
+ * Similar to ChatGPT's Deep Research feature.
+ * Uses Perplexity as the main search/synthesis engine (with Tavily fallback if PERPLEXITY_API_KEY is missing).
+ *
  * Architecture:
- * - Parallel execution of multiple research tasks
- * - Fast synthesis of results
- * - Comprehensive analysis generation
+ * - Perplexity: web search + cited answer + related_questions (primary)
+ * - OpenAI: structure synthesis (Analysis format) and optional trend/impact steps
+ * - Tavily: fallback when Perplexity is not configured
+ *
+ * Env: PERPLEXITY_API_KEY (required for Perplexity), OPENAI_API_KEY, TAVILY_API_KEY (optional fallback)
  */
 
 import type { AgentResponse } from '../../lib/agents/agent-interfaces';
@@ -35,6 +37,7 @@ let supabaseClient: ReturnType<typeof createClient> | null = null;
 
 const openaiApiKey = process.env.OPENAI_API_KEY;
 const tavilyApiKey = process.env.TAVILY_API_KEY;
+const perplexityApiKey = process.env.PERPLEXITY_API_KEY;
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -67,6 +70,8 @@ export interface DeepResearchResult {
   }>;
   processing_time_ms: number;
   agents_used: string[];
+  /** From Perplexity when used */
+  related_questions?: string[];
 }
 
 export class DeepResearchAgent {
@@ -89,24 +94,38 @@ export class DeepResearchAgent {
         };
       }
 
-      if (!openaiClient || !tavilyClient) {
+      const usePerplexity = !!perplexityApiKey;
+      const useTavily = !!tavilyClient;
+      if (!openaiClient) {
         return {
           data: null,
-          error: 'API keys not configured (OpenAI or Tavily)',
+          error: 'API keys not configured: OPENAI_API_KEY is required for synthesis.',
+          metadata: {
+            processing_time_ms: Date.now() - startTime,
+          },
+        };
+      }
+      if (!usePerplexity && !useTavily) {
+        return {
+          data: null,
+          error: 'API keys not configured: set PERPLEXITY_API_KEY (recommended) or TAVILY_API_KEY for research.',
           metadata: {
             processing_time_ms: Date.now() - startTime,
           },
         };
       }
 
-      console.log(`[DeepResearch] Starting research on: "${input.query}"`);
+      console.log(`[DeepResearch] Starting research on: "${input.query}" (engine: ${usePerplexity ? 'Perplexity' : 'Tavily'})`);
 
-      // Step 1: Parallel information collection
-      const [searchResults, relatedEvents, historicalContext] = await Promise.all([
-        this.collectInformation(input.query, input.max_sources || 10),
+      // Step 1: Parallel information collection (Perplexity primary, Tavily fallback)
+      const [collectResult, relatedEvents, historicalContext] = await Promise.all([
+        this.collectInformation(input.query, input.max_sources || 10, usePerplexity),
         this.findRelatedEvents(input.query),
-        this.getHistoricalContext(input.query),
+        this.getHistoricalContext(input.query, usePerplexity),
       ]);
+
+      const searchResults = collectResult.searchResults;
+      const related_questions = collectResult.related_questions;
 
       agentsUsed.push('InformationCollector', 'EventFinder', 'HistoricalContext');
 
@@ -136,9 +155,20 @@ export class DeepResearchAgent {
       const processingTime = Date.now() - startTime;
       console.log(`[DeepResearch] Research completed in ${processingTime}ms`);
 
+      // Attach Perplexity sources and related_questions to analysis for UI
+      const analysisWithMeta: Analysis = {
+        ...analysis,
+        ...(related_questions?.length ? { related_questions } : {}),
+        ...(searchResults.length ? {
+          sources: searchResults
+            .filter((r) => r.url)
+            .map((r) => ({ title: r.title || new URL(r.url).hostname, url: r.url })),
+        } : {}),
+      };
+
       return {
         data: {
-          analysis,
+          analysis: analysisWithMeta,
           events: eventExtraction,
           sources: searchResults.map((r, idx) => ({
             title: r.title || `Source ${idx + 1}`,
@@ -147,6 +177,7 @@ export class DeepResearchAgent {
           })),
           processing_time_ms: processingTime,
           agents_used: agentsUsed,
+          ...(related_questions?.length ? { related_questions } : {}),
         },
         metadata: {
           processing_time_ms: processingTime,
@@ -166,26 +197,102 @@ export class DeepResearchAgent {
   }
 
   /**
-   * Collect information from multiple sources in parallel
+   * Collect information: Perplexity (primary) or Tavily (fallback).
+   * Returns searchResults array + optional related_questions from Perplexity.
    */
-  private async collectInformation(query: string, maxSources: number) {
+  private async collectInformation(
+    query: string,
+    maxSources: number,
+    usePerplexity: boolean
+  ): Promise<{ searchResults: Array<{ title: string; url: string; content: string; relevance: number; published_at?: string }>; related_questions?: string[] }> {
+    if (usePerplexity && perplexityApiKey) {
+      try {
+        const { chatCompletions } = await import('../services/perplexity-service.js');
+        const response = await chatCompletions({
+          model: 'sonar-pro',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a research analyst. Provide a comprehensive, factual analysis with clear key trends and implications. Cite sources. Focus on recent and reliable information.',
+            },
+            {
+              role: 'user',
+              content: `Conduct comprehensive research on: ${query}. Include: 1) Executive summary (3-5 sentences), 2) Key trends (3-5), 3) Implications (3-5). Be factual and analytical.`,
+            },
+          ],
+          max_tokens: 2000,
+          temperature: 0.2,
+          return_citations: true,
+          return_related_questions: true,
+        });
+
+        const content = response.choices?.[0]?.message?.content || '';
+        const citations: string[] = response.choices?.[0]?.message?.citations
+          || response.citations
+          || [];
+        const related_questions = response.related_questions || [];
+
+        const searchResults: Array<{ title: string; url: string; content: string; relevance: number; published_at?: string }> = [
+          { title: 'Perplexity Research', url: '', content, relevance: 1, published_at: new Date().toISOString() },
+        ];
+        const seen = new Set<string>();
+        for (const url of citations.slice(0, maxSources - 1)) {
+          if (!url || seen.has(url)) continue;
+          seen.add(url);
+          try {
+            searchResults.push({
+              title: new URL(url).hostname,
+              url,
+              content: '',
+              relevance: 0.5,
+            });
+          } catch {
+            searchResults.push({ title: url.slice(0, 50), url, content: '', relevance: 0.5 });
+          }
+        }
+
+        return { searchResults, related_questions };
+      } catch (err: any) {
+        console.warn('[DeepResearch] Perplexity collect failed, falling back to Tavily:', err?.message);
+        if (tavilyClient) {
+          return this.collectInformationTavily(query, maxSources);
+        }
+        throw new Error(err?.message || 'Perplexity research failed');
+      }
+    }
+
+    if (tavilyClient) {
+      return this.collectInformationTavily(query, maxSources);
+    }
+
+    throw new Error('No search engine configured (PERPLEXITY_API_KEY or TAVILY_API_KEY)');
+  }
+
+  /**
+   * Tavily-based collection (fallback when Perplexity unavailable or errors).
+   */
+  private async collectInformationTavily(
+    query: string,
+    maxSources: number
+  ): Promise<{ searchResults: Array<{ title: string; url: string; content: string; relevance: number; published_at?: string }>; related_questions?: string[] }> {
     if (!tavilyClient) throw new Error('Tavily client not initialized');
 
-    // Use Tavily to search for relevant information
     const searchResults = await tavilyClient.search(query, {
       maxResults: maxSources,
-      searchDepth: 'advanced', // Deep search mode
+      searchDepth: 'advanced',
       includeAnswer: true,
       includeRawContent: true,
     });
 
-    return (searchResults.results || []).map((result: any) => ({
+    const results = (searchResults.results || []).map((result: any) => ({
       title: result.title,
       url: result.url,
       content: result.content,
       relevance: result.score || 0.5,
       published_at: result.published_date || new Date().toISOString(),
     }));
+
+    return { searchResults: results };
   }
 
   /**
@@ -232,13 +339,32 @@ export class DeepResearchAgent {
   }
 
   /**
-   * Get historical context for the query
+   * Get historical context: Perplexity (primary) or Tavily + OpenAI (fallback).
    */
-  private async getHistoricalContext(query: string): Promise<string> {
+  private async getHistoricalContext(query: string, usePerplexity: boolean): Promise<string> {
+    if (usePerplexity && perplexityApiKey) {
+      try {
+        const { chatCompletions } = await import('../services/perplexity-service.js');
+        const response = await chatCompletions({
+          model: 'sonar',
+          messages: [
+            {
+              role: 'user',
+              content: `Brief historical context and background (2-4 sentences) for: ${query}. Be concise.`,
+            },
+          ],
+          max_tokens: 300,
+          temperature: 0.2,
+        });
+        return response.choices?.[0]?.message?.content?.trim() || '';
+      } catch (err) {
+        console.warn('[DeepResearch] Perplexity historical context failed:', (err as Error)?.message);
+      }
+    }
+
     if (!tavilyClient || !openaiClient) return '';
 
     try {
-      // Search for historical information
       const historicalQuery = `historical context background ${query}`;
       const searchResults = await tavilyClient.search(historicalQuery, {
         maxResults: 5,
@@ -252,7 +378,6 @@ export class DeepResearchAgent {
         .join('\n\n')
         .substring(0, 5000);
 
-      // Summarize historical context
       const completion = await openaiClient.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [

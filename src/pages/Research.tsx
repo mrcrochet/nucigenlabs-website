@@ -128,13 +128,12 @@ function ResearchContent() {
     setIsDeepResearching(true);
     setDeepResearchError('');
     setDeepResearchResult(null);
-    setDeepResearchProgress('Collecting sources...');
+    setDeepResearchProgress('Searching with Perplexity…');
 
     try {
-      // Simulate progress updates
-      setTimeout(() => setDeepResearchProgress('Analyzing information...'), 2000);
-      setTimeout(() => setDeepResearchProgress('Synthesizing analysis...'), 4000);
-      
+      setTimeout(() => setDeepResearchProgress('Analyzing information…'), 2000);
+      setTimeout(() => setDeepResearchProgress('Synthesizing analysis…'), 4000);
+
       const apiUrl = '/api/deep-research';
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -273,7 +272,7 @@ function ResearchContent() {
                   <h3 className="text-lg font-light text-white">Deep Research</h3>
                 </div>
                 <p className="text-sm text-slate-400 font-light">
-                  Get comprehensive analysis in seconds. Our AI agents work in parallel to collect, analyze, and synthesize information from multiple sources.
+                  Get comprehensive analysis in seconds. Powered by Perplexity for web search and citations, with synthesis tailored to your focus and time horizon.
                 </p>
               </div>
               
@@ -301,7 +300,7 @@ function ResearchContent() {
                     {isDeepResearching ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>{deepResearchProgress || 'Researching...'}</span>
+                        <span>{deepResearchProgress || 'Searching with Perplexity…'}</span>
                       </>
                     ) : (
                       <>
@@ -430,6 +429,62 @@ function ResearchContent() {
                             </li>
                           ))}
                         </ul>
+                      </div>
+                    )}
+
+                    {analysis.sources && analysis.sources.length > 0 && (
+                      <div className="mb-6">
+                        <h3 className="text-sm font-light text-slate-400 mb-3 uppercase tracking-wide">
+                          Perplexity Research · Sources
+                        </h3>
+                        <ul className="space-y-2">
+                          {analysis.sources.map((src, idx) => (
+                            <li key={idx} className="flex items-center gap-2 text-sm">
+                              {src.url ? (
+                                <a
+                                  href={src.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-purple-400 hover:text-purple-300 font-light flex items-center gap-1.5"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5 flex-shrink-0" />
+                                  <span className="truncate">{src.title || src.url}</span>
+                                </a>
+                              ) : (
+                                <span className="text-slate-500 font-light">{src.title}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {analysis.related_questions && analysis.related_questions.length > 0 && (
+                      <div className="mb-6">
+                        <h3 className="text-sm font-light text-slate-400 mb-3 uppercase tracking-wide">
+                          Related questions
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                          {analysis.related_questions.map((q, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                setDeepResearchQuery(q);
+                                setTimeout(() => {
+                                  const input = document.querySelector('input[type="text"]') as HTMLInputElement;
+                                  if (input) {
+                                    input.focus();
+                                    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  }
+                                }, 100);
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-slate-300 hover:bg-purple-500/20 hover:border-purple-500/30 text-sm font-light transition-colors"
+                            >
+                              {q}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
 

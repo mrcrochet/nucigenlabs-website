@@ -151,6 +151,9 @@ export interface Analysis extends IntelligenceObject {
   // Optional: long-form content
   full_analysis?: string;
   pdf_url?: string;
+  // Optional: Perplexity Research sources and follow-up suggestions
+  sources?: Array<{ title: string; url: string }>;
+  related_questions?: string[];
 }
 
 // ============================================

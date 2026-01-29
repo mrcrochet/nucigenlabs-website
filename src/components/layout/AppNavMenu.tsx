@@ -23,14 +23,14 @@ import {
   Search
 } from 'lucide-react';
 
-// Core navigation: 5 pillars + Search
+// Core navigation: Overview first, then Search, Signals, rest
 const navItems = [
   { path: '/overview', label: 'Overview', icon: LayoutDashboard },
-  { path: '/signals', label: 'Signals', icon: TrendingUp },
+  { path: '/search', label: 'Search', icon: Search },
+  { path: '/signals', label: 'Corporate Impact', icon: TrendingUp },
   { path: '/events', label: 'Events', icon: Calendar },
   { path: '/scenarios', label: 'Scenarios', icon: Target },
   { path: '/alerts', label: 'Alerts', icon: Bell },
-  { path: '/search', label: 'Search', icon: Search },
 ];
 
 interface AppNavMenuProps {

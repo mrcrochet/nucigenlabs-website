@@ -41,6 +41,7 @@ interface Event {
   title: string;
   description?: string;
   summary?: string;
+  content?: string;
   discover_tier?: string;
   discover_category?: string;
   sector?: string;
@@ -88,16 +89,18 @@ interface MarketSignalData {
 }
 
 /**
- * Get recent geopolitical/regulatory events
+ * Get recent events for Corporate Impact (real data).
+ * Wide criteria: all tiers, geopolitics/finance/energy/supply-chain or uncategorized, last 30 days.
  */
-async function getRelevantEvents(limit: number = 10): Promise<Event[]> {
+async function getRelevantEvents(limit: number = 20): Promise<Event[]> {
   try {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
     const { data, error } = await supabase
       .from('events')
-      .select('id, title, description, content, discover_tier, discover_category, published_at')
-      .or('discover_tier.eq.critical,discover_tier.eq.strategic')
-      .in('discover_category', ['geopolitics', 'finance', 'energy', 'supply-chain'])
-      .gte('published_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+      .select('id, title, description, content, discover_tier, discover_category, published_at, region, sector')
+      .gte('published_at', since)
+      .not('title', 'is', null)
       .order('published_at', { ascending: false })
       .limit(limit);
 
@@ -106,9 +109,91 @@ async function getRelevantEvents(limit: number = 10): Promise<Event[]> {
       return [];
     }
 
-    return (data || []) as Event[];
+    const rows = (data || []) as Event[];
+    if (rows.length > 0) {
+      const withCategory = rows.filter(
+        (e) => e.discover_category && ['geopolitics', 'finance', 'energy', 'supply-chain'].includes(e.discover_category)
+      );
+      const withoutCategory = rows.filter(
+        (e) => !e.discover_category || !['geopolitics', 'finance', 'energy', 'supply-chain'].includes(e.discover_category)
+      );
+      return [...withCategory, ...withoutCategory].slice(0, limit);
+    }
+    // Fallback: sync from nucigen_events so Corporate Impact can run with real data
+    console.log('[Corporate Impact] No events in events table, syncing from nucigen_events...');
+    return getOrSyncEventsFromNucigenEvents(limit);
   } catch (error: any) {
     console.error('[Corporate Impact] Error in getRelevantEvents:', error.message);
+    return [];
+  }
+}
+
+const NUCIGEN_SYNC_SOURCE = 'nucigen_sync';
+
+/** When events table is empty, sync recent nucigen_events into events so the worker can process them. */
+async function getOrSyncEventsFromNucigenEvents(limit: number): Promise<Event[]> {
+  try {
+    const { data: neList, error: fetchError } = await supabase
+      .from('nucigen_events')
+      .select('id, summary, sector, region, created_at, why_it_matters')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (fetchError || !neList || neList.length === 0) {
+      console.warn('[Corporate Impact] No nucigen_events found:', fetchError?.message);
+      return [];
+    }
+
+    const syncedIds: string[] = [];
+    for (const ne of neList as Array<{ id: string; summary: string; sector?: string; region?: string; created_at: string; why_it_matters?: string }>) {
+      const { data: existing } = await supabase
+        .from('events')
+        .select('id')
+        .eq('source', NUCIGEN_SYNC_SOURCE)
+        .eq('source_id', ne.id)
+        .maybeSingle();
+
+      if (existing) {
+        syncedIds.push(ne.id);
+        continue;
+      }
+
+      const title = (ne.summary || '').slice(0, 500) || 'Event';
+      const description = (ne.why_it_matters || ne.summary || '').slice(0, 2000);
+      const { error: insertError } = await supabase.from('events').insert({
+        source: NUCIGEN_SYNC_SOURCE,
+        source_id: ne.id,
+        title,
+        description: description || title,
+        content: description || title,
+        published_at: ne.created_at || new Date().toISOString(),
+        status: 'pending',
+        region: ne.region || null,
+        sector: ne.sector || null,
+      } as Record<string, unknown>);
+
+      if (insertError) {
+        console.warn('[Corporate Impact] Sync insert failed for nucigen_event', ne.id, insertError.message);
+      } else {
+        syncedIds.push(ne.id);
+      }
+    }
+
+    if (syncedIds.length === 0) return [];
+
+    const { data: events, error: selectError } = await supabase
+      .from('events')
+      .select('id, title, description, content, discover_tier, discover_category, published_at, region, sector')
+      .eq('source', NUCIGEN_SYNC_SOURCE)
+      .in('source_id', syncedIds)
+      .order('published_at', { ascending: false })
+      .limit(limit);
+
+    if (selectError || !events) return [];
+    console.log('[Corporate Impact] Synced', events.length, 'events from nucigen_events');
+    return events as Event[];
+  } catch (err: any) {
+    console.error('[Corporate Impact] getOrSyncEventsFromNucigenEvents error:', err?.message);
     return [];
   }
 }
@@ -343,6 +428,23 @@ export async function generateMarketSignalsFromEvent(eventId: string): Promise<n
       return 0;
     }
 
+    // STEP: Run Corporate Impact Engine (event-level analysis → event_impact_analyses)
+    try {
+      const { runEventImpactAnalysis } = await import('../services/corporate-impact-engine.js');
+      await runEventImpactAnalysis({
+        id: event.id,
+        title: event.title,
+        published_at: event.published_at,
+        description: event.description,
+        content: event.content,
+        region: event.region,
+        sector: event.sector,
+        discover_category: event.discover_category,
+      });
+    } catch (engineErr: any) {
+      console.warn('[Corporate Impact] Engine analysis failed (non-blocking):', engineErr?.message);
+    }
+
     // STEP: Analyze trade impact with Comtrade (if applicable)
     let tradeImpactData = null;
     try {
@@ -536,7 +638,7 @@ export async function generateMarketSignalsFromEvent(eventId: string): Promise<n
 /**
  * Main worker function - processes recent events and generates signals
  */
-export async function processCorporateImpactSignals(limit: number = 5): Promise<{
+export async function processCorporateImpactSignals(limit: number = 20): Promise<{
   eventsProcessed: number;
   signalsGenerated: number;
   errors: number;
@@ -555,6 +657,23 @@ export async function processCorporateImpactSignals(limit: number = 5): Promise<
     // Process each event
     for (const event of events) {
       try {
+        // Always ensure event-level analysis exists (event_impact_analyses) so Deep Dive works
+        try {
+          const { runEventImpactAnalysis } = await import('../services/corporate-impact-engine.js');
+          await runEventImpactAnalysis({
+            id: event.id,
+            title: event.title,
+            published_at: event.published_at,
+            description: event.description,
+            content: event.content,
+            region: event.region,
+            sector: event.sector,
+            discover_category: event.discover_category,
+          });
+        } catch (engineErr: any) {
+          console.warn('[Corporate Impact] Engine analysis failed (non-blocking):', engineErr?.message);
+        }
+
         // Check if signals already exist for this event
         const { data: existing } = await supabase
           .from('market_signals')
@@ -564,7 +683,7 @@ export async function processCorporateImpactSignals(limit: number = 5): Promise<
           .limit(1);
 
         if (existing && existing.length > 0) {
-          console.log(`[Corporate Impact] Signals already exist for event ${event.id}, skipping`);
+          console.log(`[Corporate Impact] Signals already exist for event ${event.id}, skipping signal generation`);
           continue;
         }
 

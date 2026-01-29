@@ -26,6 +26,7 @@ import type { MarketSignal } from '../../types/corporate-impact';
 import ConfidenceBreakdown from './ConfidenceBreakdown';
 import ComparableEventsModal from './ComparableEventsModal';
 import ExposureBreakdownModal from './ExposureBreakdownModal';
+import EventImpactAnalysisSection from './EventImpactAnalysisSection';
 
 // Helper component for expandable evidence source sections
 function EvidenceSourceSection({ 
@@ -458,6 +459,11 @@ export default function SignalCard({ signal }: SignalCardProps) {
                   })}
                 </ul>
               </div>
+
+              {/* Event-level causal analysis (event_impact_analyses) */}
+              {signal.catalyst_event.event_id && (
+                <EventImpactAnalysisSection eventId={signal.catalyst_event.event_id} />
+              )}
 
               {/* Trade Impact Section */}
               {signal.trade_impact && (

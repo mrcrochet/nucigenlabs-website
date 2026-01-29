@@ -1,20 +1,22 @@
 /**
  * Corporate Impact Filters
- * 
- * Filter controls for Corporate Impact page
- * Includes: Type filter, Sector filter, Category filter, and Search
+ *
+ * Filter controls: Type, Industries (multi-select), Sector (single), Category, Search.
  */
 
-import { Filter, Search, X } from 'lucide-react';
+import { Filter, Search, X, ChevronDown, Building2 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import { mergeIndustries } from '../../constants/industries';
 
 interface CorporateImpactFiltersProps {
   selectedFilter: 'all' | 'opportunity' | 'risk';
   selectedSector: string;
+  selectedSectors?: string[];
   selectedCategory: string;
   searchQuery: string;
   onFilterChange: (filter: 'all' | 'opportunity' | 'risk') => void;
   onSectorChange: (sector: string) => void;
+  onSectorsChange?: (sectors: string[]) => void;
   onCategoryChange: (category: string) => void;
   onSearchChange: (search: string) => void;
   opportunitiesCount: number;
@@ -27,10 +29,12 @@ interface CorporateImpactFiltersProps {
 export default function CorporateImpactFilters({
   selectedFilter,
   selectedSector,
+  selectedSectors = [],
   selectedCategory,
   searchQuery,
   onFilterChange,
   onSectorChange,
+  onSectorsChange,
   onCategoryChange,
   onSearchChange,
   opportunitiesCount,
@@ -40,8 +44,26 @@ export default function CorporateImpactFilters({
   availableCategories = [],
 }: CorporateImpactFiltersProps) {
   const [showSearch, setShowSearch] = useState(false);
-  const [headerHeight, setHeaderHeight] = useState(244); // Default: TopNav (64) + Header (~180)
+  const [showIndustryDropdown, setShowIndustryDropdown] = useState(false);
+  const [industrySearch, setIndustrySearch] = useState('');
+  const [headerHeight, setHeaderHeight] = useState(244);
   const headerRef = useRef<HTMLDivElement>(null);
+  const industryDropdownRef = useRef<HTMLDivElement>(null);
+
+  const industries = mergeIndustries(availableSectors);
+  const filteredIndustries = industrySearch.trim()
+    ? industries.filter((i) => i.toLowerCase().includes(industrySearch.toLowerCase()))
+    : industries;
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (industryDropdownRef.current && !industryDropdownRef.current.contains(e.target as Node)) {
+        setShowIndustryDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Calculate header height dynamically
   useEffect(() => {
@@ -60,8 +82,7 @@ export default function CorporateImpactFilters({
     return () => window.removeEventListener('resize', calculateHeaderHeight);
   }, []);
 
-  // Use available sectors from API, fallback to defaults
-  const sectors = availableSectors.length > 0 
+  const sectors = availableSectors.length > 0
     ? ['All Sectors', ...availableSectors]
     : ['All Sectors', 'Technology', 'Energy', 'Materials', 'Renewable Energy', 'Software', 'Finance', 'Healthcare', 'Industrial'];
 
@@ -127,7 +148,62 @@ export default function CorporateImpactFilters({
             </button>
           </div>
 
-          {/* Sector Filter */}
+          {/* Industries multi-select */}
+          {onSectorsChange && (
+            <div className="relative min-w-[180px]" ref={industryDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setShowIndustryDropdown(!showIndustryDropdown)}
+                className="inline-flex items-center gap-2 px-4 py-2 backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 w-full justify-between"
+              >
+                <Building2 className="w-4 h-4 text-slate-400" />
+                <span className="truncate">
+                  {selectedSectors.length === 0 ? 'Toutes industries' : `${selectedSectors.length} industrie(s)`}
+                </span>
+                <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${showIndustryDropdown ? 'rotate-180' : ''}`} />
+              </button>
+              {showIndustryDropdown && (
+                <div className="absolute left-0 right-0 top-full mt-1 py-2 backdrop-blur-xl bg-[#0A0A0A] border border-white/[0.15] rounded-lg shadow-xl z-50 max-h-[280px] flex flex-col">
+                  <div className="px-2 pb-2 border-b border-white/[0.08]">
+                    <input
+                      type="text"
+                      value={industrySearch}
+                      onChange={(e) => setIndustrySearch(e.target.value)}
+                      placeholder="Rechercher une industrie..."
+                      className="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.1] text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50"
+                    />
+                  </div>
+                  <div className="overflow-y-auto max-h-[220px] px-2 pt-2">
+                    {filteredIndustries.map((ind) => {
+                      const isSelected = selectedSectors.includes(ind);
+                      return (
+                        <button
+                          key={ind}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              onSectorsChange(selectedSectors.filter((s) => s !== ind));
+                            } else {
+                              onSectorsChange([...selectedSectors, ind]);
+                            }
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all ${
+                            isSelected
+                              ? 'bg-[#E1463E]/20 text-[#E1463E]'
+                              : 'text-slate-300 hover:bg-white/[0.06]'
+                          }`}
+                        >
+                          {ind}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Sector Filter (single, quick) */}
           <select
             value={selectedSector}
             onChange={(e) => onSectorChange(e.target.value)}
@@ -170,6 +246,28 @@ export default function CorporateImpactFilters({
             <Search className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Selected industries chips */}
+        {onSectorsChange && selectedSectors.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {selectedSectors.map((ind) => (
+              <span
+                key={ind}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#E1463E]/15 border border-[#E1463E]/30 text-[#E1463E] text-xs font-medium"
+              >
+                {ind}
+                <button
+                  type="button"
+                  onClick={() => onSectorsChange(selectedSectors.filter((s) => s !== ind))}
+                  className="hover:bg-[#E1463E]/20 rounded p-0.5"
+                  aria-label={`Remove ${ind}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Search Bar */}
         {showSearch && (

@@ -21,6 +21,7 @@ import {
   getOrCreateSupabaseUserId
 } from '../lib/supabase';
 import { getSignalsViaAgent } from '../lib/api/signal-api';
+import { safeFetchJson } from '../lib/safe-fetch-json';
 import type { Signal } from '../types/intelligence';
 import type { MarketSignal, MarketSignalStats } from '../types/corporate-impact';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -30,7 +31,7 @@ import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SectionHeader from '../components/ui/SectionHeader';
 import SkeletonSignal from '../components/ui/SkeletonSignal';
-import { Search, MapPin, TrendingUp, Clock, Sparkles, ArrowRight, BarChart3, Activity, Building2, Table2, List } from 'lucide-react';
+import { Search, MapPin, TrendingUp, Clock, Sparkles, ArrowRight, BarChart3, Activity, Building2, Table2, List, Loader2 } from 'lucide-react';
 import SignalFilters from '../components/signals/SignalFilters';
 import SignalsTable from '../components/signals/SignalsTable';
 import SignalPreviewDrawer from '../components/signals/SignalPreviewDrawer';
@@ -38,6 +39,8 @@ import CorporateImpactHeader from '../components/corporate-impact/CorporateImpac
 import CorporateImpactFilters from '../components/corporate-impact/CorporateImpactFilters';
 import SignalCard from '../components/corporate-impact/SignalCard';
 import EmptyState from '../components/corporate-impact/EmptyState';
+import CorporateImpactReportCard from '../components/corporate-impact/CorporateImpactReportCard';
+import CorporateImpactPerplexityQuery from '../components/corporate-impact/CorporateImpactPerplexityQuery';
 import WatchlistButton from '../components/watchlist/WatchlistButton';
 import { AlertTriangle, Info } from 'lucide-react';
 
@@ -67,14 +70,17 @@ function SignalsPageContent() {
     risks: 0,
     avg_confidence: 'Medium-High',
   });
+  const [filteredStats, setFilteredStats] = useState<{ total_signals: number; opportunities: number; risks: number } | null>(null);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'opportunity' | 'risk'>('all');
   const [selectedSector, setSelectedSector] = useState('all');
+  const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [companySearchQuery, setCompanySearchQuery] = useState('');
   const [availableSectors, setAvailableSectors] = useState<string[]>([]);
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [companyLoading, setCompanyLoading] = useState(true);
   const [companyError, setCompanyError] = useState<string | null>(null);
+  const [isTriggeringGeneration, setIsTriggeringGeneration] = useState(false);
   
   // Table view state (SignalsFeed)
   const [tableSignals, setTableSignals] = useState<Signal[]>([]);
@@ -162,21 +168,34 @@ function SignalsPageContent() {
       setCompanyLoading(true);
       const params = new URLSearchParams();
       if (selectedFilter !== 'all') params.append('type', selectedFilter);
-      if (selectedSector !== 'all') params.append('sector', selectedSector);
+      if (selectedSectors.length > 0) {
+        params.append('sectors', selectedSectors.join(','));
+      } else if (selectedSector !== 'all') {
+        params.append('sector', selectedSector);
+      }
       if (selectedCategory !== 'all') params.append('category', selectedCategory);
       if (companySearchQuery) params.append('search', companySearchQuery);
       params.append('limit', '50');
 
-      const response = await fetch(`/api/corporate-impact/signals?${params.toString()}`);
-      
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
+      const data = await safeFetchJson<{
+        success: boolean;
+        error?: string;
+        data?: {
+          signals?: MarketSignal[];
+          stats?: MarketSignalStats;
+          filtered_stats?: { total_signals: number; opportunities: number; risks: number };
+          available_sectors?: string[];
+          available_categories?: string[];
+        };
+      }>(`/api/corporate-impact/signals?${params.toString()}`);
 
-      const data = await response.json();
-      if (data.success && data.data) {
+      if (!data.success) {
+        throw new Error(data.error || 'API error');
+      }
+      if (data.data) {
         setCompanySignals(data.data.signals || []);
         if (data.data.stats) setCompanyStats(data.data.stats);
+        setFilteredStats(data.data.filtered_stats ?? null);
         if (data.data.available_sectors) setAvailableSectors(data.data.available_sectors);
         if (data.data.available_categories) setAvailableCategories(data.data.available_categories);
       }
@@ -236,7 +255,7 @@ function SignalsPageContent() {
     } else if (viewMode === 'table') {
       loadTableSignals();
     }
-  }, [viewMode, fetchGeneralSignals, selectedFilter, selectedSector, selectedCategory, companySearchQuery, tableFilters]);
+  }, [viewMode, fetchGeneralSignals, selectedFilter, selectedSector, selectedSectors, selectedCategory, companySearchQuery, tableFilters]);
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -287,8 +306,8 @@ function SignalsPageContent() {
   return (
     <AppShell>
       <SEO 
-        title="Signals — Nucigen"
-        description="Intelligence signals: what changed and what to do"
+        title="Corporate Impact — Nucigen"
+        description="Corporate impact: what changed and what to do"
       />
 
       <div className="col-span-1 sm:col-span-12">
@@ -296,7 +315,7 @@ function SignalsPageContent() {
         <header className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <SectionHeader
-              title="Signals"
+              title="Corporate Impact"
               subtitle="What changed and what to do"
             />
           </div>
@@ -472,10 +491,12 @@ function SignalsPageContent() {
             <CorporateImpactFilters
               selectedFilter={selectedFilter}
               selectedSector={selectedSector}
+              selectedSectors={selectedSectors}
               selectedCategory={selectedCategory}
               searchQuery={companySearchQuery}
               onFilterChange={setSelectedFilter}
               onSectorChange={setSelectedSector}
+              onSectorsChange={setSelectedSectors}
               onCategoryChange={setSelectedCategory}
               onSearchChange={setCompanySearchQuery}
               opportunitiesCount={companyStats.opportunities}
@@ -484,6 +505,18 @@ function SignalsPageContent() {
               availableSectors={availableSectors}
               availableCategories={availableCategories}
             />
+            {selectedSectors.length > 0 && (
+              <CorporateImpactReportCard
+                industries={selectedSectors}
+                totalSignals={filteredStats?.total_signals ?? companyStats.total_signals}
+                opportunities={filteredStats?.opportunities ?? companyStats.opportunities}
+                risks={filteredStats?.risks ?? companyStats.risks}
+                topCompanies={[...new Set(companySignals.map((s) => s.company?.name).filter(Boolean))] as string[]}
+              />
+            )}
+            <div className="mb-6">
+              <CorporateImpactPerplexityQuery industries={selectedSectors} />
+            </div>
             {companyLoading ? (
               <div className="text-center py-12">
                 <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
@@ -498,7 +531,54 @@ function SignalsPageContent() {
                 </div>
               </div>
             ) : companySignals.length === 0 ? (
-              <EmptyState />
+              <div className="space-y-6">
+                <EmptyState />
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setIsTriggeringGeneration(true);
+                      setCompanyError(null);
+                      try {
+                        const json = await safeFetchJson<{ success: boolean; result?: unknown; error?: string }>(
+                          '/api/corporate-impact/trigger',
+                          {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ limit: 20 }),
+                          }
+                        );
+                        if (json.success && json.result) {
+                          await loadCompanySignals();
+                        } else {
+                          setCompanyError(json.error || 'Generation failed');
+                        }
+                      } catch (e: any) {
+                        setCompanyError(e?.message || 'Request failed');
+                      } finally {
+                        setIsTriggeringGeneration(false);
+                      }
+                    }}
+                    disabled={isTriggeringGeneration}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 disabled:opacity-50 text-white rounded-lg text-sm font-light transition-all"
+                  >
+                    {isTriggeringGeneration ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Generating from recent events…
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        Generate from recent events
+                      </>
+                    )}
+                  </button>
+                  <p className="text-xs text-slate-500 mt-3">
+                    Runs analysis on the latest events (last 30 days) and creates company impact signals.
+                  </p>
+                </div>
+              </div>
             ) : (
               <div className="space-y-6">
                 {companySignals.map((signal) => (
