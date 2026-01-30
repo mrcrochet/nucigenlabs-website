@@ -1435,6 +1435,74 @@ app.get('/api/events/:id/context', async (req, res) => {
   }
 });
 
+// GET /api/events/:eventId/predictions - Get or generate scenario prediction for an event
+app.get('/api/events/:eventId/predictions', async (req, res) => {
+  try {
+    const eventId = req.params.eventId as string;
+    const tier = (req.query.tier as string) || 'standard';
+    if (!eventId) {
+      return res.status(400).json({ success: false, error: 'eventId is required' });
+    }
+    const { generatePrediction } = await import('./services/prediction-engine.js');
+    const tierVal = tier === 'fast' || tier === 'deep' ? tier : 'standard';
+    const result = await generatePrediction({ event_id: eventId, tier: tierVal });
+    if (!result.success) {
+      const status = result.error?.includes('not found') ? 404 : 500;
+      return res.status(status).json({
+        success: false,
+        error: result.error || 'Failed to load prediction',
+      });
+    }
+    return res.json({
+      success: true,
+      prediction: result.prediction,
+      from_cache: result.from_cache || false,
+    });
+  } catch (error: any) {
+    console.error('[API] Event predictions GET error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// POST /api/events/:eventId/predictions - Force refresh scenario prediction
+app.post('/api/events/:eventId/predictions', async (req, res) => {
+  try {
+    const eventId = req.params.eventId as string;
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const tier = (body.tier as string) || (req.query.tier as string) || 'standard';
+    if (!eventId) {
+      return res.status(400).json({ success: false, error: 'eventId is required' });
+    }
+    const { generatePrediction } = await import('./services/prediction-engine.js');
+    const result = await generatePrediction({
+      event_id: eventId,
+      tier: tier as 'fast' | 'standard' | 'deep',
+      force_refresh: true,
+    });
+    if (!result.success) {
+      const status = result.error?.includes('not found') ? 404 : 500;
+      return res.status(status).json({
+        success: false,
+        error: result.error || 'Failed to generate prediction',
+      });
+    }
+    return res.json({
+      success: true,
+      prediction: result.prediction,
+      from_cache: false,
+    });
+  } catch (error: any) {
+    console.error('[API] Event predictions POST error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
 // ============================================
 // Optional Endpoints - Signals
 // ============================================

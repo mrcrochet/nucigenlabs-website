@@ -32,11 +32,10 @@ export async function getSignalsViaAgent(
   options: SignalApiOptions = {}
 ): Promise<Signal[]> {
   try {
-    // Use Vite proxy in dev, direct API in production
-    const API_BASE = import.meta.env.DEV ? '/api' : 'http://localhost:3001';
-    
-    // Call API endpoint (agent runs on server)
-    const response = await fetch(`${API_BASE}/api/signals`, {
+    const { apiUrl } = await import('../api-base');
+    const url = apiUrl('/api/signals');
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

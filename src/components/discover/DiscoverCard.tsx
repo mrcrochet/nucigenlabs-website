@@ -372,8 +372,8 @@ export default function DiscoverCard({ item, onSave, onView, onShare, initialSav
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* View Predictions Button (only for topic/event type items) */}
-          {(item.type === 'topic' || item.type === 'trend') && (
+          {/* View Predictions Button (only for topic/trend items that are events in DB, i.e. UUID id) */}
+          {(item.type === 'topic' || item.type === 'trend') && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.id) && (
             <button
               onClick={(e) => {
                 e.stopPropagation();

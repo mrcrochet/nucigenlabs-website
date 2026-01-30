@@ -29,7 +29,7 @@ import SkeletonCard from '../components/ui/SkeletonCard';
 import SkeletonSignal from '../components/ui/SkeletonSignal';
 import TransitionWrapper from '../components/ui/TransitionWrapper';
 import { cachedFetch, cacheKeys } from '../utils/cache-client';
-import { Search, MapPin, Building2, TrendingUp, Clock, Sparkles, ArrowRight, Filter, BarChart3, Activity } from 'lucide-react';
+import { Search, MapPin, Building2, TrendingUp, Clock, Sparkles, ArrowRight, Filter, BarChart3, Activity, Loader2, RotateCw } from 'lucide-react';
 
 function IntelligenceFeedContent() {
   const { user, isLoaded: userLoaded } = useUser();
@@ -47,6 +47,7 @@ function IntelligenceFeedContent() {
   const [showFilters, setShowFilters] = useState(false);
   const [minImpact, setMinImpact] = useState(0);
   const [minConfidence, setMinConfidence] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Debounce search query
   useEffect(() => {
@@ -295,21 +296,21 @@ function IntelligenceFeedContent() {
         <div className="col-span-1 sm:col-span-12 flex items-center justify-center min-h-[400px]">
           <div className="max-w-2xl w-full text-center">
             <div className="mb-6 p-6 bg-red-500/10 border border-red-500/20 rounded-xl">
-              <p className="text-base text-red-400 font-light mb-2">Unable to load signals</p>
+              <p className="text-base text-red-400 font-light mb-2">Impossible de charger les signaux</p>
               <p className="text-sm text-slate-400 font-light">{error}</p>
             </div>
             <div className="flex gap-4 justify-center">
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => { setError(''); fetchSignals(); }}
                 className="px-6 py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white rounded-lg transition-colors text-sm font-light"
               >
-                Retry
+                Réessayer
               </button>
               <button
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate('/overview')}
                 className="px-6 py-3 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
               >
-                Back to Dashboard
+                Retour à l'overview
               </button>
             </div>
           </div>
@@ -326,20 +327,37 @@ function IntelligenceFeedContent() {
       />
 
       <div className="col-span-1 sm:col-span-12">
-        <header className="mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <SectionHeader
-                title="Intelligence Feed"
-                subtitle={`Synthesized signals · Updated ${signals[0] ? formatTimeAgo(signals[0].last_updated) : 'recently'}`}
-              />
-            </div>
+        <header className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-light text-white mb-1">Intelligence Feed</h1>
+            <p className="text-slate-400 text-sm font-light mb-1">
+              Signaux de haut niveau synthétisés à partir d'événements — filtrez par impact et confiance.
+            </p>
+            <p className="text-slate-500 text-xs font-light">
+              Mis à jour {signals[0] ? formatTimeAgo(signals[0].last_updated) : 'récemment'}
+            </p>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
             {signals.length > 0 && (
               <Badge variant="critical" className="flex items-center gap-1.5">
                 <Sparkles className="w-3 h-3" />
-                {signals.length} signal{signals.length !== 1 ? 's' : ''}
+                {filteredSignals.length} signal{filteredSignals.length !== 1 ? 's' : ''}
               </Badge>
             )}
+            <button
+              type="button"
+              onClick={async () => {
+                setRefreshing(true);
+                await fetchSignals();
+                setRefreshing(false);
+              }}
+              disabled={refreshing}
+              className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light disabled:opacity-50"
+              aria-label="Actualiser"
+            >
+              <Loader2 className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              Actualiser
+            </button>
           </div>
         </header>
 
@@ -425,10 +443,26 @@ function IntelligenceFeedContent() {
           {/* Advanced Filters */}
           {showFilters && (
             <Card className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm text-slate-400 font-light">
+                  {minImpact > 0 || minConfidence > 0
+                    ? `${filteredSignals.length} signal${filteredSignals.length !== 1 ? 's' : ''} après filtres`
+                    : 'Filtres'}
+                </span>
+                {(minImpact > 0 || minConfidence > 0) && (
+                  <button
+                    type="button"
+                    onClick={() => { setMinImpact(0); setMinConfidence(0); }}
+                    className="text-xs text-slate-400 hover:text-white font-light"
+                  >
+                    Réinitialiser les filtres
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm text-slate-400 font-light mb-2 block">
-                    Minimum Impact: {minImpact}%
+                    Impact minimum : {minImpact}%
                   </label>
                   <input
                     type="range"
@@ -441,7 +475,7 @@ function IntelligenceFeedContent() {
                 </div>
                 <div>
                   <label className="text-sm text-slate-400 font-light mb-2 block">
-                    Minimum Confidence: {minConfidence}%
+                    Confiance minimum : {minConfidence}%
                   </label>
                   <input
                     type="range"
@@ -485,12 +519,21 @@ function IntelligenceFeedContent() {
                   <p className="text-sm text-slate-400 font-light mb-6">
                     Try adjusting your search query or filters to find relevant signals.
                   </p>
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
-                  >
-                    Clear Search
-                  </button>
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      onClick={() => { setSearchQuery(''); fetchSignals(); }}
+                      className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light flex items-center gap-2"
+                    >
+                      <RotateCw className="w-4 h-4" />
+                      Réessayer
+                    </button>
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
+                    >
+                      Effacer la recherche
+                    </button>
+                  </div>
                 </>
               ) : (
                 <>
@@ -499,18 +542,25 @@ function IntelligenceFeedContent() {
                   <p className="text-sm text-slate-400 font-light mb-6">
                     Complete your onboarding to receive personalized intelligence signals based on your preferences.
                   </p>
-                  <div className="flex gap-3 justify-center">
+                  <div className="flex flex-wrap gap-3 justify-center">
+                    <button
+                      onClick={() => { setError(''); fetchSignals(); }}
+                      className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light flex items-center gap-2"
+                    >
+                      <RotateCw className="w-4 h-4" />
+                      Réessayer
+                    </button>
                     <button
                       onClick={() => navigate('/onboarding')}
                       className="px-6 py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white rounded-lg transition-colors text-sm font-light"
                     >
-                      Complete Onboarding
+                      Compléter l'onboarding
                     </button>
                     <button
-                      onClick={() => navigate('/events-feed')}
+                      onClick={() => navigate('/events')}
                       className="px-6 py-3 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
                     >
-                      Browse Events
+                      Voir les actualités
                     </button>
                   </div>
                 </>
