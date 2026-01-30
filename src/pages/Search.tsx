@@ -34,6 +34,8 @@ function SearchContent() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [impactBriefOpen, setImpactBriefOpen] = useState(false);
+  const [impactBriefText, setImpactBriefText] = useState('');
   const [searchResults, setSearchResults] = useState<{
     results: SearchResult[];
     buckets: any;
@@ -383,8 +385,29 @@ function SearchContent() {
           buckets={searchResults?.buckets || { events: [], actors: [], assets: [], sources: [] }}
           onViewResults={() => setShowResults(!showResults)}
           onGenerateImpactBrief={() => {
-            // TODO: Implement impact brief generation
-            toast.info('Impact Brief generation coming soon');
+            const results = searchResults?.results || [];
+            const buckets = searchResults?.buckets || { events: [], actors: [], assets: [], sources: [] };
+            const graph = searchResults?.graph || { nodes: [], links: [] };
+            const lines: string[] = [];
+            if (results.length > 0) {
+              const top = results[0];
+              lines.push('Summary: ' + (top.summary?.slice(0, 200) || top.title || '') + (top.summary && top.summary.length > 200 ? '...' : ''));
+              lines.push('');
+              lines.push('Key events:');
+              results.slice(0, 5).forEach((r, i) => lines.push(`  ${i + 1}. ${r.title || r.summary?.slice(0, 80) || '—'}`));
+            }
+            const actors = buckets.actors?.length ? buckets.actors : graph.nodes?.filter((n: any) => ['person', 'company', 'organization', 'country'].includes(n.type))?.slice(0, 8).map((n: any) => n.label) || [];
+            if (actors.length > 0) {
+              lines.push('');
+              lines.push('Actors: ' + actors.join(', '));
+            }
+            const events = buckets.events?.slice(0, 5).map((e: any) => e.title || e.name || e.id) || [];
+            if (events.length > 0) {
+              lines.push('');
+              lines.push('Events: ' + events.join('; '));
+            }
+            setImpactBriefText(lines.length ? lines.join('\n') : 'No results to summarize. Run a search first.');
+            setImpactBriefOpen(true);
           }}
         />
       </div>
@@ -444,6 +467,24 @@ function SearchContent() {
         meta={searchResults?.meta}
         error={searchError}
       />
+
+      {/* Impact Brief Modal */}
+      {impactBriefOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImpactBriefOpen(false)} aria-hidden />
+          <div className="relative bg-background-base border border-borders-subtle rounded-xl p-6 w-full max-w-lg max-h-[80vh] overflow-auto shadow-xl">
+            <h3 className="text-lg font-semibold text-text-primary mb-3">Impact Brief</h3>
+            <pre className="text-sm text-text-secondary whitespace-pre-wrap font-sans">{impactBriefText}</pre>
+            <button
+              type="button"
+              onClick={() => setImpactBriefOpen(false)}
+              className="mt-4 px-4 py-2 bg-borders-subtle hover:bg-borders-medium rounded-lg text-sm text-text-primary"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

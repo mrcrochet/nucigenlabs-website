@@ -28,8 +28,6 @@ export default function ActionItemsCard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // TODO: Fetch from API
-    // For now, placeholder data
     setActionItems([
       {
         id: '1',
@@ -102,7 +100,7 @@ export default function ActionItemsCard() {
 
   return (
     <Card>
-      <SectionHeader title="Decision Points" subtitle="What to do now" />
+      <SectionHeader title="Decision Points" subtitle="What to do now — Données indicatives" />
       
       <div className="mt-4 space-y-3">
         {actionItems.length === 0 ? (

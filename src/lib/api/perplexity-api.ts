@@ -15,6 +15,7 @@ export interface PerplexityChatRequest {
     max_tokens?: number;
     return_citations?: boolean;
     return_related_questions?: boolean;
+    return_images?: boolean;
   };
 }
 
@@ -28,10 +29,12 @@ export interface PerplexityChatResponse {
         role: string;
         content: string;
         citations?: string[];
+        images?: string[];
       };
     }>;
     citations?: string[];
     related_questions?: string[];
+    images?: string[];
   };
   error?: string;
 }

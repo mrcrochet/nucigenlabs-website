@@ -80,7 +80,7 @@ function EventDetailContent() {
             <p className="text-text-primary mb-2">Event not found</p>
             <p className="text-sm text-text-secondary mb-4">{error}</p>
             <button
-              onClick={() => navigate('/events')}
+              onClick={() => navigate('/discover?source=events')}
               className="px-4 py-2 bg-primary-red text-text-primary rounded-lg hover:bg-primary-redHover transition-colors"
             >
               Back to Events

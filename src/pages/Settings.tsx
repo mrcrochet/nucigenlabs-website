@@ -9,7 +9,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useUser, useClerk } from '@clerk/clerk-react';
-import { getUserPreferences, updateUserPreferences } from '../lib/supabase';
+import { getUserPreferences, updateUserPreferences, getProfileByClerkId, updateUserProfile } from '../lib/supabase';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import AppShell from '../components/layout/AppShell';
@@ -31,7 +31,8 @@ import {
   Key,
   Trash2,
   Download,
-  Monitor
+  Monitor,
+  Building2,
 } from 'lucide-react';
 
 // Available options (same as onboarding)
@@ -83,6 +84,25 @@ const TIME_HORIZON_OPTIONS = [
   { value: 'weeks', label: 'Weeks (medium-term)' },
 ];
 
+const ROLE_OPTIONS = [
+  { value: 'analyst', label: 'Analyst' },
+  { value: 'trader', label: 'Trader' },
+  { value: 'portfolio_manager', label: 'Portfolio Manager' },
+  { value: 'researcher', label: 'Researcher' },
+  { value: 'executive', label: 'Executive / Decision Maker' },
+  { value: 'consultant', label: 'Consultant' },
+  { value: 'student', label: 'Student / Academic' },
+  { value: 'other', label: 'Other' },
+];
+
+const EXPOSURE_OPTIONS = [
+  { value: '', label: 'Choose if applicable' },
+  { value: 'retail', label: 'Retail / Individual' },
+  { value: 'institutional', label: 'Institutional' },
+  { value: 'enterprise', label: 'Enterprise / Corporate' },
+  { value: 'academic', label: 'Academic / Research' },
+];
+
 function SettingsContent() {
   const { user } = useUser();
   const [activeTab, setActiveTab] = useState<'preferences' | 'account' | 'security'>('preferences');
@@ -97,6 +117,13 @@ function SettingsContent() {
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   
+  const [profile, setProfile] = useState({
+    company: '',
+    professional_role: '',
+    intended_use: '',
+    exposure: '',
+  });
+
   const [preferences, setPreferences] = useState({
     preferred_sectors: [] as string[],
     preferred_regions: [] as string[],
@@ -112,9 +139,9 @@ function SettingsContent() {
 
   const [focusAreaInput, setFocusAreaInput] = useState('');
 
-  // Load existing preferences
+  // Load existing profile and preferences
   useEffect(() => {
-    async function loadPreferences() {
+    async function load() {
       if (!user?.id) {
         setLoading(false);
         return;
@@ -122,30 +149,41 @@ function SettingsContent() {
 
       try {
         setLoading(true);
-        const data = await getUserPreferences(user.id);
-        if (data) {
+        const [profileData, prefsData] = await Promise.all([
+          getProfileByClerkId(user.id),
+          getUserPreferences(user.id),
+        ]);
+        if (profileData) {
+          setProfile({
+            company: profileData.company || '',
+            professional_role: profileData.professional_role || '',
+            intended_use: profileData.intended_use || '',
+            exposure: profileData.exposure || '',
+          });
+        }
+        if (prefsData) {
           setPreferences({
-            preferred_sectors: data.preferred_sectors || [],
-            preferred_regions: data.preferred_regions || [],
-            preferred_event_types: data.preferred_event_types || [],
-            focus_areas: data.focus_areas || [],
-            feed_priority: data.feed_priority || 'balanced',
-            min_impact_score: data.min_impact_score || 0.3,
-            min_confidence_score: data.min_confidence_score || 0.5,
-            preferred_time_horizons: data.preferred_time_horizons || [],
-            notify_on_new_event: data.notify_on_new_event ?? true,
-            notify_frequency: data.notify_frequency || 'realtime',
+            preferred_sectors: prefsData.preferred_sectors || [],
+            preferred_regions: prefsData.preferred_regions || [],
+            preferred_event_types: prefsData.preferred_event_types || [],
+            focus_areas: prefsData.focus_areas || [],
+            feed_priority: prefsData.feed_priority || 'balanced',
+            min_impact_score: prefsData.min_impact_score || 0.3,
+            min_confidence_score: prefsData.min_confidence_score || 0.5,
+            preferred_time_horizons: prefsData.preferred_time_horizons || [],
+            notify_on_new_event: prefsData.notify_on_new_event ?? true,
+            notify_frequency: prefsData.notify_frequency || 'realtime',
           });
         }
       } catch (err: any) {
-        console.error('Error loading preferences:', err);
-        setError('Failed to load preferences. Please try again.');
+        console.error('Error loading settings:', err);
+        setError('Failed to load settings. Please try again.');
       } finally {
         setLoading(false);
       }
     }
-    loadPreferences();
-  }, []);
+    load();
+  }, [user?.id]);
 
   const handleSave = async () => {
     try {
@@ -156,6 +194,14 @@ function SettingsContent() {
       if (!user?.id) {
         throw new Error('User not authenticated');
       }
+
+      await updateUserProfile({
+        company: profile.company || undefined,
+        professional_role: profile.professional_role || undefined,
+        intended_use: profile.intended_use || undefined,
+        exposure: profile.exposure || undefined,
+        sector: preferences.preferred_sectors[0] || undefined,
+      }, user.id);
 
       await updateUserPreferences({
         preferred_sectors: preferences.preferred_sectors,
@@ -230,7 +276,7 @@ function SettingsContent() {
             <Card className="p-4 mb-6 bg-green-500/10 border-green-500/20">
               <div className="flex items-center gap-3">
                 <CheckCircle className="w-5 h-5 text-green-400" />
-                <p className="text-sm text-green-400 font-light">Preferences saved successfully!</p>
+                <p className="text-sm text-green-400 font-light">Settings saved successfully!</p>
               </div>
             </Card>
           )}
@@ -280,6 +326,64 @@ function SettingsContent() {
 
           {activeTab === 'preferences' && (
           <div className="space-y-6">
+            {/* Profile (company, role, intended use) */}
+            <Card className="p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <Building2 className="w-5 h-5 text-[#E1463E]" />
+                <h3 className="text-lg font-light text-white">Profile</h3>
+              </div>
+              <p className="text-sm text-slate-400 font-light mb-6">
+                Your organization and role help us prioritize relevant signals and tune the platform to your needs.
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-light text-slate-300 mb-2">Organization</label>
+                  <input
+                    type="text"
+                    value={profile.company}
+                    onChange={(e) => setProfile({ ...profile, company: e.target.value })}
+                    placeholder="e.g. BlackRock, Goldman Sachs, MIT"
+                    className="w-full px-4 py-2 bg-white/[0.02] border border-white/[0.05] rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-white/10 focus:bg-white/[0.03] transition-all font-light text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-light text-slate-300 mb-2">Your role</label>
+                  <select
+                    value={profile.professional_role}
+                    onChange={(e) => setProfile({ ...profile, professional_role: e.target.value })}
+                    className="w-full px-4 py-2 bg-white/[0.02] border border-white/[0.05] rounded-lg text-white focus:outline-none focus:border-white/10 focus:bg-white/[0.03] transition-all font-light text-sm [&>option]:bg-[#1a1a1a]"
+                  >
+                    <option value="">Choose your primary function</option>
+                    {ROLE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-light text-slate-300 mb-2">Intended use</label>
+                  <textarea
+                    value={profile.intended_use}
+                    onChange={(e) => setProfile({ ...profile, intended_use: e.target.value })}
+                    placeholder="Monitor geopolitical risks, track supply chain disruptions..."
+                    rows={3}
+                    className="w-full px-4 py-2 bg-white/[0.02] border border-white/[0.05] rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-white/10 focus:bg-white/[0.03] transition-all font-light text-sm resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-light text-slate-300 mb-2">Market exposure (optional)</label>
+                  <select
+                    value={profile.exposure}
+                    onChange={(e) => setProfile({ ...profile, exposure: e.target.value })}
+                    className="w-full px-4 py-2 bg-white/[0.02] border border-white/[0.05] rounded-lg text-white focus:outline-none focus:border-white/10 focus:bg-white/[0.03] transition-all font-light text-sm [&>option]:bg-[#1a1a1a]"
+                  >
+                    {EXPOSURE_OPTIONS.map((opt) => (
+                      <option key={opt.value || 'none'} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </Card>
+
             {/* Feed Preferences */}
             <Card className="p-6">
               <div className="flex items-center gap-3 mb-6">

@@ -1,15 +1,16 @@
 /**
  * TriggeredAlertsFeed - 8 alerts
- * 
- * Data: GET /alerts/triggered?range=7d&limit=8
+ * Data: GET /api/alerts/triggered?range=7d&limit=8&userId=
  */
 
 import { useState, useEffect } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import { Link } from 'react-router-dom';
 import Card from '../ui/Card';
 import SectionHeader from '../ui/SectionHeader';
 import Badge from '../ui/Badge';
 import { Bell } from 'lucide-react';
+import { apiUrl } from '../../lib/api-base';
 
 interface Alert {
   id: string;
@@ -20,16 +21,68 @@ interface Alert {
   relatedSignalId?: string;
 }
 
+function normalizeSeverity(s: string | undefined): 'moderate' | 'high' | 'critical' {
+  if (s === 'high' || s === 'critical' || s === 'moderate') return s;
+  if (s === 'low') return 'moderate';
+  return 'moderate';
+}
+
 export default function TriggeredAlertsFeed() {
+  const { user } = useUser();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // TODO: Fetch from GET /alerts/triggered?range=7d&limit=8
-    // Placeholder data
-    setAlerts([]);
-    setLoading(false);
-  }, []);
+    if (!user?.id) {
+      setAlerts([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    const url = apiUrl(`/api/alerts/triggered?range=7d&limit=8&userId=${encodeURIComponent(user.id)}`);
+    fetch(url)
+      .then((res) => {
+        if (cancelled) return null;
+        if (res.status === 400) {
+          setAlerts([]);
+          return null;
+        }
+        if (!res.ok) throw new Error('Indisponible');
+        return res.json();
+      })
+      .then((json) => {
+        if (cancelled || !json) return;
+        if (json.success && json.data?.alerts) {
+          setAlerts(
+            json.data.alerts.map((a: { id: string; title: string; severity?: string; triggered_at: string; related_event_id?: string }) => ({
+              id: a.id,
+              title: a.title || 'Alert',
+              severity: normalizeSeverity(a.severity),
+              triggeredAt: a.triggered_at,
+              relatedEventId: a.related_event_id,
+            }))
+          );
+        } else {
+          setAlerts([]);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError('Indisponible');
+          setAlerts([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   if (loading) {
     return (
@@ -45,7 +98,7 @@ export default function TriggeredAlertsFeed() {
         <SectionHeader title="Triggered Alerts" />
         <div className="mt-4 text-sm text-text-secondary flex items-center gap-2">
           <Bell className="w-4 h-4" />
-          <span>No alerts triggered</span>
+          <span>{error ? 'Indisponible' : !user ? 'Connectez-vous pour voir vos alertes' : 'Aucune alerte déclenchée'}</span>
         </div>
       </Card>
     );

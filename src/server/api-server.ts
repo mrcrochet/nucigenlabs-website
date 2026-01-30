@@ -945,6 +945,48 @@ app.post('/api/alerts/generate', async (req, res) => {
   }
 });
 
+// POST /api/alerts - Create user alert rule (from CreateAlertModal)
+app.post('/api/alerts', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.body?.userId as string) || (req.headers['x-user-id'] as string);
+    const { name, indicator, scenarioTitle, eventId, notificationMethods, threshold } = req.body || {};
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'User ID required' });
+    }
+    if (!indicator || typeof indicator !== 'string' || !indicator.trim()) {
+      return res.status(400).json({ success: false, error: 'indicator is required' });
+    }
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Database not configured' });
+    }
+    const supabaseUserId = await getSupabaseUserId(userId, supabase);
+    if (!supabaseUserId) {
+      return res.status(400).json({ success: false, error: 'Invalid user ID' });
+    }
+    const { data, error } = await supabase
+      .from('user_alert_rules')
+      .insert({
+        user_id: supabaseUserId,
+        name: (name && typeof name === 'string' ? name.trim() : indicator) || indicator,
+        indicator: indicator.trim(),
+        scenario_title: scenarioTitle && typeof scenarioTitle === 'string' ? scenarioTitle.trim() : null,
+        event_id: eventId && typeof eventId === 'string' ? eventId : null,
+        threshold: threshold && typeof threshold === 'string' ? threshold : 'medium',
+        notification_methods: notificationMethods && typeof notificationMethods === 'object' ? notificationMethods : { email: true, inApp: true, webhook: false },
+      })
+      .select('id')
+      .single();
+    if (error) {
+      console.error('[API] Create alert rule error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    res.status(201).json({ success: true, id: data?.id, message: 'Alert created' });
+  } catch (error: any) {
+    console.error('[API] Create alert error:', error);
+    res.status(500).json({ success: false, error: error?.message || 'Internal server error' });
+  }
+});
+
 // Impact Exposure endpoint
 app.post('/api/impacts/exposure', async (req, res) => {
   try {
@@ -1714,14 +1756,7 @@ app.get('/api/impacts/:id', async (req, res) => {
 // GET /api/watchlists - User watchlists
 app.get('/api/watchlists', async (req, res) => {
   try {
-    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'userId is required',
-      });
-    }
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || (req.headers['x-clerk-user-id'] as string);
 
     if (!supabase) {
       return res.status(503).json({
@@ -1730,15 +1765,27 @@ app.get('/api/watchlists', async (req, res) => {
       });
     }
 
-    // Note: Watchlists table may not exist yet
-    // Return placeholder response
-    res.json({
-      success: true,
-      data: {
-        watchlists: [],
-      },
-      message: 'Watchlists feature not yet implemented.',
-    });
+    if (!userId) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const supabaseUserId = await getSupabaseUserId(userId, supabase);
+    if (!supabaseUserId) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const { data: rows, error } = await supabase
+      .from('watchlists')
+      .select('*')
+      .eq('user_id', supabaseUserId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[API] Watchlists error:', error);
+      return res.json({ success: true, data: [] });
+    }
+
+    res.json({ success: true, data: rows || [] });
   } catch (error: any) {
     console.error('[API] Watchlists error:', error);
     res.status(500).json({
@@ -2926,6 +2973,128 @@ app.delete('/api/discover/:id/save', async (req, res) => {
   } catch (error: any) {
     console.error('[API] Unsave item error:', error);
     res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+  }
+});
+
+// POST /api/newsletter - Subscribe email to newsletter
+app.post('/api/newsletter', async (req, res) => {
+  try {
+    const { email } = req.body || {};
+    const raw = typeof email === 'string' ? email.trim() : '';
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!raw || !re.test(raw)) {
+      return res.status(400).json({ success: false, error: 'Valid email is required' });
+    }
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Database not configured' });
+    }
+    const { error } = await supabase
+      .from('newsletter_subscribers')
+      .insert({ email: raw });
+    if (error) {
+      if (error.code === '23505') {
+        return res.status(400).json({ success: false, error: 'Already subscribed' });
+      }
+      console.error('[API] Newsletter subscribe error:', error);
+      return res.status(500).json({ success: false, error: error.message || 'Subscription failed' });
+    }
+    res.status(201).json({ success: true, message: 'Subscribed' });
+  } catch (error: any) {
+    console.error('[API] Newsletter error:', error);
+    res.status(500).json({ success: false, error: error?.message || 'Internal server error' });
+  }
+});
+
+// GET /api/intelligence/claims/saved - List saved claim IDs for user
+app.get('/api/intelligence/claims/saved', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'User ID required' });
+    }
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Database not configured' });
+    }
+    const supabaseUserId = await getSupabaseUserId(userId, supabase);
+    if (!supabaseUserId) {
+      return res.status(400).json({ success: false, error: 'Invalid user ID' });
+    }
+    const { data: rows, error } = await supabase
+      .from('user_saved_claims')
+      .select('claim_id')
+      .eq('user_id', supabaseUserId)
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('[API] Claims saved list error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    const claimIds = (rows || []).map((r: { claim_id: string }) => r.claim_id).filter(Boolean);
+    res.json({ success: true, claimIds });
+  } catch (error: any) {
+    console.error('[API] Claims saved error:', error);
+    res.status(500).json({ success: false, error: error?.message || 'Internal server error' });
+  }
+});
+
+// POST /api/intelligence/claims/save - Save a claim (bookmark)
+app.post('/api/intelligence/claims/save', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.body?.userId as string) || (req.headers['x-user-id'] as string);
+    const claimId = (req.query.claimId as string) || (req.body?.claimId as string);
+    const variant = (req.body?.variant as string) || undefined;
+    if (!userId || !claimId) {
+      return res.status(400).json({ success: false, error: 'userId and claimId required' });
+    }
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Database not configured' });
+    }
+    const supabaseUserId = await getSupabaseUserId(userId, supabase);
+    if (!supabaseUserId) {
+      return res.status(400).json({ success: false, error: 'Invalid user ID' });
+    }
+    const { error } = await supabase
+      .from('user_saved_claims')
+      .upsert({ user_id: supabaseUserId, claim_id: claimId, variant: variant || null }, { onConflict: 'user_id,claim_id' });
+    if (error) {
+      if (error.code === '23505') return res.json({ success: true, message: 'Already saved' });
+      console.error('[API] Claim save error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    res.json({ success: true, message: 'Saved' });
+  } catch (error: any) {
+    console.error('[API] Claim save error:', error);
+    res.status(500).json({ success: false, error: error?.message || 'Internal server error' });
+  }
+});
+
+// DELETE /api/intelligence/claims/save - Unsave a claim
+app.delete('/api/intelligence/claims/save', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+    const claimId = req.query.claimId as string;
+    if (!userId || !claimId) {
+      return res.status(400).json({ success: false, error: 'userId and claimId required' });
+    }
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Database not configured' });
+    }
+    const supabaseUserId = await getSupabaseUserId(userId, supabase);
+    if (!supabaseUserId) {
+      return res.status(400).json({ success: false, error: 'Invalid user ID' });
+    }
+    const { error } = await supabase
+      .from('user_saved_claims')
+      .delete()
+      .eq('user_id', supabaseUserId)
+      .eq('claim_id', claimId);
+    if (error) {
+      console.error('[API] Claim unsave error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    res.json({ success: true, message: 'Removed' });
+  } catch (error: any) {
+    console.error('[API] Claim unsave error:', error);
+    res.status(500).json({ success: false, error: error?.message || 'Internal server error' });
   }
 });
 

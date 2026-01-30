@@ -1,12 +1,13 @@
 /**
  * Create Alert Modal
- * 
- * Allows users to create alerts on watch indicators
+ * Creates user alert rules via POST /api/alerts
  */
 
 import { useState } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import { X, Bell, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiUrl } from '../../lib/api-base';
 import type { Outlook } from '../../types/prediction';
 
 interface CreateAlertModalProps {
@@ -24,6 +25,7 @@ export default function CreateAlertModal({
   scenarioTitle,
   eventId,
 }: CreateAlertModalProps) {
+  const { user } = useUser();
   const [alertName, setAlertName] = useState('');
   const [notificationMethods, setNotificationMethods] = useState({
     email: true,
@@ -38,30 +40,34 @@ export default function CreateAlertModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-
     try {
-      // TODO: Implement API call to create alert
-      // await fetch('/api/alerts', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     name: alertName || indicator,
-      //     indicator,
-      //     scenario_title: scenarioTitle,
-      //     event_id: eventId,
-      //     notification_methods: notificationMethods,
-      //     threshold,
-      //   }),
-      // });
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
+      if (!user?.id) {
+        toast.error('Please sign in to create an alert.');
+        setSaving(false);
+        return;
+      }
+      const res = await fetch(apiUrl('/api/alerts'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          name: alertName.trim() || indicator,
+          indicator,
+          scenarioTitle: scenarioTitle || undefined,
+          eventId: eventId || undefined,
+          notificationMethods,
+          threshold,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create alert');
+      }
       toast.success('Alert created successfully');
       onClose();
     } catch (error: any) {
       console.error('Error creating alert:', error);
-      toast.error('Failed to create alert. Please try again.');
+      toast.error(error?.message || 'Failed to create alert. Please try again.');
     } finally {
       setSaving(false);
     }

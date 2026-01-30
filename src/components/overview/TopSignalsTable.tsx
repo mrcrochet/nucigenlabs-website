@@ -108,10 +108,7 @@ export default function TopSignalsTable({ limit = 10 }: TopSignalsTableProps) {
                   {signal.related_event_ids?.length || 0}
                 </td>
                 <td className="py-3 px-4">
-                  <div className="flex flex-wrap gap-1">
-                    {/* TODO: Extract linked assets from signal data */}
-                    <span className="text-xs text-text-tertiary">-</span>
-                  </div>
+                  <span className="text-xs text-text-tertiary">—</span>
                 </td>
                 <td className="py-3 px-4 text-sm text-text-tertiary">
                   {new Date(signal.last_updated).toLocaleDateString()}

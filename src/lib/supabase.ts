@@ -564,6 +564,28 @@ export async function getUserProfile(userId: string) {
 }
 
 /**
+ * Get user profile by Clerk user ID (for Settings / profile display).
+ * Resolves Clerk ID to Supabase UUID then fetches from public.users.
+ * Returns null if not found or on RLS/error (caller can show empty form).
+ */
+export async function getProfileByClerkId(clerkId: string) {
+  if (!isConfigured) return null;
+  try {
+    const supabaseUserId = await getOrCreateSupabaseUserId(clerkId);
+    if (!supabaseUserId) return null;
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', supabaseUserId)
+      .maybeSingle();
+    if (error) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Update user profile
  * @param updates - Profile updates
  * @param userId - Optional Clerk user ID. If not provided, tries to get from Supabase Auth (legacy)
@@ -1365,8 +1387,11 @@ export interface SearchOptions {
   timeHorizonFilter?: string[];
   minImpactScore?: number;
   minConfidenceScore?: number;
+  minImpact?: number;
   limit?: number;
   offset?: number;
+  dateFrom?: string;
+  dateTo?: string;
 }
 
 /**

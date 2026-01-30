@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
 import { toast } from 'sonner';
 import { ArrowLeft, Loader2 } from 'lucide-react';
@@ -49,6 +49,8 @@ function SearchWorkspaceContent() {
   const [isLoadingFollowup, setIsLoadingFollowup] = useState(false);
   const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [impactBriefOpen, setImpactBriefOpen] = useState(false);
+  const [impactBriefText, setImpactBriefText] = useState('');
 
   // Load session from localStorage (client-side for now)
   useEffect(() => {
@@ -209,22 +211,30 @@ function SearchWorkspaceContent() {
     <AppShell>
       <SEO title={`${session.query} | Search | Nucigen Labs`} description="Search workspace with AI-powered intelligence" />
       
-      {/* Header with back button and query summary */}
-      <div className="col-span-1 sm:col-span-12 mb-6">
-        <button
-          onClick={() => navigate('/search')}
-          className="flex items-center gap-2 text-text-secondary hover:text-text-primary mb-4 transition-colors"
+      {/* Header with back button, query summary, and Answer tab */}
+      <div className="col-span-1 sm:col-span-12 mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <button
+            onClick={() => navigate('/search')}
+            className="flex items-center gap-2 text-text-secondary hover:text-text-primary mb-4 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to Search</span>
+          </button>
+          <SearchSessionHeader
+            query={session.query}
+            inputType={session.inputType}
+            resultCount={session.results.length}
+            createdAt={session.createdAt}
+          />
+        </div>
+        <Link
+          to={`/search/session/${sessionId}/reponse`}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-borders-subtle bg-borders-subtle/50 text-text-secondary hover:text-text-primary hover:bg-[#E1463E]/10 hover:border-[#E1463E]/30 text-sm font-medium transition-colors shrink-0"
         >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Search</span>
-        </button>
-        
-        <SearchSessionHeader
-          query={session.query}
-          inputType={session.inputType}
-          resultCount={session.results.length}
-          createdAt={session.createdAt}
-        />
+          <span>Réponse</span>
+          <span className="text-xs opacity-80">→</span>
+        </Link>
       </div>
 
       {/* Main Content: Insight Panel (Left) + Graph (Right) */}
@@ -238,12 +248,34 @@ function SearchWorkspaceContent() {
             document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
           }}
           onGenerateImpactBrief={() => {
-            toast.info('Impact Brief generation coming soon');
+            const results = session.results || [];
+            const buckets = session.buckets || { events: [], actors: [], assets: [], sources: [] };
+            const graph = session.graph || { nodes: [], links: [] };
+            const lines: string[] = [];
+            if (results.length > 0) {
+              const top = results[0];
+              lines.push('Summary: ' + (top.summary?.slice(0, 200) || top.title || '') + (top.summary && top.summary.length > 200 ? '...' : ''));
+              lines.push('');
+              lines.push('Key events:');
+              results.slice(0, 5).forEach((r, i) => lines.push(`  ${i + 1}. ${r.title || r.summary?.slice(0, 80) || '—'}`));
+            }
+            const actors = buckets.actors?.length ? buckets.actors : graph.nodes?.filter((n: any) => ['person', 'company', 'organization', 'country'].includes(n.type))?.slice(0, 8).map((n: any) => n.label) || [];
+            if (actors.length > 0) {
+              lines.push('');
+              lines.push('Actors: ' + actors.join(', '));
+            }
+            const events = buckets.events?.slice(0, 5).map((e: any) => e.title || e.name || e.id) || [];
+            if (events.length > 0) {
+              lines.push('');
+              lines.push('Events: ' + events.join('; '));
+            }
+            setImpactBriefText(lines.length ? lines.join('\n') : 'No results to summarize.');
+            setImpactBriefOpen(true);
           }}
         />
       </div>
 
-      {/* Knowledge Graph - Central and Large */}
+      {/* Knowledge Graph - Central */}
       <div className="col-span-1 sm:col-span-7">
         <div className="sticky top-24">
           <KnowledgeGraph
@@ -296,6 +328,24 @@ function SearchWorkspaceContent() {
             handleFollowup(`Tell me more about: ${selectedResult.title}`);
           }}
         />
+      )}
+
+      {/* Impact Brief Modal */}
+      {impactBriefOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setImpactBriefOpen(false)} aria-hidden />
+          <div className="relative bg-background-base border border-borders-subtle rounded-xl p-6 w-full max-w-lg max-h-[80vh] overflow-auto shadow-xl">
+            <h3 className="text-lg font-semibold text-text-primary mb-3">Impact Brief</h3>
+            <pre className="text-sm text-text-secondary whitespace-pre-wrap font-sans">{impactBriefText}</pre>
+            <button
+              type="button"
+              onClick={() => setImpactBriefOpen(false)}
+              className="mt-4 px-4 py-2 bg-borders-subtle hover:bg-borders-medium rounded-lg text-sm text-text-primary"
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
     </AppShell>
   );

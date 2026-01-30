@@ -120,7 +120,7 @@ function DashboardContent() {
             <span className="text-sm font-light">Intelligence</span>
           </button>
           <button
-            onClick={() => navigate('/events')}
+            onClick={() => navigate('/discover?source=events')}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-slate-600 hover:text-white hover:bg-white/[0.02]"
           >
             <AlertCircle className="w-5 h-5" />
@@ -245,7 +245,7 @@ function DashboardContent() {
               </button>
               <button
                 onClick={() => {
-                  navigate('/events');
+                  navigate('/discover?source=events');
                   setMobileMenuOpen(false);
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all min-h-[44px] text-slate-500 hover:text-white hover:bg-white/[0.03]"

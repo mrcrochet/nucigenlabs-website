@@ -114,14 +114,16 @@ export default function KPIGrid() {
           {
             label: 'High-Impact Impacts (7d)',
             value: impacts7d.length.toString(),
-            delta: 0, // TODO: Calculate when impacts are implemented
+            delta: 0,
             trendData: Array.from({ length: 7 }, () => Math.floor(Math.random() * 5)),
+            subLabel: 'Données indicatives',
           },
           {
             label: 'Watchlist Volatility',
-            value: '0%', // TODO: Calculate from watchlist
+            value: '0%',
             delta: 0,
             trendData: Array.from({ length: 7 }, () => Math.floor(Math.random() * 25) + 10),
+            subLabel: 'Données indicatives',
           },
         ]);
       } catch (error) {
@@ -145,12 +147,14 @@ export default function KPIGrid() {
             value: '0',
             delta: 0,
             trendData: [2, 3, 2, 4, 5, 3, 2],
+            subLabel: 'Données indicatives',
           },
           {
             label: 'Watchlist Volatility',
             value: '0%',
             delta: 0,
             trendData: [15, 18, 16, 20, 22, 19, 17],
+            subLabel: 'Données indicatives',
           },
         ]);
       } finally {

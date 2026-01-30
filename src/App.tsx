@@ -37,7 +37,6 @@ const AuthCallback = lazy(() => import('./pages/AuthCallback'));
 // NEW ARCHITECTURE: Core 5 Pillars
 const Overview = lazy(() => import('./pages/Overview'));
 const SignalsPage = lazy(() => import('./pages/SignalsPage')); // Unified Signals
-const EventsFeed = lazy(() => import('./pages/EventsFeed'));
 const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
 const ScenariosPage = lazy(() => import('./pages/ScenariosPage')); // Renamed from Impacts
 const Alerts = lazy(() => import('./pages/Alerts'));
@@ -56,6 +55,7 @@ const IntelligenceFeed = lazy(() => import('./pages/IntelligenceFeed'));
 const Research = lazy(() => import('./pages/Research'));
 const SearchHome = lazy(() => import('./pages/SearchHome'));
 const SearchWorkspace = lazy(() => import('./pages/SearchWorkspace'));
+const SearchResponsePage = lazy(() => import('./pages/SearchResponsePage'));
 const Recommendations = lazy(() => import('./pages/Recommendations'));
 
 // User / System
@@ -116,7 +116,7 @@ function App() {
     '/app', '/dashboard', '/overview',
     '/signals', '/events', '/scenarios', '/alerts',
     // Legacy routes (redirected)
-    '/intelligence', '/intelligence-feed', '/library', '/signals-feed', '/corporate-impact', '/discover', '/impacts',
+    '/intelligence', '/intelligence-feed', '/signals-feed', '/corporate-impact', '/discover', '/impacts',
     // Other app routes
     '/research', '/search', '/recommendations', '/quality',
     '/profile', '/settings', '/onboarding'
@@ -177,7 +177,7 @@ function App() {
         <Route path="/overview" element={<ProtectedRoute><Overview /></ProtectedRoute>} />
         <Route path="/signals" element={<ProtectedRoute><SignalsPage /></ProtectedRoute>} />
         <Route path="/signals/:id" element={<ProtectedRoute><SignalDetailPage /></ProtectedRoute>} />
-        <Route path="/events" element={<ProtectedRoute><EventsFeed /></ProtectedRoute>} />
+        <Route path="/events" element={<Navigate to="/discover?source=events" replace />} />
         <Route path="/events/:id" element={<ProtectedRoute><EventDetailPage /></ProtectedRoute>} />
         <Route path="/scenarios" element={<ProtectedRoute><ScenariosPage /></ProtectedRoute>} />
         <Route path="/scenarios/:id" element={<ProtectedRoute><ImpactDetailPage /></ProtectedRoute>} />
@@ -205,7 +205,7 @@ function App() {
         <Route path="/impacts/:id" element={<Navigate to="/scenarios/:id" replace />} />
         
         {/* Legacy Events → Events (simplified) */}
-        <Route path="/events-feed" element={<Navigate to="/events" replace />} />
+        <Route path="/events-feed" element={<Navigate to="/discover?source=events" replace />} />
         <Route path="/events-feed/:id" element={<Navigate to="/events/:id" replace />} />
         <Route path="/events/:eventId/predictions" element={<ProtectedRoute><PredictionPage /></ProtectedRoute>} />
         
@@ -213,6 +213,7 @@ function App() {
         <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} />
         <Route path="/search" element={<ProtectedRoute><SearchHome /></ProtectedRoute>} />
         <Route path="/search/session/:sessionId" element={<ProtectedRoute><SearchWorkspace /></ProtectedRoute>} />
+        <Route path="/search/session/:sessionId/reponse" element={<ProtectedRoute><SearchResponsePage /></ProtectedRoute>} />
         <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
         
         {/* User / System */}

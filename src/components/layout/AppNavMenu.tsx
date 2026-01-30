@@ -24,10 +24,11 @@ import {
   Sparkles,
   Newspaper,
   Activity,
-  Bookmark
+  Bookmark,
+  Settings
 } from 'lucide-react';
 
-// Core navigation: Overview, Search, Corporate Impact, Discover, Ma bibliothèque, Intelligence feed, Actuality feed, Events, Scenarios, Alerts
+// Core navigation: Overview, Search, Corporate Impact, Discover, Ma bibliothèque, Intelligence feed, Scenarios, Alerts, Settings (Actualité = Discover?source=events)
 const navItems = [
   { path: '/overview', label: 'Overview', icon: LayoutDashboard },
   { path: '/search', label: 'Search', icon: Search },
@@ -35,9 +36,9 @@ const navItems = [
   { path: '/discover', label: 'Discover', icon: Sparkles },
   { path: '/library', label: 'Ma bibliothèque', icon: Bookmark },
   { path: '/intelligence-feed', label: 'Intelligence feed', icon: Activity },
-  { path: '/events', label: 'Actuality feed', icon: Newspaper },
   { path: '/scenarios', label: 'Scenarios', icon: Target },
   { path: '/alerts', label: 'Alerts', icon: Bell },
+  { path: '/settings', label: 'Settings', icon: Settings },
 ];
 
 interface AppNavMenuProps {

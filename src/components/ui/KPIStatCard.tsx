@@ -12,6 +12,7 @@ export interface KPIData {
   delta?: number; // percentage change
   trendData?: number[]; // for sparkline
   trendDirection?: 'up' | 'down' | 'neutral';
+  subLabel?: string; // e.g. "Données indicatives"
 }
 
 interface KPIStatCardProps {
@@ -20,7 +21,7 @@ interface KPIStatCardProps {
 }
 
 export default function KPIStatCard({ data, className = '' }: KPIStatCardProps) {
-  const { label, value, delta, trendData, trendDirection } = data;
+  const { label, value, delta, trendData, trendDirection, subLabel } = data;
 
   const getDeltaColor = () => {
     if (!delta) return 'text-text-secondary';
@@ -42,6 +43,9 @@ export default function KPIStatCard({ data, className = '' }: KPIStatCardProps) 
         <div>
           <p className="text-sm text-text-secondary font-medium mb-1">{label}</p>
           <p className="text-2xl font-semibold text-text-primary">{value}</p>
+          {subLabel && (
+            <p className="text-xs text-text-tertiary font-light mt-1">{subLabel}</p>
+          )}
         </div>
         {trendData && trendData.length > 0 && (
           <div className="w-16 h-8">

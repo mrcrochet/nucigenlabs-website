@@ -304,7 +304,7 @@ function RecommendationsContent() {
                             </span>
                             {rec.related_event_ids && rec.related_event_ids.length > 0 && (
                               <button
-                                onClick={() => navigate(`/events?event_ids=${rec.related_event_ids?.join(',')}`)}
+                                onClick={() => navigate('/discover?source=events')}
                                 className="flex items-center gap-1.5 text-slate-500 hover:text-white transition-colors"
                               >
                                 View {rec.related_event_ids.length} related event{rec.related_event_ids.length !== 1 ? 's' : ''}

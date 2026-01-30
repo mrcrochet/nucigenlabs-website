@@ -1,13 +1,15 @@
 /**
  * ClaimActions Component
- * 
  * Reusable action buttons for claims (Bookmark, Share, Create Alert, Expand/Collapse)
+ * Bookmark state is persisted via GET/POST/DELETE /api/intelligence/claims/saved|save
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
 import { Bookmark, Share2, Bell, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiUrl } from '../../lib/api-base';
 import type { Claim } from '../../types/search';
 
 interface ClaimActionsProps {
@@ -23,14 +25,57 @@ export default function ClaimActions({
   onToggleExpand,
   variant = 'risks',
 }: ClaimActionsProps) {
+  const { user } = useUser();
   const navigate = useNavigate();
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [savedClaimIds, setSavedClaimIds] = useState<string[]>([]);
+  const isBookmarked = savedClaimIds.includes(claim.id);
 
-  const handleBookmark = () => {
-    setIsBookmarked(!isBookmarked);
-    toast.success(isBookmarked ? 'Removed from watchlist' : 'Added to watchlist');
-    // TODO: Save to backend/database
-  };
+  useEffect(() => {
+    if (!user?.id) {
+      setSavedClaimIds([]);
+      return;
+    }
+    let cancelled = false;
+    const url = apiUrl(`/api/intelligence/claims/saved?userId=${encodeURIComponent(user.id)}`);
+    fetch(url)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.success) return;
+        setSavedClaimIds(Array.isArray(data.claimIds) ? data.claimIds : []);
+      })
+      .catch(() => { if (!cancelled) setSavedClaimIds([]); });
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  const handleBookmark = useCallback(async () => {
+    if (!user?.id) {
+      toast.info('Connectez-vous pour enregistrer.');
+      return;
+    }
+    const base = apiUrl('/api/intelligence/claims/save');
+    const nextBookmarked = !isBookmarked;
+    try {
+      if (nextBookmarked) {
+        const res = await fetch(base, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, claimId: claim.id, variant }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Failed to save');
+        setSavedClaimIds((prev) => (prev.includes(claim.id) ? prev : [...prev, claim.id]));
+        toast.success('Added to watchlist');
+      } else {
+        const res = await fetch(`${base}?userId=${encodeURIComponent(user.id)}&claimId=${encodeURIComponent(claim.id)}`, { method: 'DELETE' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Failed to remove');
+        setSavedClaimIds((prev) => prev.filter((id) => id !== claim.id));
+        toast.success('Removed from watchlist');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || (nextBookmarked ? 'Failed to save' : 'Failed to remove'));
+    }
+  }, [user?.id, claim.id, variant, isBookmarked]);
 
   const handleShare = () => {
     const url = `${window.location.origin}${window.location.pathname}#claim-${claim.id}`;

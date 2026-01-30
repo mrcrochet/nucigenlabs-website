@@ -185,7 +185,7 @@ function EventDetailContent() {
             <p className="text-sm text-red-400">{error || 'Event not found'}</p>
           </div>
           <button
-            onClick={() => navigate('/events')}
+            onClick={() => navigate('/discover?source=events')}
             className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
           >
             Back to Events
@@ -218,7 +218,7 @@ function EventDetailContent() {
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-10 py-6">
             <div className="flex items-center gap-4 mb-4">
               <button
-                onClick={() => navigate('/events')}
+                onClick={() => navigate('/discover?source=events')}
                 className="p-2 text-slate-600 hover:text-white hover:bg-white/[0.02] rounded-xl transition-all"
               >
                 <ArrowLeft className="w-5 h-5" />

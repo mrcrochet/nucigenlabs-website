@@ -39,7 +39,7 @@ export default function AppSidebar() {
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/intelligence', label: 'Intelligence', icon: Brain },
-    { path: '/events', label: 'Events', icon: FileText },
+    { path: '/discover?source=events', label: 'Actualité', icon: FileText },
     { path: '/recommendations', label: 'Recommendations', icon: Target },
     { path: '/alerts', label: 'Alerts', icon: Bell },
     { path: '/research', label: 'Research', icon: BookOpen },
@@ -55,7 +55,10 @@ export default function AppSidebar() {
     if (path === '/dashboard') {
       return location.pathname === '/dashboard' || location.pathname === '/app';
     }
-    return location.pathname.startsWith(path);
+    if (path === '/discover?source=events') {
+      return location.pathname === '/discover' && location.search.includes('source=events');
+    }
+    return location.pathname.startsWith(path.split('?')[0]);
   };
 
   return (

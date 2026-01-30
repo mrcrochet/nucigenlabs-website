@@ -1,14 +1,16 @@
 /**
  * AssetTable - Asset table (watchlist)
+ * Loads symbols from GET /api/watchlists when user is logged in; otherwise default list.
  */
 
 import { useState, useEffect } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import { Link } from 'react-router-dom';
 import Card from '../ui/Card';
 import SectionHeader from '../ui/SectionHeader';
 import Sparkline from '../charts/Sparkline';
-import Badge from '../ui/Badge';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { apiUrl } from '../../lib/api-base';
 
 interface Asset {
   symbol: string;
@@ -25,24 +27,35 @@ interface AssetTableProps {
   onSymbolSelect: (symbol: string) => void;
 }
 
+const DEFAULT_SYMBOLS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX'];
+
 export default function AssetTable({ selectedSymbol, onSymbolSelect }: AssetTableProps) {
+  const { user } = useUser();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadAssets = async () => {
       try {
-        // TODO: Load from user watchlist
-        // For now, use default symbols
-        const symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'META', 'NVDA', 'NFLX'];
-        const API_BASE = import.meta.env.DEV ? 'http://localhost:3001' : '/api';
-        
+        let symbols: Array<{ symbol: string; name: string }> = DEFAULT_SYMBOLS.map((s) => ({ symbol: s, name: `${s} Inc.` }));
+
+        if (user?.id) {
+          const res = await fetch(apiUrl(`/api/watchlists?userId=${encodeURIComponent(user.id)}`));
+          const data = await res.json().catch(() => ({}));
+          if (data?.success && Array.isArray(data.data) && data.data.length > 0) {
+            const fromWatchlist = data.data
+              .filter((w: { entity_type?: string; entity_id?: string; entity_name?: string }) => w.entity_id && (w.entity_type === 'company' || w.entity_type === 'asset' || !w.entity_type))
+              .map((w: { entity_id: string; entity_name?: string }) => ({ symbol: w.entity_id, name: w.entity_name || `${w.entity_id} Inc.` }));
+            if (fromWatchlist.length > 0) symbols = fromWatchlist;
+          }
+        }
+
         const assetsData = await Promise.all(
-          symbols.map(async (symbol) => {
+          symbols.map(async ({ symbol, name: entityName }) => {
             try {
               const [priceResponse, tsResponse] = await Promise.all([
-                fetch(`${API_BASE}/api/market-data/${symbol}`),
-                fetch(`${API_BASE}/api/market-data/${symbol}/timeseries?interval=1h&days=1`),
+                fetch(apiUrl(`/api/market-data/${symbol}`)),
+                fetch(apiUrl(`/api/market-data/${symbol}/timeseries?interval=1h&days=1`)),
               ]);
 
               let priceData: any = null;
@@ -50,24 +63,19 @@ export default function AssetTable({ selectedSymbol, onSymbolSelect }: AssetTabl
 
               if (priceResponse.ok) {
                 const priceResult = await priceResponse.json();
-                if (priceResult.success && priceResult.data) {
-                  priceData = priceResult.data;
-                }
+                if (priceResult.success && priceResult.data) priceData = priceResult.data;
               }
-
               if (tsResponse.ok) {
                 const tsResult = await tsResponse.json();
-                if (tsResult.success && tsResult.data && tsResult.data.values) {
-                  sparkline = tsResult.data.values.map((point: any) => 
-                    parseFloat(point.close || point.price || 0)
-                  );
+                if (tsResult.success && tsResult.data?.values) {
+                  sparkline = tsResult.data.values.map((point: any) => parseFloat(point.close || point.price || 0));
                 }
               }
 
               if (priceData) {
                 return {
                   symbol,
-                  name: `${symbol} Inc.`, // TODO: Get real name
+                  name: entityName,
                   price: parseFloat(priceData.price || priceData.close || 0),
                   change: parseFloat(priceData.change || 0),
                   changePercent: parseFloat(priceData.percent_change || 0),
@@ -84,28 +92,33 @@ export default function AssetTable({ selectedSymbol, onSymbolSelect }: AssetTabl
         );
 
         const validAssets = assetsData.filter((a): a is Asset => a !== null);
-        setAssets(validAssets);
+        setAssets(validAssets.length > 0 ? validAssets : [{
+          symbol: 'AAPL',
+          name: 'Apple Inc.',
+          price: 150.5,
+          change: 2.5,
+          changePercent: 1.69,
+          volume: 50000000,
+          sparkline: Array.from({ length: 10 }, () => 150 + Math.random() * 5),
+        }]);
       } catch (error) {
         console.error('Error loading assets:', error);
-        // Fallback
-        setAssets([
-          {
-            symbol: 'AAPL',
-            name: 'Apple Inc.',
-            price: 150.5,
-            change: 2.5,
-            changePercent: 1.69,
-            volume: 50000000,
-            sparkline: Array.from({ length: 10 }, () => 150 + Math.random() * 5),
-          },
-        ]);
+        setAssets([{
+          symbol: 'AAPL',
+          name: 'Apple Inc.',
+          price: 150.5,
+          change: 2.5,
+          changePercent: 1.69,
+          volume: 50000000,
+          sparkline: Array.from({ length: 10 }, () => 150 + Math.random() * 5),
+        }]);
       } finally {
         setLoading(false);
       }
     };
 
     loadAssets();
-  }, []);
+  }, [user?.id]);
 
   return (
     <Card>

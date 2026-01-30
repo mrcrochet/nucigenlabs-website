@@ -557,7 +557,7 @@ function IntelligenceFeedContent() {
                       Compléter l'onboarding
                     </button>
                     <button
-                      onClick={() => navigate('/events')}
+                      onClick={() => navigate('/discover?source=events')}
                       className="px-6 py-3 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light"
                     >
                       Voir les actualités

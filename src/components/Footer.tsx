@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
+import { toast } from 'sonner';
+import { apiUrl } from '../lib/api-base';
 import { logger } from '../utils/logger';
 
 export default function Footer() {
@@ -11,15 +13,23 @@ export default function Footer() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      // TODO: Implement newsletter subscription API call
-      logger.log('Newsletter subscription:', email);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setEmail('');
-      // TODO: Show success toast
+      const res = await fetch(apiUrl('/api/newsletter'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        setEmail('');
+        toast.success('Merci, vous êtes inscrit.');
+      } else if (res.status === 400 && (data.error === 'Already subscribed' || data.error?.toLowerCase?.().includes('already'))) {
+        toast.info('Cet email est déjà inscrit.');
+      } else {
+        toast.error(data.error || 'Une erreur est survenue. Réessayez plus tard.');
+      }
     } catch (error) {
       logger.error('Newsletter subscription error:', error);
-      // TODO: Show error toast
+      toast.error('Une erreur est survenue. Réessayez plus tard.');
     } finally {
       setIsSubmitting(false);
     }
