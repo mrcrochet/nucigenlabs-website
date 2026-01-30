@@ -95,6 +95,10 @@ export default function DiscoverListCard({ item, onSave, onView, onShare }: Disc
   const consensusInfo = consensusConfig[consensus];
   const ConsensusIcon = consensusInfo.icon;
 
+  const sourceLabel = item.id.startsWith('perplexity-')
+    ? 'Perplexity'
+    : (item.sources?.[0]?.name || 'Nucigen');
+
   const tierClasses = {
     critical: 'border-[#E1463E]/30 bg-[#E1463E]/5',
     strategic: 'border-white/10 bg-white/5',
@@ -130,6 +134,9 @@ export default function DiscoverListCard({ item, onSave, onView, onShare }: Disc
           <div className="flex items-start justify-between mb-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Badge variant="category">{item.category}</Badge>
+              <span className="text-[10px] text-slate-500 font-light" title="Source">
+                {sourceLabel}
+              </span>
               {item.metadata.relevance_score > 85 && tier !== 'critical' && (
                 <span className="flex items-center gap-1 px-2 py-0.5 bg-[#E1463E]/20 border border-[#E1463E]/30 rounded text-xs text-[#E1463E] font-light">
                   <Flame className="w-3 h-3" />
@@ -160,6 +167,7 @@ export default function DiscoverListCard({ item, onSave, onView, onShare }: Disc
 
           {/* Footer: Meta info */}
           <div className="flex items-center gap-4 text-xs text-slate-600">
+            <span className="font-light text-slate-500" title="Source">{sourceLabel}</span>
             <div className="flex items-center gap-1.5">
               <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center">
                 <span className="text-[8px]">📰</span>

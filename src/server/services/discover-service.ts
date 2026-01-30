@@ -448,6 +448,29 @@ function mapEventToDiscoverItem(event: any): DiscoverItem {
 }
 
 /**
+ * Fetch Discover items by IDs (for saved/library)
+ */
+export async function getDiscoverItemsByIds(ids: string[]): Promise<DiscoverItem[]> {
+  if (!ids.length) return [];
+  try {
+    const { data: events, error } = await supabase
+      .from('events')
+      .select('*')
+      .in('id', ids)
+      .not('discover_score', 'is', null)
+      .not('discover_type', 'is', null);
+    if (error) {
+      console.error('[Discover Service] getDiscoverItemsByIds error:', error);
+      return [];
+    }
+    return (events || []).map(mapEventToDiscoverItem);
+  } catch (err: any) {
+    console.error('[Discover Service] getDiscoverItemsByIds exception:', err?.message || err);
+    return [];
+  }
+}
+
+/**
  * Generate trending topics (like Perplexity Discover)
  */
 async function generateTrendingTopics(
@@ -773,14 +796,15 @@ export function calculatePersonalizationScore(
     preferred_sectors?: string[];
     preferred_regions?: string[];
     saved_items?: string[];
+    focus_areas?: string[];
   }
 ): number {
   let score = item.metadata.relevance_score || 50;
 
   if (userPreferences) {
     if (userPreferences.preferred_sectors) {
-      const sectorMatch = item.tags.some(tag => 
-        userPreferences.preferred_sectors!.some(sector => 
+      const sectorMatch = item.tags.some(tag =>
+        userPreferences.preferred_sectors!.some(sector =>
           tag.toLowerCase().includes(sector.toLowerCase())
         )
       );
@@ -792,6 +816,16 @@ export function calculatePersonalizationScore(
         userPreferences.preferred_regions[0]?.toLowerCase() || ''
       );
       if (regionMatch) score += 15;
+    }
+
+    if (userPreferences.focus_areas && userPreferences.focus_areas.length > 0) {
+      const norm = (s: string) => s.toLowerCase().replace(/\s*&\s*/g, ' ').replace(/\s+/g, ' ');
+      const itemText = norm([item.category, ...item.tags].join(' '));
+      const interestMatch = userPreferences.focus_areas.some(interest => {
+        const key = norm(interest).split(' ')[0];
+        return key && itemText.includes(key);
+      });
+      if (interestMatch) score += 15;
     }
 
     if (userPreferences.saved_items && userPreferences.saved_items.length > 0) {

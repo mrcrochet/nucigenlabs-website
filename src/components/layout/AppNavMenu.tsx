@@ -20,15 +20,22 @@ import {
   TrendingUp, 
   Target, 
   Bell,
-  Search
+  Search,
+  Sparkles,
+  Newspaper,
+  Activity,
+  Bookmark
 } from 'lucide-react';
 
-// Core navigation: Overview first, then Search, Signals, rest
+// Core navigation: Overview, Search, Corporate Impact, Discover, Ma bibliothèque, Intelligence feed, Actuality feed, Events, Scenarios, Alerts
 const navItems = [
   { path: '/overview', label: 'Overview', icon: LayoutDashboard },
   { path: '/search', label: 'Search', icon: Search },
   { path: '/signals', label: 'Corporate Impact', icon: TrendingUp },
-  { path: '/events', label: 'Events', icon: Calendar },
+  { path: '/discover', label: 'Discover', icon: Sparkles },
+  { path: '/library', label: 'Ma bibliothèque', icon: Bookmark },
+  { path: '/intelligence-feed', label: 'Intelligence feed', icon: Activity },
+  { path: '/events', label: 'Actuality feed', icon: Newspaper },
   { path: '/scenarios', label: 'Scenarios', icon: Target },
   { path: '/alerts', label: 'Alerts', icon: Bell },
 ];
@@ -50,14 +57,14 @@ export default function AppNavMenu({ isOpen, onClose }: AppNavMenuProps) {
       return '/overview';
     }
     
-    // Legacy Intelligence/Corporate Impact/Signals Feed → Signals
+    // Legacy Intelligence/Corporate Impact/Signals Feed → Signals (Discover, Intelligence feed stay)
     if (
       path === '/intelligence' || 
-      path.startsWith('/intelligence/') ||
-      path === '/signals-feed' ||
-      path === '/corporate-impact' ||
-      path === '/discover'
+      (path.startsWith('/intelligence/') && !path.startsWith('/intelligence-feed'))
     ) {
+      return '/signals';
+    }
+    if (path === '/signals-feed' || path === '/corporate-impact') {
       return '/signals';
     }
     

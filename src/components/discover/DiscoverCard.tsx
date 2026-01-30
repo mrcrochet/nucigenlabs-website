@@ -49,11 +49,13 @@ interface DiscoverCardProps {
   onSave?: (itemId: string) => Promise<void>;
   onView?: (itemId: string) => void;
   onShare?: (itemId: string, platform: string) => void;
+  /** When true (e.g. on Library page), bookmark appears filled and click = unsave */
+  initialSaved?: boolean;
 }
 
-export default function DiscoverCard({ item, onSave, onView, onShare }: DiscoverCardProps) {
+export default function DiscoverCard({ item, onSave, onView, onShare, initialSaved = false }: DiscoverCardProps) {
   const navigate = useNavigate();
-  const [isSaved, setIsSaved] = useState(false);
+  const [isSaved, setIsSaved] = useState(initialSaved);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async (e: React.MouseEvent) => {
@@ -63,7 +65,7 @@ export default function DiscoverCard({ item, onSave, onView, onShare }: Discover
     setIsSaving(true);
     try {
       await onSave(item.id);
-      setIsSaved(!isSaved);
+      setIsSaved((prev) => !prev);
     } catch (error) {
       console.error('Error saving item:', error);
     } finally {
@@ -146,6 +148,11 @@ export default function DiscoverCard({ item, onSave, onView, onShare }: Discover
   const consensusInfo = consensusConfig[consensus];
   const ConsensusIcon = consensusInfo.icon;
 
+  // Source label: Perplexity (id prefix) or first source name / Nucigen
+  const sourceLabel = item.id.startsWith('perplexity-')
+    ? 'Perplexity'
+    : (item.sources?.[0]?.name || 'Nucigen');
+
   // Tier-based styling
   const tierClasses = {
     critical: 'border-[#E1463E]/30 bg-[#E1463E]/5',
@@ -199,10 +206,13 @@ export default function DiscoverCard({ item, onSave, onView, onShare }: Discover
         </div>
       )}
 
-      {/* Header: Category Badge + Type + Trending */}
+      {/* Header: Category Badge + Type + Source + Trending */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="category">{item.category}</Badge>
+          <span className="text-[10px] text-slate-500 font-light" title="Source">
+            {sourceLabel}
+          </span>
           {item.metadata.relevance_score > 85 && tier !== 'critical' && (
             <span className="flex items-center gap-1 px-2 py-0.5 bg-[#E1463E]/20 border border-[#E1463E]/30 rounded text-xs text-[#E1463E] font-light">
               <Flame className="w-3 h-3" />

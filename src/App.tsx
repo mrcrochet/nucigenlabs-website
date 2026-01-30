@@ -47,6 +47,11 @@ const SignalDetailPage = lazy(() => import('./pages/SignalDetailPage'));
 const ImpactDetailPage = lazy(() => import('./pages/ImpactDetailPage'));
 const PredictionPage = lazy(() => import('./pages/PredictionPage'));
 
+// Discover & Actuality (restored)
+const Discover = lazy(() => import('./pages/Discover'));
+const LibraryPage = lazy(() => import('./pages/LibraryPage'));
+const IntelligenceFeed = lazy(() => import('./pages/IntelligenceFeed'));
+
 // Other modules (kept for now)
 const Research = lazy(() => import('./pages/Research'));
 const SearchHome = lazy(() => import('./pages/SearchHome'));
@@ -111,7 +116,7 @@ function App() {
     '/app', '/dashboard', '/overview',
     '/signals', '/events', '/scenarios', '/alerts',
     // Legacy routes (redirected)
-    '/intelligence', '/signals-feed', '/corporate-impact', '/discover', '/impacts',
+    '/intelligence', '/intelligence-feed', '/library', '/signals-feed', '/corporate-impact', '/discover', '/impacts',
     // Other app routes
     '/research', '/search', '/recommendations', '/quality',
     '/profile', '/settings', '/onboarding'
@@ -182,12 +187,18 @@ function App() {
         <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
         <Route path="/app" element={<Navigate to="/overview" replace />} />
         
-        {/* Legacy Intelligence/Corporate Impact/Discover → Signals */}
+        {/* Discover (restored) */}
+        <Route path="/discover" element={<ProtectedRoute><Discover /></ProtectedRoute>} />
+        <Route path="/library" element={<ProtectedRoute><LibraryPage /></ProtectedRoute>} />
+
+        {/* Intelligence feed (restored) */}
+        <Route path="/intelligence-feed" element={<ProtectedRoute><IntelligenceFeed /></ProtectedRoute>} />
+
+        {/* Legacy Intelligence/Corporate Impact → Signals */}
         <Route path="/intelligence" element={<Navigate to="/signals" replace />} />
         <Route path="/intelligence/*" element={<Navigate to="/signals" replace />} />
         <Route path="/signals-feed" element={<Navigate to="/signals" replace />} />
         <Route path="/corporate-impact" element={<Navigate to="/signals" replace />} />
-        <Route path="/discover" element={<Navigate to="/signals" replace />} />
         
         {/* Legacy Impacts → Scenarios */}
         <Route path="/impacts" element={<Navigate to="/scenarios" replace />} />

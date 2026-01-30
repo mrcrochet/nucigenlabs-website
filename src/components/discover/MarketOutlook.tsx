@@ -59,7 +59,12 @@ export default function MarketOutlook() {
   }
 
   if (markets.length === 0) {
-    return null;
+    return (
+      <div className="bg-white/5 border border-white/10 rounded-lg p-4 mb-6">
+        <h3 className="text-sm font-light text-white mb-2">Market Outlook</h3>
+        <p className="text-xs text-slate-500 font-light">Indices bientôt disponibles.</p>
+      </div>
+    );
   }
 
   return (

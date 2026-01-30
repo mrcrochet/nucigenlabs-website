@@ -2453,7 +2453,70 @@ const discoverHandler = async (req: any, res: any) => {
 
     const { fetchDiscoverItems, calculatePersonalizationScore } = await import('./services/discover-service.js');
     
-            // Fetch items from events table (read-only, no Perplexity calls)
+            // First page: enrich with Perplexity-sourced news (parallel with DB fetch)
+            const isFirstPage = offset === 0 && !searchQuery && process.env.PERPLEXITY_API_KEY;
+            let perplexityItems: any[] = [];
+            if (isFirstPage) {
+              try {
+                const { fetchDiscoverNewsFromPerplexity } = await import('./services/discover-perplexity-feed.js');
+                perplexityItems = await fetchDiscoverNewsFromPerplexity(category, Math.min(6, limit));
+                if (perplexityItems.length > 0) {
+                  console.log('[API] Discover Perplexity news:', perplexityItems.length);
+                }
+              } catch (e: any) {
+                console.warn('[API] Discover Perplexity enrichment failed:', e?.message);
+              }
+            }
+
+            // Parse advanced filters from query (optional)
+            const advancedFilters: any = {};
+            const tagsQ = req.query.tags as string | undefined;
+            if (tagsQ && tagsQ.trim()) {
+              advancedFilters.tags = tagsQ.split(',').map((s: string) => s.trim()).filter(Boolean);
+            }
+            const consensusQ = req.query.consensus as string | undefined;
+            if (consensusQ && consensusQ.trim()) {
+              advancedFilters.consensus = consensusQ.split(',').map((s: string) => s.trim()).filter(Boolean) as any;
+            }
+            const tierQ = req.query.tier as string | undefined;
+            if (tierQ && tierQ.trim()) {
+              advancedFilters.tier = tierQ.split(',').map((s: string) => s.trim()).filter(Boolean) as any;
+            }
+            const sectorsQ = req.query.sectors as string | undefined;
+            if (sectorsQ && sectorsQ.trim()) {
+              advancedFilters.sectors = sectorsQ.split(',').map((s: string) => s.trim()).filter(Boolean);
+            }
+            const regionsQ = req.query.regions as string | undefined;
+            if (regionsQ && regionsQ.trim()) {
+              advancedFilters.regions = regionsQ.split(',').map((s: string) => s.trim()).filter(Boolean);
+            }
+            const entitiesQ = req.query.entities as string | undefined;
+            if (entitiesQ && entitiesQ.trim()) {
+              advancedFilters.entities = entitiesQ.split(',').map((s: string) => s.trim()).filter(Boolean);
+            }
+            const minSourcesQ = req.query.minSources as string | undefined;
+            if (minSourcesQ !== undefined && minSourcesQ !== '') {
+              const n = parseInt(minSourcesQ, 10);
+              if (!isNaN(n)) advancedFilters.minSources = n;
+            }
+            const maxSourcesQ = req.query.maxSources as string | undefined;
+            if (maxSourcesQ !== undefined && maxSourcesQ !== '') {
+              const n = parseInt(maxSourcesQ, 10);
+              if (!isNaN(n)) advancedFilters.maxSources = n;
+            }
+            const minScoreQ = req.query.minScore as string | undefined;
+            if (minScoreQ !== undefined && minScoreQ !== '') {
+              const n = parseInt(minScoreQ, 10);
+              if (!isNaN(n)) advancedFilters.minScore = n;
+            }
+            const maxScoreQ = req.query.maxScore as string | undefined;
+            if (maxScoreQ !== undefined && maxScoreQ !== '') {
+              const n = parseInt(maxScoreQ, 10);
+              if (!isNaN(n)) advancedFilters.maxScore = n;
+            }
+            const hasAdvancedFilters = Object.keys(advancedFilters).length > 0;
+
+            // Fetch items from events table (read-only)
             let items: any[] = [];
             try {
               items = await fetchDiscoverItems(
@@ -2462,7 +2525,8 @@ const discoverHandler = async (req: any, res: any) => {
                 userId,
                 searchQuery,
                 timeRange,
-                sortBy
+                sortBy,
+                hasAdvancedFilters ? advancedFilters : undefined
               );
       console.log('[API] Discover fetched items:', items.length);
     } catch (fetchError: any) {
@@ -2476,13 +2540,21 @@ const discoverHandler = async (req: any, res: any) => {
       });
     }
 
+    // First page: merge Perplexity items at the top, then apply pagination
+    if (offset === 0 && perplexityItems.length > 0) {
+      items = [...perplexityItems, ...items];
+      if (items.length > 0) {
+        console.log('[API] Discover merged Perplexity + DB items:', items.length);
+      }
+    }
+
     // Get user preferences for personalization
     let userPreferences: any = null;
     if (userId && supabase) {
       try {
         const { data, error } = await supabase
           .from('user_preferences')
-          .select('preferred_sectors, preferred_regions')
+          .select('preferred_sectors, preferred_regions, focus_areas')
           .eq('user_id', userId)
           .maybeSingle();
         
@@ -2518,9 +2590,9 @@ const discoverHandler = async (req: any, res: any) => {
       console.warn('[Discover] Error sorting items:', sortError?.message || sortError);
     }
 
-    // Items are already filtered and paginated by DB query
-    const paginatedItems = items;
-    const hasMore = items.length === limit; // If we got full limit, there might be more
+    // Apply pagination: after merge (first page) we may have more than limit items
+    const paginatedItems = items.slice(0, limit);
+    const hasMore = items.length >= limit; // full page => possibly more
 
     console.log('[API] Discover response:', { items: paginatedItems.length, total: items.length, hasMore });
 
@@ -2689,6 +2761,36 @@ app.get('/api/eventregistry/health', async (req, res) => {
   }
 });
 
+// GET /api/discover/saved - List saved (library) items for user
+app.get('/api/discover/saved', async (req, res) => {
+  try {
+    const userId = req.query.userId as string;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'User ID required' });
+    }
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Database not configured' });
+    }
+    const { data: rows, error } = await supabase
+      .from('user_engagement')
+      .select('event_id')
+      .eq('user_id', userId)
+      .eq('engagement_type', 'save')
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('[API] Discover saved list error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    const ids = (rows || []).map((r: any) => r.event_id).filter(Boolean);
+    const { getDiscoverItemsByIds } = await import('./services/discover-service.js');
+    const items = await getDiscoverItemsByIds(ids);
+    res.json({ success: true, items });
+  } catch (error: any) {
+    console.error('[API] Discover saved error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+  }
+});
+
 // POST /api/discover/:id/save - Save item to library
 app.post('/api/discover/:id/save', async (req, res) => {
   try {
@@ -2709,7 +2811,7 @@ app.post('/api/discover/:id/save', async (req, res) => {
       });
     }
 
-    // Track engagement
+    // Track engagement (only UUID event ids are stored; Perplexity ids may fail silently)
     try {
       const { trackEngagement } = await import('./services/engagement-service.js');
       await trackEngagement(userId, id, 'save');
@@ -2718,7 +2820,6 @@ app.post('/api/discover/:id/save', async (req, res) => {
       // Don't fail the request if tracking fails
     }
 
-    // For now, just return success (library feature to be implemented)
     res.json({
       success: true,
       message: 'Item saved to library',
@@ -2729,6 +2830,34 @@ app.post('/api/discover/:id/save', async (req, res) => {
       success: false,
       error: error.message || 'Internal server error',
     });
+  }
+});
+
+// DELETE /api/discover/:id/save - Remove item from library
+app.delete('/api/discover/:id/save', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = (req.query.userId as string) || (req.body?.userId as string);
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'User ID required' });
+    }
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Database not configured' });
+    }
+    const { error } = await supabase
+      .from('user_engagement')
+      .delete()
+      .eq('user_id', userId)
+      .eq('event_id', id)
+      .eq('engagement_type', 'save');
+    if (error) {
+      console.error('[API] Discover unsave error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    res.json({ success: true, message: 'Removed from library' });
+  } catch (error: any) {
+    console.error('[API] Unsave item error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Internal server error' });
   }
 });
 

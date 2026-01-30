@@ -58,7 +58,12 @@ export default function TrendingCompanies() {
   }
 
   if (companies.length === 0) {
-    return null;
+    return (
+      <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+        <h3 className="text-sm font-light text-white mb-2">Trending Companies</h3>
+        <p className="text-xs text-slate-500 font-light">Aucune donnée pour le moment.</p>
+      </div>
+    );
   }
 
   return (

@@ -4,7 +4,7 @@
  * Displays contextual empty states for the Discover page
  */
 
-import { Search, Filter, RefreshCw } from 'lucide-react';
+import { Search, Filter, RefreshCw, RotateCw } from 'lucide-react';
 
 interface EmptyStateProps {
   searchQuery?: string;
@@ -15,13 +15,15 @@ interface EmptyStateProps {
   };
   onResetFilters?: () => void;
   onClearSearch?: () => void;
+  onRetry?: () => void;
 }
 
 export default function EmptyState({ 
   searchQuery, 
   filters, 
   onResetFilters,
-  onClearSearch 
+  onClearSearch,
+  onRetry,
 }: EmptyStateProps) {
   const hasActiveFilters = searchQuery || 
     (filters?.category && filters.category !== 'all') ||
@@ -73,28 +75,39 @@ export default function EmptyState({
         <h3 className="text-xl font-light text-white mb-2">{title}</h3>
         <p className="text-sm text-slate-400 font-light mb-6">{description}</p>
 
-        {hasActiveFilters && (
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            {searchQuery && onClearSearch && (
-              <button
-                onClick={onClearSearch}
-                className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light flex items-center justify-center gap-2"
-              >
-                <Search className="w-4 h-4" />
-                Clear search
-              </button>
-            )}
-            {onResetFilters && (
-              <button
-                onClick={onResetFilters}
-                className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light flex items-center justify-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Reset filters
-              </button>
-            )}
-          </div>
-        )}
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          {hasActiveFilters && (
+            <>
+              {searchQuery && onClearSearch && (
+                <button
+                  onClick={onClearSearch}
+                  className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light flex items-center justify-center gap-2"
+                >
+                  <Search className="w-4 h-4" />
+                  Clear search
+                </button>
+              )}
+              {onResetFilters && (
+                <button
+                  onClick={onResetFilters}
+                  className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Réinitialiser les filtres
+                </button>
+              )}
+            </>
+          )}
+          {onRetry && (
+            <button
+              onClick={onRetry}
+              className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light flex items-center justify-center gap-2"
+            >
+              <RotateCw className="w-4 h-4" />
+              Réessayer / Actualiser
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

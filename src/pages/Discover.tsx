@@ -23,22 +23,18 @@ import SEO from '../components/SEO';
 import ProtectedRoute from '../components/ProtectedRoute';
 import DiscoverCard, { type DiscoverItem } from '../components/discover/DiscoverCard';
 import DiscoverListCard from '../components/discover/DiscoverListCard';
-import DiscoverTabs from '../components/discover/DiscoverTabs';
 import DiscoverFilters from '../components/discover/DiscoverFilters';
-import DiscoverSearch from '../components/discover/DiscoverSearch';
 import DiscoverSidebar from '../components/discover/DiscoverSidebar';
 import DiscoverDetailModal from '../components/discover/DiscoverDetailModal';
 import PersonalizationModal from '../components/discover/PersonalizationModal';
 import EmptyState from '../components/discover/EmptyState';
 import ViewModeToggle, { type ViewMode } from '../components/discover/ViewModeToggle';
 import AdvancedFilters, { type AdvancedFilters as AdvancedFiltersType } from '../components/discover/AdvancedFilters';
-import VirtualizedGrid from '../components/discover/VirtualizedGrid';
-import VirtualizedList from '../components/discover/VirtualizedList';
 import { DiscoverErrorBoundary } from '../components/discover/DiscoverErrorBoundary';
 import SkeletonCard from '../components/ui/SkeletonCard';
 import { Loader2, Filter } from 'lucide-react';
-import { getOrCreateSupabaseUserId } from '../lib/supabase';
-import { trackPageView, trackItemView, trackItemSave, trackItemShare, trackFilterChange, trackSearchQuery, trackViewModeChange, trackAdvancedFilterApply, trackSectorFilter, trackRegionFilter, trackEntityFilter, trackPredictionView, trackVirtualScrollEnabled } from '../lib/analytics';
+import { getOrCreateSupabaseUserId, updateUserPreferences } from '../lib/supabase';
+import { trackPageView, trackItemView, trackItemSave, trackItemShare, trackFilterChange, trackViewModeChange, trackAdvancedFilterApply, trackSectorFilter, trackRegionFilter, trackEntityFilter, trackPredictionView, trackVirtualScrollEnabled } from '../lib/analytics';
 
 // Wrapper component for DiscoverDetailModal to handle async userId
 function DiscoverDetailModalWrapper({
@@ -82,8 +78,6 @@ function DiscoverDetailModalWrapper({
 function DiscoverContent() {
   const { user } = useUser();
   const queryClient = useQueryClient();
-  const [selectedTab, setSelectedTab] = useState<string>('for-you');
-  const [searchQuery, setSearchQuery] = useState<string>('');
   const [filters, setFilters] = useState({
     timeRange: 'all' as 'now' | '24h' | '7d' | '30d' | 'structural' | 'all',
     sortBy: 'relevance' as 'relevance' | 'recent' | 'trending',
@@ -117,7 +111,6 @@ function DiscoverContent() {
   // Track page view
   useEffect(() => {
     trackPageView('discover', {
-      tab: selectedTab,
       view_mode: viewMode,
     });
   }, []); // Only on mount
@@ -144,8 +137,6 @@ function DiscoverContent() {
     }
   }, [filters.category]);
 
-  // Track search queries - moved after items definition
-
   // Show personalization modal on first visit
   useEffect(() => {
     const hasSeenPersonalization = localStorage.getItem('hasSeenPersonalization');
@@ -155,39 +146,61 @@ function DiscoverContent() {
   }, []);
 
   // Keyboard shortcuts
-  useHotkeys('/', (e) => {
-    e.preventDefault();
-    searchInputRef.current?.focus();
-  }, { preventDefault: true });
-
   useHotkeys('esc', () => {
     if (isModalOpen) {
       setIsModalOpen(false);
       setSelectedItem(null);
-    } else if (searchQuery) {
-      setSearchQuery('');
     }
   });
 
   // Keyboard shortcuts will be defined after items is available
 
-  // Determine category based on selected tab
-  const category = useMemo(() => {
-    if (selectedTab === 'topics') {
-      return filters.category || 'all';
-    } else if (selectedTab === 'top') {
-      return 'all'; // Top shows all categories
-    } else {
-      return 'all'; // For You shows personalized content
+  // Category from filters (users filter the curated feed)
+  const category = useMemo(() => filters.category || 'all', [filters.category]);
+
+  // Serialize advanced filters to query params
+  const advancedFiltersParams = useMemo(() => {
+    const params = new URLSearchParams();
+    if (advancedFilters.tags?.length) {
+      params.set('tags', advancedFilters.tags.join(','));
     }
-  }, [selectedTab, filters.category]);
+    if (advancedFilters.consensus?.length) {
+      params.set('consensus', advancedFilters.consensus.join(','));
+    }
+    if (advancedFilters.tier?.length) {
+      params.set('tier', advancedFilters.tier.join(','));
+    }
+    if (advancedFilters.sectors?.length) {
+      params.set('sectors', advancedFilters.sectors.join(','));
+    }
+    if (advancedFilters.regions?.length) {
+      params.set('regions', advancedFilters.regions.join(','));
+    }
+    if (advancedFilters.entities?.length) {
+      params.set('entities', advancedFilters.entities.join(','));
+    }
+    if (advancedFilters.minSources !== undefined) {
+      params.set('minSources', String(advancedFilters.minSources));
+    }
+    if (advancedFilters.maxSources !== undefined) {
+      params.set('maxSources', String(advancedFilters.maxSources));
+    }
+    if (advancedFilters.minScore !== undefined) {
+      params.set('minScore', String(advancedFilters.minScore));
+    }
+    if (advancedFilters.maxScore !== undefined) {
+      params.set('maxScore', String(advancedFilters.maxScore));
+    }
+    const str = params.toString();
+    return str ? `&${str}` : '';
+  }, [advancedFilters]);
 
   // Fetch discover items function for React Query
   const fetchDiscoverItems = useCallback(async ({ pageParam = 0 }: { pageParam?: number }) => {
     const userId = user ? await getOrCreateSupabaseUserId(user.id) : undefined;
     const offset = pageParam * itemsPerPage;
 
-    const apiUrl = `/api/discover?category=${category}&offset=${offset}&limit=${itemsPerPage}&sortBy=${filters.sortBy}&timeRange=${filters.timeRange}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}${userId ? `&userId=${userId}` : ''}`;
+    const apiUrl = `/api/discover?category=${category}&offset=${offset}&limit=${itemsPerPage}&sortBy=${filters.sortBy}&timeRange=${filters.timeRange}${userId ? `&userId=${userId}` : ''}${advancedFiltersParams}`;
     
     console.log('[Discover] Fetching from:', apiUrl);
     
@@ -242,7 +255,7 @@ function DiscoverContent() {
       hasMore: data.hasMore !== false,
       nextPage: data.hasMore ? pageParam + 1 : undefined,
     };
-  }, [category, filters.sortBy, filters.timeRange, searchQuery, user, itemsPerPage]);
+  }, [category, filters.sortBy, filters.timeRange, advancedFiltersParams, user, itemsPerPage]);
 
   // React Query infinite query
   const {
@@ -250,16 +263,18 @@ function DiscoverContent() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    isFetching,
     isLoading,
     isError,
     error,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ['discover', category, filters.sortBy, filters.timeRange, searchQuery, advancedFilters, user?.id],
+    queryKey: ['discover', category, filters.sortBy, filters.timeRange, advancedFilters, user?.id],
     queryFn: fetchDiscoverItems,
     getNextPageParam: (lastPage) => lastPage.nextPage,
     initialPageParam: 0,
   });
+  const isRefreshing = isFetching;
 
   // Flatten pages into single array
   const items = useMemo(() => {
@@ -290,13 +305,6 @@ function DiscoverContent() {
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
-
-  // Track search queries (after items is defined)
-  useEffect(() => {
-    if (searchQuery && searchQuery.trim() && items.length > 0) {
-      trackSearchQuery(searchQuery, items.length);
-    }
-  }, [searchQuery, items.length]);
 
   // Keyboard shortcuts (after items is defined)
   useHotkeys('j', () => {
@@ -516,31 +524,23 @@ function DiscoverContent() {
       <SEO title="Discover — Nucigen" description="Explore insights, trends, and analysis" />
 
       {/* Header */}
-      <div className="col-span-1 sm:col-span-12 mb-6">
-        <h1 className="text-3xl sm:text-4xl font-light text-white mb-6">Discover</h1>
-        
-        {/* Navigation Tabs */}
-        <div className="mb-6">
-          <DiscoverTabs
-            selected={selectedTab}
-            onSelect={(tab) => {
-              setSelectedTab(tab);
-              // Reset category when switching tabs
-              if (tab !== 'topics') {
-                setFilters(prev => ({ ...prev, category: 'all' }));
-              }
-            }}
-          />
+      <div className="col-span-1 sm:col-span-12 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl sm:text-4xl font-light text-white mb-1">Discover</h1>
+          <p className="text-slate-400 text-sm font-light">
+            Actualités entreprises, marchés, géopolitique — filtrez par catégorie et par période.
+          </p>
         </div>
-
-        {/* Search Bar */}
-        <div className="mb-6">
-          <DiscoverSearch
-            ref={searchInputRef}
-            onSearch={setSearchQuery}
-            placeholder="Search topics, trends, or ask a question... (Press / to focus)"
-          />
-        </div>
+        <button
+          type="button"
+          onClick={() => refetch()}
+          disabled={isRefreshing}
+          className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light shrink-0 self-start sm:self-center disabled:opacity-50"
+          aria-label="Actualiser le fil"
+        >
+          <Loader2 className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Actualiser
+        </button>
       </div>
 
       {/* Filters + View Mode Toggle */}
@@ -553,7 +553,7 @@ function DiscoverContent() {
               ...newFilters,
               category: newFilters.category ?? filters.category,
             })}
-            showCategory={selectedTab === 'topics'}
+            showCategory={true}
           />
           <button
             onClick={() => setIsAdvancedFiltersOpen(true)}
@@ -581,7 +581,7 @@ function DiscoverContent() {
             {/* Content */}
             {items.length === 0 ? (
               <EmptyState
-                searchQuery={searchQuery}
+                searchQuery=""
                 filters={filters}
                 onResetFilters={() => {
                   setFilters({
@@ -589,9 +589,9 @@ function DiscoverContent() {
                     sortBy: 'relevance',
                     category: 'all',
                   });
-                  setSearchQuery('');
                 }}
-                onClearSearch={() => setSearchQuery('')}
+                onClearSearch={() => {}}
+                onRetry={() => refetch()}
               />
             ) : (
               <>
@@ -730,11 +730,15 @@ function DiscoverContent() {
             setIsPersonalizationModalOpen(false);
             localStorage.setItem('hasSeenPersonalization', 'true');
           }}
-          onSave={(interests) => {
-            // Save interests to user preferences
-            console.log('Saved interests:', interests);
+          onSave={async (interests) => {
             localStorage.setItem('hasSeenPersonalization', 'true');
-            // TODO: Save to Supabase user preferences
+            if (user?.id) {
+              try {
+                await updateUserPreferences({ focus_areas: interests }, user.id);
+              } catch (err) {
+                console.warn('[Discover] Failed to save personalization:', err);
+              }
+            }
           }}
         />
       </Suspense>
