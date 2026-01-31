@@ -92,6 +92,55 @@ export interface SignalEnrichmentResponse {
   error?: string;
 }
 
+export interface DetectiveMessageRequest {
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  resultsSummary?: string;
+  options?: { maxScrapeUrls?: number };
+}
+
+export interface DetectiveMessageResponse {
+  success: boolean;
+  data?: {
+    content: string;
+    citations: string[];
+    related_questions: string[];
+    images: string[];
+    evidence: Array<{ url: string; title: string; excerpt: string }>;
+  };
+  error?: string;
+}
+
+/**
+ * Detective chat: Perplexity + Firecrawl evidence (pieces a conviction)
+ */
+export async function chatDetectiveMessage(
+  request: DetectiveMessageRequest
+): Promise<DetectiveMessageResponse> {
+  try {
+    const API_BASE = import.meta.env.DEV ? '/api' : '/api';
+    const response = await fetch(`${API_BASE}/search/detective/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: request.messages,
+        resultsSummary: request.resultsSummary,
+        options: request.options ?? { maxScrapeUrls: 3 },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Detective request failed' }));
+      throw new Error(errorData.error || 'Detective request failed');
+    }
+    return await response.json();
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error.message || 'Detective request failed',
+    };
+  }
+}
+
 /**
  * Chat with Perplexity
  */

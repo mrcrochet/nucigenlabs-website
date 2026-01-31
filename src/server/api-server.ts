@@ -737,6 +737,92 @@ app.post('/api/perplexity/chat', async (req, res) => {
   }
 });
 
+// Detective chat: Perplexity + Firecrawl evidence (scrape citations for "pieces a conviction")
+app.post('/api/search/detective/message', async (req, res) => {
+  try {
+    const { messages, resultsSummary, options: opts } = req.body;
+    const maxScrapeUrls = opts?.maxScrapeUrls ?? 3;
+
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({
+        success: false,
+        error: 'messages array is required',
+      });
+    }
+
+    const { chatCompletions } = await import('./services/perplexity-service.js');
+    const apiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+      ...(resultsSummary
+        ? [{ role: 'system' as const, content: `Sujet et contexte:\n${String(resultsSummary).slice(0, 800)}` }]
+        : []),
+      ...messages.map((m: { role: string; content: string }) => ({
+        role: (m.role === 'system' ? 'system' : m.role === 'assistant' ? 'assistant' : 'user') as 'system' | 'user' | 'assistant',
+        content: m.content,
+      })),
+    ];
+
+    const response = await chatCompletions({
+      model: 'sonar-pro',
+      messages: apiMessages,
+      return_citations: true,
+      return_related_questions: true,
+      return_images: true,
+    });
+
+    const content = response.choices?.[0]?.message?.content ?? '';
+    const citations = response.citations ?? response.choices?.[0]?.message?.citations ?? [];
+    const related_questions = response.related_questions ?? [];
+    const images = response.images ?? response.choices?.[0]?.message?.images ?? [];
+
+    const urlsToScrape = [...(Array.isArray(citations) ? citations : [])].slice(0, maxScrapeUrls);
+    const evidence: Array<{ url: string; title: string; excerpt: string }> = [];
+
+    if (urlsToScrape.length > 0) {
+      const { scrapeOfficialDocument, isFirecrawlAvailable } = await import('./phase4/firecrawl-official-service.js');
+      if (isFirecrawlAvailable()) {
+        const results = await Promise.allSettled(
+          urlsToScrape.map(async (url: string) => {
+            try {
+              const doc = await scrapeOfficialDocument(url, { checkWhitelist: false });
+              if (doc && doc.content) {
+                const domain = doc.domain || (url.match(/https?:\/\/(?:www\.)?([^/]+)/)?.[1] ?? '');
+                return {
+                  url,
+                  title: doc.title || domain,
+                  excerpt: doc.content.slice(0, 400).trim(),
+                };
+              }
+              return null;
+            } catch {
+              return null;
+            }
+          })
+        );
+        for (const r of results) {
+          if (r.status === 'fulfilled' && r.value) evidence.push(r.value);
+        }
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        content,
+        citations: Array.isArray(citations) ? citations : [],
+        related_questions: Array.isArray(related_questions) ? related_questions : [],
+        images: Array.isArray(images) ? images : [],
+        evidence,
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Detective message error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
 // Enrich signal with Perplexity
 app.post('/api/signals/:id/enrich', async (req, res) => {
   try {

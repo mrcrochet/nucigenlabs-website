@@ -8,10 +8,16 @@
  */
 
 import { useState, useCallback } from 'react';
-import { Send, Loader2, ExternalLink, Sparkles, MessageSquare, Settings, Globe, Image as ImageIcon, User } from 'lucide-react';
-import { chatWithPerplexity, type PerplexityChatResponse } from '../../lib/api/perplexity-api';
+import { Send, Loader2, ExternalLink, Sparkles, MessageSquare, Settings, Globe, Image as ImageIcon, User, Search, X } from 'lucide-react';
+import { chatDetectiveMessage, type DetectiveMessageResponse } from '../../lib/api/perplexity-api';
 
 type AnswerTab = 'answer' | 'links' | 'images';
+
+export interface EvidenceItem {
+  url: string;
+  title: string;
+  excerpt: string;
+}
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -19,6 +25,7 @@ export interface ChatMessage {
   citations?: string[];
   relatedQuestions?: string[];
   images?: string[];
+  evidence?: EvidenceItem[];
 }
 
 export interface SearchAnswerPanelProps {
@@ -43,39 +50,35 @@ export default function SearchAnswerPanel({
   const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState('');
 
-  const parseResponse = (res: PerplexityChatResponse): Omit<ChatMessage, 'role'> => {
+  const parseDetectiveResponse = (res: DetectiveMessageResponse): Omit<ChatMessage, 'role'> => {
     const data = res.data;
-    const content = data?.choices?.[0]?.message?.content ?? '';
-    const citations = data?.citations ?? data?.choices?.[0]?.message?.citations ?? [];
-    const relatedQuestions = data?.related_questions ?? [];
-    const images = data?.images ?? data?.choices?.[0]?.message?.images ?? [];
+    if (!data) {
+      return { content: '', citations: [], relatedQuestions: [], images: [], evidence: [] };
+    }
     return {
-      content,
-      citations: Array.isArray(citations) ? citations : [],
-      relatedQuestions: Array.isArray(relatedQuestions) ? relatedQuestions : [],
-      images: Array.isArray(images) ? images : [],
+      content: data.content ?? '',
+      citations: Array.isArray(data.citations) ? data.citations : [],
+      relatedQuestions: Array.isArray(data.related_questions) ? data.related_questions : [],
+      images: Array.isArray(data.images) ? data.images : [],
+      evidence: Array.isArray(data.evidence) ? data.evidence : [],
     };
   };
 
   const requestAnswer = useCallback(
-    async (apiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>): Promise<Omit<ChatMessage, 'role'> | null> => {
+    async (apiMessages: Array<{ role: 'user' | 'assistant'; content: string }>): Promise<Omit<ChatMessage, 'role'> | null> => {
       setLoading(true);
       setError(null);
       try {
-        const res = await chatWithPerplexity({
+        const res = await chatDetectiveMessage({
           messages: apiMessages,
-          model: 'sonar-pro',
-          options: {
-            return_citations: true,
-            return_related_questions: true,
-            return_images: true,
-          },
+          resultsSummary: resultsSummary ? resultsSummary.slice(0, 800) : undefined,
+          options: { maxScrapeUrls: 3 },
         });
         if (!res.success) {
           setError(res.error || 'Échec de la requête');
           return null;
         }
-        return parseResponse(res);
+        return parseDetectiveResponse(res);
       } catch (err: any) {
         setError(err?.message || 'Échec de la requête');
         return null;
@@ -83,7 +86,7 @@ export default function SearchAnswerPanel({
         setLoading(false);
       }
     },
-    []
+    [resultsSummary]
   );
 
   const sendMessage = useCallback(
@@ -95,14 +98,8 @@ export default function SearchAnswerPanel({
       const userMessage: ChatMessage = { role: 'user', content: q };
       setMessages((prev) => [...prev, userMessage]);
 
-      const systemContent = resultsSummary
-        ? `Sujet de la recherche et contexte (utilise pour enrichir ta réponse) :\n${resultsSummary.slice(0, 800)}`
-        : undefined;
-      const apiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-        ...(systemContent ? [{ role: 'system' as const, content: systemContent }] : []),
-        ...messages.flatMap((m) =>
-          m.role === 'user' ? [{ role: 'user' as const, content: m.content }] : [{ role: 'assistant' as const, content: m.content }]
-        ),
+      const apiMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [
+        ...messages.flatMap((m) => [{ role: m.role, content: m.content }]),
         { role: 'user', content: q },
       ];
 
@@ -111,8 +108,58 @@ export default function SearchAnswerPanel({
         setMessages((prev) => [...prev, { role: 'assistant', ...reply }]);
       }
     },
-    [messages, resultsSummary, requestAnswer]
+    [messages, requestAnswer]
   );
+
+  const [sourceDrawer, setSourceDrawer] = useState<{
+    url: string;
+    title: string;
+    loading: boolean;
+    error: string | null;
+    data: {
+      title?: string;
+      summary?: string;
+      content?: string;
+      entities?: Array<{ name: string; type?: string }>;
+      keyFacts?: string[];
+    } | null;
+  } | null>(null);
+
+  const openCreuserSource = useCallback((url: string, title: string) => {
+    setSourceDrawer({ url, title, loading: true, error: null, data: null });
+    fetch('/api/enrich', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    })
+      .then((r) => r.json())
+      .then((json) => {
+        if (!json.success) {
+          setSourceDrawer((d) => (d ? { ...d, loading: false, error: json.error || 'Erreur' } : null));
+          return;
+        }
+        setSourceDrawer((d) =>
+          d
+            ? {
+                ...d,
+                loading: false,
+                data: {
+                  title: json.enrichedData?.title,
+                  summary: json.enrichedData?.summary,
+                  content: json.enrichedData?.content,
+                  entities: json.entities,
+                  keyFacts: json.keyFacts,
+                },
+              }
+            : null
+        );
+      })
+      .catch((err) => {
+        setSourceDrawer((d) => (d ? { ...d, loading: false, error: err?.message || 'Erreur réseau' } : null));
+      });
+  }, []);
+
+  const closeSourceDrawer = useCallback(() => setSourceDrawer(null), []);
 
   const handleExplainClick = () => {
     sendMessage(query.trim());
@@ -183,19 +230,54 @@ export default function SearchAnswerPanel({
             >
               {msg.role === 'user' ? <User className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
             </div>
-            <div
-              className={`flex-1 min-w-0 max-w-[85%] rounded-xl px-4 py-3 ${
-                msg.role === 'user'
-                  ? 'bg-[#E1463E]/10 border border-[#E1463E]/20 text-text-primary'
-                  : 'bg-borders-subtle/50 border border-borders-subtle text-text-primary'
-              }`}
-            >
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-              {msg.role === 'assistant' && msg.citations && msg.citations.length > 0 && i === messages.length - 1 && (
-                <p className="mt-2 flex items-center gap-1.5 text-xs text-text-secondary">
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  Revue {msg.citations.length} source{msg.citations.length > 1 ? 's' : ''}
-                </p>
+            <div className="flex-1 min-w-0 max-w-[85%] space-y-3">
+              <div
+                className={`rounded-xl px-4 py-3 ${
+                  msg.role === 'user'
+                    ? 'bg-[#E1463E]/10 border border-[#E1463E]/20 text-text-primary'
+                    : 'bg-borders-subtle/50 border border-borders-subtle text-text-primary'
+                }`}
+              >
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                {msg.role === 'assistant' && msg.citations && msg.citations.length > 0 && i === messages.length - 1 && (
+                  <p className="mt-2 flex items-center gap-1.5 text-xs text-text-secondary">
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Revue {msg.citations.length} source{msg.citations.length > 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
+              {msg.role === 'assistant' && msg.evidence && msg.evidence.length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">Preuves</span>
+                  <div className="space-y-2">
+                    {msg.evidence.map((ev, j) => (
+                      <div
+                        key={j}
+                        className="rounded-lg border border-borders-subtle bg-borders-subtle/30 px-3 py-2.5 space-y-1.5"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <a
+                            href={ev.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-medium text-text-primary hover:text-[#E1463E] truncate flex-1 min-w-0"
+                          >
+                            {ev.title}
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => openCreuserSource(ev.url, ev.title)}
+                            className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded text-xs text-text-secondary hover:bg-[#E1463E]/10 hover:text-[#E1463E] transition-colors"
+                          >
+                            <Search className="w-3.5 h-3.5" />
+                            Creuser
+                          </button>
+                        </div>
+                        <p className="text-xs text-text-secondary line-clamp-2">{ev.excerpt}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -293,6 +375,83 @@ export default function SearchAnswerPanel({
             )}
           </div>
         </>
+      )}
+
+      {/* Drawer Creuser cette source */}
+      {sourceDrawer && (
+        <div className="fixed inset-0 z-50 flex items-stretch justify-end">
+          <div className="absolute inset-0 bg-black/50" onClick={closeSourceDrawer} aria-hidden />
+          <div className="relative w-full max-w-md bg-background-base border-l border-borders-subtle shadow-xl flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b border-borders-subtle flex items-center justify-between shrink-0">
+              <h3 className="text-sm font-semibold text-text-primary truncate">{sourceDrawer.title}</h3>
+              <button
+                type="button"
+                onClick={closeSourceDrawer}
+                className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-borders-subtle"
+                aria-label="Fermer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {sourceDrawer.loading && (
+                <div className="flex items-center gap-2 text-text-secondary text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Chargement…</span>
+                </div>
+              )}
+              {sourceDrawer.error && (
+                <p className="text-sm text-[#E1463E]">{sourceDrawer.error}</p>
+              )}
+              {!sourceDrawer.loading && sourceDrawer.data && (
+                <>
+                  {sourceDrawer.data.title && (
+                    <h4 className="text-sm font-medium text-text-primary">{sourceDrawer.data.title}</h4>
+                  )}
+                  {(sourceDrawer.data.summary || sourceDrawer.data.content) && (
+                    <p className="text-sm text-text-secondary whitespace-pre-wrap line-clamp-6">
+                      {sourceDrawer.data.summary || (sourceDrawer.data.content || '').slice(0, 800)}
+                    </p>
+                  )}
+                  {sourceDrawer.data.entities && sourceDrawer.data.entities.length > 0 && (
+                    <div>
+                      <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">Entités</span>
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {sourceDrawer.data.entities.map((e, k) => (
+                          <span
+                            key={k}
+                            className="px-2 py-1 rounded bg-borders-subtle/50 text-xs text-text-secondary"
+                          >
+                            {e.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {sourceDrawer.data.keyFacts && sourceDrawer.data.keyFacts.length > 0 && (
+                    <div>
+                      <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">Faits clés</span>
+                      <ul className="mt-2 space-y-1 text-sm text-text-secondary list-disc list-inside">
+                        {sourceDrawer.data.keyFacts.slice(0, 8).map((fact, k) => (
+                          <li key={k}>{fact}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <a
+                    href={sourceDrawer.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-sm text-[#E1463E] hover:underline"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Ouvrir la source
+                  </a>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Champ de saisie */}
