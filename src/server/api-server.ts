@@ -737,11 +737,32 @@ app.post('/api/perplexity/chat', async (req, res) => {
   }
 });
 
+// In-memory cache for detective evidence (URL -> { title, excerpt, contentTruncated, cachedAt }), TTL 1 hour
+const DETECTIVE_EVIDENCE_CACHE_TTL_MS = 60 * 60 * 1000;
+const detectiveEvidenceCache = new Map<
+  string,
+  { title: string; excerpt: string; contentTruncated: string; cachedAt: number }
+>();
+
+function getCachedEvidence(url: string): { title: string; excerpt: string; contentTruncated: string } | null {
+  const entry = detectiveEvidenceCache.get(url);
+  if (!entry || Date.now() - entry.cachedAt > DETECTIVE_EVIDENCE_CACHE_TTL_MS) return null;
+  return { title: entry.title, excerpt: entry.excerpt, contentTruncated: entry.contentTruncated };
+}
+
+function setCachedEvidence(
+  url: string,
+  value: { title: string; excerpt: string; contentTruncated: string }
+): void {
+  detectiveEvidenceCache.set(url, { ...value, cachedAt: Date.now() });
+}
+
 // Detective chat: Perplexity + Firecrawl evidence (scrape citations for "pieces a conviction")
 app.post('/api/search/detective/message', async (req, res) => {
   try {
     const { messages, resultsSummary, options: opts } = req.body;
     const maxScrapeUrls = opts?.maxScrapeUrls ?? 3;
+    const includeGrounding = opts?.includeGrounding === true;
 
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({
@@ -761,35 +782,51 @@ app.post('/api/search/detective/message', async (req, res) => {
       })),
     ];
 
+    const detectiveMaxTokens = parseInt(process.env.PERPLEXITY_DETECTIVE_MAX_TOKENS || '1024', 10) || 1024;
     const response = await chatCompletions({
-      model: 'sonar-pro',
+      model: process.env.PERPLEXITY_MODEL_DEFAULT === 'sonar' ? 'sonar' : 'sonar-pro',
       messages: apiMessages,
+      max_tokens: detectiveMaxTokens,
       return_citations: true,
       return_related_questions: true,
       return_images: true,
     });
 
-    const content = response.choices?.[0]?.message?.content ?? '';
+    let content = response.choices?.[0]?.message?.content ?? '';
     const citations = response.citations ?? response.choices?.[0]?.message?.citations ?? [];
-    const related_questions = response.related_questions ?? [];
+    let related_questions = response.related_questions ?? [];
     const images = response.images ?? response.choices?.[0]?.message?.images ?? [];
 
     const urlsToScrape = [...(Array.isArray(citations) ? citations : [])].slice(0, maxScrapeUrls);
     const evidence: Array<{ url: string; title: string; excerpt: string }> = [];
+    const contentForGrounding: string[] = [];
 
     if (urlsToScrape.length > 0) {
       const { scrapeOfficialDocument, isFirecrawlAvailable } = await import('./phase4/firecrawl-official-service.js');
       if (isFirecrawlAvailable()) {
         const results = await Promise.allSettled(
           urlsToScrape.map(async (url: string) => {
+            const cached = getCachedEvidence(url);
+            if (cached) {
+              contentForGrounding.push(cached.contentTruncated);
+              return { url, title: cached.title, excerpt: cached.excerpt };
+            }
             try {
               const doc = await scrapeOfficialDocument(url, { checkWhitelist: false });
               if (doc && doc.content) {
                 const domain = doc.domain || (url.match(/https?:\/\/(?:www\.)?([^/]+)/)?.[1] ?? '');
+                const excerpt = doc.content.slice(0, 400).trim();
+                const contentTruncated = doc.content.slice(0, 2000).trim();
+                setCachedEvidence(url, {
+                  title: doc.title || domain,
+                  excerpt,
+                  contentTruncated,
+                });
+                contentForGrounding.push(contentTruncated);
                 return {
                   url,
                   title: doc.title || domain,
-                  excerpt: doc.content.slice(0, 400).trim(),
+                  excerpt,
                 };
               }
               return null;
@@ -801,6 +838,32 @@ app.post('/api/search/detective/message', async (req, res) => {
         for (const r of results) {
           if (r.status === 'fulfilled' && r.value) evidence.push(r.value);
         }
+      }
+    }
+
+    if (includeGrounding && contentForGrounding.length > 0 && messages.length > 0) {
+      const lastUserMessage = [...messages].reverse().find((m: { role: string }) => m.role === 'user');
+      const userQuery = lastUserMessage?.content ?? content;
+      const contextText = contentForGrounding
+        .map((c, i) => `[Source ${i + 1}]:\n${c}`)
+        .join('\n\n---\n\n');
+      try {
+        const groundedResponse = await chatCompletions({
+          model: 'sonar-pro',
+          messages: [
+            {
+              role: 'system',
+              content: `Answer based only on the following context. If the context does not contain enough information to answer, say so and summarize what is available.\n\nContext:\n${contextText}`,
+            },
+            { role: 'user', content: userQuery },
+          ],
+          return_citations: false,
+          return_related_questions: false,
+        });
+        const groundedContent = groundedResponse.choices?.[0]?.message?.content ?? '';
+        if (groundedContent) content = groundedContent;
+      } catch (groundErr: any) {
+        console.warn('[API] Detective grounding fallback:', groundErr?.message);
       }
     }
 
@@ -820,6 +883,298 @@ app.post('/api/search/detective/message', async (req, res) => {
       success: false,
       error: error.message || 'Internal server error',
     });
+  }
+});
+
+// ============================================
+// Investigation Threads (Nucigen Intelligence Detective)
+// ============================================
+
+function getInvestigationUserId(req: express.Request): string | null {
+  return (req.body?.userId as string) || (req.query.userId as string) || (req.headers['x-user-id'] as string) || (req.headers['x-clerk-user-id'] as string) || null;
+}
+
+// POST /api/investigations — Create thread
+app.post('/api/investigations', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Database not configured' });
+    }
+    const clerkUserId = getInvestigationUserId(req);
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, error: 'User ID required. Send x-clerk-user-id header or userId in body.' });
+    }
+    const supabaseUserId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!supabaseUserId) {
+      return res.status(400).json({ success: false, error: 'Invalid user ID' });
+    }
+    const { initial_hypothesis, title, scope } = req.body;
+    if (!initial_hypothesis || typeof initial_hypothesis !== 'string') {
+      return res.status(400).json({ success: false, error: 'initial_hypothesis required' });
+    }
+    const scopeVal = scope && ['geopolitics', 'commodities', 'security', 'finance'].includes(scope) ? scope : 'geopolitics';
+    const titleVal = title && typeof title === 'string' ? title.trim() : initial_hypothesis.slice(0, 80);
+    const { data: thread, error } = await supabase
+      .from('investigation_threads')
+      .insert({
+        user_id: supabaseUserId,
+        title: titleVal,
+        initial_hypothesis: initial_hypothesis.trim(),
+        scope: scopeVal,
+        status: 'active',
+        confidence_score: null,
+        investigative_axes: [],
+        blind_spots: [],
+      })
+      .select()
+      .single();
+    if (error) {
+      console.error('[API] Investigation create error:', error);
+      return res.status(500).json({ success: false, error: error.message || 'Database error' });
+    }
+    res.status(200).json({ success: true, thread });
+  } catch (err: any) {
+    console.error('[API] Investigations create:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
+  }
+});
+
+// GET /api/investigations — List threads for user
+app.get('/api/investigations', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Database not configured' });
+    }
+    const clerkUserId = getInvestigationUserId(req);
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, error: 'User ID required. Send x-clerk-user-id header or userId query.' });
+    }
+    const supabaseUserId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!supabaseUserId) {
+      return res.json({ success: true, threads: [] });
+    }
+    const { data: threads, error } = await supabase
+      .from('investigation_threads')
+      .select('*')
+      .eq('user_id', supabaseUserId)
+      .order('updated_at', { ascending: false });
+    if (error) {
+      console.error('[API] Investigations list error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    res.status(200).json({ success: true, threads: threads || [] });
+  } catch (err: any) {
+    console.error('[API] Investigations list:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
+  }
+});
+
+// GET /api/investigations/:threadId — Thread detail + messages + signals
+app.get('/api/investigations/:threadId', async (req, res) => {
+  try {
+    const { threadId } = req.params;
+    const clerkUserId = getInvestigationUserId(req);
+    if (!clerkUserId || !supabase) {
+      return res.status(400).json({ success: false, error: 'User ID required' });
+    }
+    const supabaseUserId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!supabaseUserId) {
+      return res.status(400).json({ success: false, error: 'Invalid user ID' });
+    }
+    const { data: thread, error: threadError } = await supabase
+      .from('investigation_threads')
+      .select('*')
+      .eq('id', threadId)
+      .eq('user_id', supabaseUserId)
+      .single();
+    if (threadError || !thread) {
+      return res.status(404).json({ success: false, error: 'Thread not found' });
+    }
+    const [messagesRes, signalsRes] = await Promise.all([
+      supabase.from('investigation_messages').select('*').eq('thread_id', threadId).order('created_at', { ascending: true }),
+      supabase.from('investigation_signals').select('*').eq('thread_id', threadId).order('created_at', { ascending: false }),
+    ]);
+    const messages = messagesRes.data || [];
+    const signals = signalsRes.data || [];
+    res.status(200).json({ success: true, thread, messages, signals });
+  } catch (err: any) {
+    console.error('[API] Investigation get:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
+  }
+});
+
+// POST /api/investigations/:threadId/messages — Send message, run detective, persist message + signals
+app.post('/api/investigations/:threadId/messages', async (req, res) => {
+  try {
+    const { threadId } = req.params;
+    const { content } = req.body;
+    if (!content || typeof content !== 'string') {
+      return res.status(400).json({ success: false, error: 'content required' });
+    }
+    const clerkUserId = getInvestigationUserId(req);
+    if (!clerkUserId || !supabase) {
+      return res.status(400).json({ success: false, error: 'User ID required' });
+    }
+    const supabaseUserId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!supabaseUserId) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+    const { data: thread } = await supabase
+      .from('investigation_threads')
+      .select('id, initial_hypothesis')
+      .eq('id', threadId)
+      .eq('user_id', supabaseUserId)
+      .single();
+    if (!thread) {
+      return res.status(404).json({ success: false, error: 'Thread not found' });
+    }
+    const { data: existingMessages } = await supabase
+      .from('investigation_messages')
+      .select('role, content')
+      .eq('thread_id', threadId)
+      .order('created_at', { ascending: true });
+    const apiMessages = (existingMessages || []).map((m: { role: string; content: string }) => ({ role: m.role, content: m.content }));
+    apiMessages.push({ role: 'user', content: content.trim() });
+    const resultsSummary = thread.initial_hypothesis ? `Hypothèse de la piste: ${thread.initial_hypothesis}` : undefined;
+    const detectiveRes = await fetch(`${req.protocol}://${req.get('host') || 'localhost:3001'}/api/search/detective/message`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: apiMessages, resultsSummary, options: { maxScrapeUrls: 3 } }),
+    });
+    if (!detectiveRes.ok) {
+      const errData = await detectiveRes.json().catch(() => ({}));
+      return res.status(502).json({ success: false, error: (errData as { error?: string }).error || 'Detective request failed' });
+    }
+    const detectiveData = await detectiveRes.json();
+    const data = detectiveData.data || {};
+    const assistantContent = data.content || '';
+    const citations = Array.isArray(data.citations) ? data.citations : [];
+    const evidence = Array.isArray(data.evidence) ? data.evidence : [];
+    const { data: userMsg, error: userMsgErr } = await supabase
+      .from('investigation_messages')
+      .insert({ thread_id: threadId, role: 'user', content: content.trim(), citations: [] })
+      .select()
+      .single();
+    if (userMsgErr) {
+      console.error('[API] Investigation user message insert:', userMsgErr);
+    }
+    const { data: assistantMsg, error: assistantMsgErr } = await supabase
+      .from('investigation_messages')
+      .insert({
+        thread_id: threadId,
+        role: 'assistant',
+        content: assistantContent,
+        citations,
+        evidence_snapshot: evidence,
+      })
+      .select()
+      .single();
+    if (assistantMsgErr) {
+      console.error('[API] Investigation assistant message insert:', assistantMsgErr);
+    }
+    const newSignals: any[] = [];
+    for (let i = 0; i < evidence.length; i++) {
+      const ev = evidence[i];
+      const { data: sig } = await supabase
+        .from('investigation_signals')
+        .insert({
+          thread_id: threadId,
+          type: 'article',
+          source: ev.title || new URL(ev.url).hostname,
+          url: ev.url,
+          summary: (ev.excerpt || '').slice(0, 500),
+          actors: [],
+          extracted_facts: [],
+          raw_evidence: ev,
+        })
+        .select()
+        .single();
+      if (sig) newSignals.push(sig);
+    }
+    await supabase
+      .from('investigation_threads')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', threadId);
+    res.status(200).json({
+      success: true,
+      message: assistantMsg || { role: 'assistant', content: assistantContent, citations, evidence_snapshot: evidence },
+      newSignals,
+    });
+  } catch (err: any) {
+    console.error('[API] Investigation message:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
+  }
+});
+
+// GET /api/investigations/:threadId/signals
+app.get('/api/investigations/:threadId/signals', async (req, res) => {
+  try {
+    const { threadId } = req.params;
+    const clerkUserId = getInvestigationUserId(req);
+    if (!clerkUserId || !supabase) {
+      return res.status(400).json({ success: false, error: 'User ID required' });
+    }
+    const supabaseUserId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!supabaseUserId) {
+      return res.json({ success: true, signals: [] });
+    }
+    const { data: thread } = await supabase
+      .from('investigation_threads')
+      .select('id')
+      .eq('id', threadId)
+      .eq('user_id', supabaseUserId)
+      .single();
+    if (!thread) {
+      return res.status(404).json({ success: false, error: 'Thread not found' });
+    }
+    const { data: signals, error } = await supabase
+      .from('investigation_signals')
+      .select('*')
+      .eq('thread_id', threadId)
+      .order('created_at', { ascending: false });
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    res.status(200).json({ success: true, signals: signals || [] });
+  } catch (err: any) {
+    console.error('[API] Investigation signals:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
+  }
+});
+
+// PATCH /api/investigations/:threadId
+app.patch('/api/investigations/:threadId', async (req, res) => {
+  try {
+    const { threadId } = req.params;
+    const { status, title } = req.body;
+    const clerkUserId = getInvestigationUserId(req);
+    if (!clerkUserId || !supabase) {
+      return res.status(400).json({ success: false, error: 'User ID required' });
+    }
+    const supabaseUserId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!supabaseUserId) {
+      return res.status(400).json({ success: false, error: 'Invalid user ID' });
+    }
+    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (status && ['active', 'dormant', 'closed'].includes(status)) updates.status = status;
+    if (title && typeof title === 'string') updates.title = title.trim();
+    const { data: thread, error } = await supabase
+      .from('investigation_threads')
+      .update(updates)
+      .eq('id', threadId)
+      .eq('user_id', supabaseUserId)
+      .select()
+      .single();
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    if (!thread) {
+      return res.status(404).json({ success: false, error: 'Thread not found' });
+    }
+    res.status(200).json({ success: true, thread });
+  } catch (err: any) {
+    console.error('[API] Investigation patch:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
   }
 });
 

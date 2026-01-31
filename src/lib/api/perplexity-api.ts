@@ -124,7 +124,7 @@ export async function chatDetectiveMessage(
       body: JSON.stringify({
         messages: request.messages,
         resultsSummary: request.resultsSummary,
-        options: request.options ?? { maxScrapeUrls: 3 },
+        options: { maxScrapeUrls: 3, includeGrounding: false, ...request.options },
       }),
     });
 

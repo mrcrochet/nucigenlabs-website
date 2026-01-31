@@ -28,6 +28,14 @@ dotenv.config();
 const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
 const PERPLEXITY_BASE_URL = 'https://api.perplexity.ai';
 
+/** Default max_tokens when not set (reduces cost). Override with PERPLEXITY_MAX_TOKENS_DEFAULT in .env */
+const DEFAULT_MAX_TOKENS = typeof process.env.PERPLEXITY_MAX_TOKENS_DEFAULT !== 'undefined'
+  ? parseInt(process.env.PERPLEXITY_MAX_TOKENS_DEFAULT, 10) || 2048
+  : 2048;
+
+/** Default model when not set. Use 'sonar' for lower cost, 'sonar-pro' for quality. */
+const DEFAULT_MODEL = (process.env.PERPLEXITY_MODEL_DEFAULT as 'sonar' | 'sonar-pro') || 'sonar-pro';
+
 // Debug: Log API key status (without exposing the key)
 if (!PERPLEXITY_API_KEY) {
   console.warn('[Perplexity] ⚠️  PERPLEXITY_API_KEY not found in environment variables');
@@ -168,10 +176,10 @@ export async function chatCompletions(
   const response = await makeRequest('/chat/completions', {
     method: 'POST',
     body: JSON.stringify({
-      model: options.model || 'sonar',
+      model: options.model || DEFAULT_MODEL,
       messages: options.messages,
       temperature: options.temperature,
-      max_tokens: options.max_tokens,
+      max_tokens: options.max_tokens ?? DEFAULT_MAX_TOKENS,
       top_p: options.top_p,
       top_k: options.top_k,
       stream: options.stream || false,
