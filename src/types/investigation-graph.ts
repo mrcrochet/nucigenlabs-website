@@ -14,6 +14,12 @@ export type InvestigationEdgeRelation =
   | 'restricts'
   | 'triggers';
 
+/**
+ * Path lifecycle status.
+ * - active: hypothesis supported by evidence.
+ * - weak: hypothesis not confirmed (insufficient or conflicting evidence).
+ * - dead: hypothesis invalidated (contradicted by solid facts). Never deleted.
+ */
 export type InvestigationPathStatus = 'active' | 'weak' | 'dead';
 
 /** Node: fact / event / actor in the graph */
@@ -35,12 +41,18 @@ export interface InvestigationGraphEdge {
   confidence: number;
 }
 
-/** Path: computed investigative lead (ordered nodes, status) */
+/**
+ * Path: computed investigative lead (ordered nodes, status).
+ * Convention: confidence is 0..100 (display/UI). Internal scoring uses 0..1.
+ */
 export interface InvestigationGraphPath {
   id: string;
   nodes: string[];
   status: InvestigationPathStatus;
+  /** 0..100 (display). Do not use 0..1 in graph/UI. */
   confidence: number;
+  /** Optional label for UX (e.g. "Sanctions-driven supply shock"). Not computed in v1. */
+  hypothesis_label?: string;
 }
 
 /** Full investigation graph — single state fed to all three views */

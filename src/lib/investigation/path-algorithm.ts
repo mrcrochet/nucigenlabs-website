@@ -6,6 +6,8 @@
  * Output: Multiple investigative paths with lifecycle and scoring.
  *
  * Edges = raw material. Paths = intelligence.
+ *
+ * Confidence convention: internal scoring = 0..1; output (InvestigationGraphPath.confidence) = 0..100 for UI.
  */
 
 import type {
