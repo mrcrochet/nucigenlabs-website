@@ -9,8 +9,7 @@
  * - Result details drawer
  */
 
-import { useState, useCallback, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useCallback } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import { toast } from 'sonner';
 import AppShell from '../components/layout/AppShell';
@@ -21,20 +20,16 @@ import FiltersDrawer from '../components/search/FiltersDrawer';
 import ResultsPanel from '../components/search/ResultsPanel';
 import KnowledgeGraph from '../components/search/KnowledgeGraph';
 import ResultDetailsDrawer from '../components/search/ResultDetailsDrawer';
-import EntityDetailsDrawer from '../components/search/EntityDetailsDrawer';
 import SearchStatusBar from '../components/search/SearchStatusBar';
 import InsightPanel from '../components/search/InsightPanel';
-import { createThread } from '../lib/api/investigation-api';
-import type { SearchMode, SearchFilters, SearchResult, KnowledgeGraph as KnowledgeGraphType, GraphNode } from '../types/search';
+import type { SearchMode, SearchFilters, SearchResult, KnowledgeGraph as KnowledgeGraphType } from '../types/search';
 
 function SearchContent() {
-  const navigate = useNavigate();
   const { user } = useUser();
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<SearchMode>('standard');
   const [filters, setFilters] = useState<SearchFilters>({});
   const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
-  const [selectedEntityNode, setSelectedEntityNode] = useState<GraphNode | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [showResults, setShowResults] = useState(false);
@@ -333,63 +328,6 @@ function SearchContent() {
 
   const selectedResult = searchResults?.results.find(r => r.id === selectedResultId) || null;
 
-  const handleNodeClick = useCallback(
-    (nodeId: string, node?: GraphNode) => {
-      if (!node) {
-        setSelectedResultId(nodeId);
-        setSelectedEntityNode(null);
-        return;
-      }
-      const isResultNode =
-        (node.type === 'event' || node.type === 'article' || node.type === 'document') &&
-        searchResults?.results.some((r) => r.id === node.id);
-      if (isResultNode) {
-        setSelectedResultId(node.id);
-        setSelectedEntityNode(null);
-      } else {
-        setSelectedEntityNode(node);
-        setSelectedResultId(null);
-      }
-    },
-    [searchResults?.results]
-  );
-
-  const handleNodeContextMenu = useCallback((_nodeId: string, node: GraphNode, ev?: { clientX: number; clientY: number }) => {
-    setGraphContextMenu({ x: ev?.clientX ?? 0, y: ev?.clientY ?? 0, node });
-  }, []);
-
-  useEffect(() => {
-    const close = () => setGraphContextMenu(null);
-    if (graphContextMenu) {
-      const onGlobalClick = (e: MouseEvent) => {
-        const target = e.target as HTMLElement;
-        if (!target.closest('[data-graph-context-menu]')) close();
-      };
-      document.addEventListener('click', onGlobalClick);
-      return () => document.removeEventListener('click', onGlobalClick);
-    }
-  }, [graphContextMenu]);
-
-  const handleCreateInvestigationFromNode = useCallback(async () => {
-    if (!graphContextMenu?.node || !user?.id) return;
-    const { node } = graphContextMenu;
-    const isResultNode = ['event', 'article', 'document'].includes(node.type);
-    const hypothesis = isResultNode
-      ? `Vérifier et approfondir : ${node.label}.`
-      : `Explorer le rôle de ${node.label} (${node.type}) dans le contexte de la recherche : ${query || 'requête actuelle'}.`;
-    setGraphContextMenu(null);
-    const res = await createThread(
-      { initial_hypothesis: hypothesis, scope: 'geopolitics' },
-      { clerkUserId: user.id }
-    );
-    if (res.success && res.thread) {
-      toast.success('Enquête créée');
-      navigate(`/investigations/${res.thread.id}`);
-    } else {
-      toast.error(res.error || 'Erreur à la création');
-    }
-  }, [graphContextMenu, user?.id, query]);
-
   // Handle node explore (click on graph node = contextual search)
   const handleNodeExplore = useCallback((_nodeId: string, nodeLabel: string) => {
     // Build contextual query: original query + clicked node
@@ -480,11 +418,8 @@ function SearchContent() {
           <KnowledgeGraph
             graph={searchResults?.graph || { nodes: [], links: [] }}
             query={query || undefined}
-            searchMode={searchResults?.meta?.mode ?? null}
-            initialFocusNodeId={focusNodeIdFromUrl}
-            onNodeClick={handleNodeClick}
+            onNodeClick={setSelectedResultId}
             onNodeExplore={handleNodeExplore}
-            onNodeContextMenu={handleNodeContextMenu}
             height={600}
           />
         </div>
@@ -525,40 +460,6 @@ function SearchContent() {
           onClose={() => setSelectedResultId(null)}
           onExploreDeeper={() => handleExploreDeeper(selectedResult.id)}
         />
-      )}
-
-      {selectedEntityNode && (
-        <EntityDetailsDrawer
-          entityNode={selectedEntityNode}
-          results={searchResults?.results ?? []}
-          graph={searchResults?.graph ?? { nodes: [], links: [] }}
-          isOpen={!!selectedEntityNode}
-          onClose={() => setSelectedEntityNode(null)}
-        />
-      )}
-
-      {/* Graph context menu: Créer une enquête */}
-      {graphContextMenu && (
-        <div
-          data-graph-context-menu
-          className="fixed z-[10002] min-w-[180px] py-1 bg-background-base border border-borders-subtle rounded-lg shadow-xl"
-          style={{ left: Math.min(graphContextMenu.x, typeof window !== 'undefined' ? window.innerWidth - 200 : graphContextMenu.x), top: graphContextMenu.y }}
-        >
-          <button
-            type="button"
-            onClick={handleCreateInvestigationFromNode}
-            className="w-full px-4 py-2 text-left text-sm text-text-primary hover:bg-background-glass-subtle"
-          >
-            Créer une enquête
-          </button>
-          <button
-            type="button"
-            onClick={() => setGraphContextMenu(null)}
-            className="w-full px-4 py-2 text-left text-sm text-text-secondary hover:bg-background-glass-subtle"
-          >
-            Fermer
-          </button>
-        </div>
       )}
 
       {/* Status Bar */}

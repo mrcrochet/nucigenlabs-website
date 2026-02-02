@@ -88,11 +88,11 @@ export interface SearchBuckets {
 export interface KnowledgeGraph {
   nodes: Array<{
     id: string;
-    type: 'event' | 'article' | 'document' | 'country' | 'company' | 'commodity' | 'organization' | 'person';
+    type: 'event' | 'country' | 'company' | 'commodity' | 'organization' | 'person';
     label: string;
     data: any;
     validFrom?: string; // ISO timestamp (when this node became valid)
-    validTo?: string | null; // ISO timestamp (when this node became invalid, null = still valid)
+    validTo?: string; // ISO timestamp (when this node became invalid, null = still valid)
     confidence?: number; // 0-1 (confidence in this node)
     sourceCount?: number; // How many sources support this node
   }>;
@@ -102,7 +102,7 @@ export interface KnowledgeGraph {
     type: 'causes' | 'precedes' | 'related_to' | 'operates_in' | 'exposes_to' | 'impacts';
     strength: number;
     validFrom?: string; // ISO timestamp (when this link became valid)
-    validTo?: string | null; // ISO timestamp (when this link became invalid, null = still valid)
+    validTo?: string; // ISO timestamp (when this link became invalid, null = still valid)
     confidence?: number; // 0-1 (confidence in this link)
     sourceCount?: number; // How many sources support this link
   }>;

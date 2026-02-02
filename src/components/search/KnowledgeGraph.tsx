@@ -4,28 +4,22 @@
  * D3.js force-directed graph visualization with fullscreen support
  */
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 import { Maximize2, Minimize2, PanelRightOpen, ZoomOut, Download, Image } from 'lucide-react';
-import type { KnowledgeGraph as KnowledgeGraphType, GraphNode } from '../../types/search';
-import type { SearchMode } from '../../types/search';
+import type { KnowledgeGraph as KnowledgeGraphType } from '../../types/search';
 
 const LABEL_MAX_LEN_NORMAL = 15;
 const LABEL_MAX_LEN_FULLSCREEN = 30;
 
-const NODE_TYPES = ['event', 'article', 'document', 'country', 'company', 'commodity', 'organization', 'person'] as const;
-const NODE_SIZE_MIN = 6;
-const NODE_SIZE_MAX = 20;
+const NODE_TYPES = ['event', 'country', 'company', 'commodity', 'organization', 'person'] as const;
 const LINK_TYPES = ['causes', 'precedes', 'related_to', 'operates_in', 'exposes_to', 'impacts'] as const;
 
 interface KnowledgeGraphProps {
   graph: KnowledgeGraphType;
   query?: string;
-  searchMode?: SearchMode | null;
-  initialFocusNodeId?: string | null;
-  onNodeClick?: (nodeId: string, node?: GraphNode) => void;
+  onNodeClick?: (nodeId: string) => void;
   onNodeExplore?: (nodeId: string, nodeLabel: string) => void;
-  onNodeContextMenu?: (nodeId: string, node: GraphNode, event?: { clientX: number; clientY: number }) => void;
   height?: number;
 }
 
@@ -38,18 +32,12 @@ function renderGraph(
     isFullscreen: boolean;
     height: number;
     graph: KnowledgeGraphType;
-    onNodeClick?: (nodeId: string, node?: GraphNode) => void;
+    onNodeClick?: (nodeId: string) => void;
     onNodeExplore?: (nodeId: string, nodeLabel: string) => void;
-    onNodeContextMenu?: (nodeId: string, node: GraphNode, position: { x: number; y: number }) => void;
     zoomRef?: React.MutableRefObject<ZoomRef | null>;
-    focusedNodeId?: string | null;
-    neighborIds?: Set<string>;
-    searchMatchedIds?: Set<string>;
   }
 ): () => void {
-  const { isFullscreen, height, graph, onNodeClick, onNodeExplore, onNodeContextMenu, zoomRef, focusedNodeId, neighborIds, searchMatchedIds } = opts;
-  const focusSet = focusedNodeId != null && neighborIds ? new Set([focusedNodeId, ...neighborIds]) : null;
-  const hasSearchHighlight = searchMatchedIds != null && searchMatchedIds.size > 0;
+  const { isFullscreen, height, graph, onNodeClick, onNodeExplore, zoomRef } = opts;
   const width = containerEl.clientWidth;
   const graphHeight = isFullscreen ? window.innerHeight - 80 : height;
   const labelMaxLen = isFullscreen ? LABEL_MAX_LEN_FULLSCREEN : LABEL_MAX_LEN_NORMAL;
@@ -57,18 +45,6 @@ function renderGraph(
   d3.select(svgEl).selectAll('*').remove();
 
   const svg = d3.select(svgEl).attr('width', width).attr('height', graphHeight);
-  // Arrow marker for directional links
-  const defs = svg.append('defs');
-  defs.append('marker')
-    .attr('id', 'arrowhead')
-    .attr('markerWidth', 10)
-    .attr('markerHeight', 7)
-    .attr('refX', 9)
-    .attr('refY', 3.5)
-    .attr('orient', 'auto')
-    .append('polygon')
-    .attr('points', '0 0, 10 3.5, 0 7')
-    .attr('fill', '#94a3b8');
   const g = svg.append('g');
 
   const zoom = d3.zoom<SVGSVGElement, unknown>()
@@ -80,17 +56,11 @@ function renderGraph(
   svg.call(zoom);
   if (isFullscreen && zoomRef) zoomRef.current = { zoom, svg };
 
-  const SIMULATION_MAX_TICKS = 300;
   const simulation = d3.forceSimulation(graph.nodes as d3.SimulationNodeDatum & { id: string; x?: number; y?: number }[])
     .force('link', d3.forceLink(graph.links).id((d: any) => d.id).distance(100))
     .force('charge', d3.forceManyBody().strength(-300))
     .force('center', d3.forceCenter(width / 2, graphHeight / 2))
-    .force('collision', d3.forceCollide().radius((d: any) => getNodeSizeFromData(d) + 8));
-  let tickCount = 0;
-  simulation.on('tick', () => {
-    tickCount += 1;
-    if (tickCount >= SIMULATION_MAX_TICKS) simulation.stop();
-  });
+    .force('collision', d3.forceCollide().radius(30));
 
   const link = g.append('g')
     .selectAll('line')
@@ -98,30 +68,16 @@ function renderGraph(
     .enter()
     .append('line')
     .attr('stroke', (d: any) => getLinkColor(d.type))
-    .attr('stroke-opacity', (d: any) => {
-      const obsolete = d.validTo != null;
-      const conf = d.confidence ?? 0.5;
-      return obsolete ? 0.25 : Math.min(1, 0.4 + 0.6 * conf);
-    })
-    .attr('stroke-width', (d: any) => {
-      const conf = d.confidence ?? 0.5;
-      const sc = d.sourceCount ?? 1;
-      return Math.max(1, (d.strength * 2) * (0.7 + 0.3 * conf) * Math.min(1.5, 0.7 + 0.3 * Math.log10(1 + sc)));
-    })
-    .attr('marker-end', (d: any) => (isDirectionalLinkType(d.type) ? 'url(#arrowhead)' : null));
+    .attr('stroke-opacity', 0.6)
+    .attr('stroke-width', (d: any) => d.strength * 3);
 
   const node = g.append('g')
     .selectAll('circle')
     .data(graph.nodes)
     .enter()
     .append('circle')
-    .attr('r', (d: any) => getNodeSizeFromData(d))
+    .attr('r', (d: any) => getNodeSize(d.type))
     .attr('fill', (d: any) => getNodeColor(d.type))
-    .attr('fill-opacity', (d: any) => {
-      const obsolete = d.validTo != null;
-      const conf = d.confidence ?? 0.5;
-      return obsolete ? 0.35 : (0.6 + 0.4 * conf);
-    })
     .attr('stroke', '#fff')
     .attr('stroke-width', 1.5)
     .call(drag(simulation) as any)
@@ -130,17 +86,12 @@ function renderGraph(
       if (event.ctrlKey || event.metaKey) {
         onNodeExplore?.(d.id, d.label);
       } else {
-        onNodeClick?.(d.id, d);
+        onNodeClick?.(d.id);
       }
     })
     .on('dblclick', (event: any, d: any) => {
       event.stopPropagation();
       onNodeExplore?.(d.id, d.label);
-    })
-    .on('contextmenu', (event: any, d: any) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onNodeContextMenu?.(d.id, d, { clientX: event.clientX, clientY: event.clientY });
     });
 
   const label = g.append('g')
@@ -152,12 +103,7 @@ function renderGraph(
     .attr('font-size', '10px')
     .attr('fill', '#fff')
     .attr('text-anchor', 'middle')
-    .attr('dy', (d: any) => getNodeSizeFromData(d) + 12)
-    .attr('opacity', (d: any) => {
-      if (focusSet) return focusSet.has(d.id) ? 1 : 0.15;
-      if (hasSearchHighlight) return searchMatchedIds!.has(d.id) ? 1 : 0.2;
-      return 1;
-    });
+    .attr('dy', (d: any) => getNodeSize(d.type) + 12);
 
   const tooltip = d3.select('body')
     .append('div')
@@ -175,12 +121,7 @@ function renderGraph(
   node
     .on('mouseover', (event: any, d: any) => {
       tooltip.transition().duration(200).style('opacity', 1);
-      const validRange = d.validFrom
-        ? `Valide de ${d.validFrom.slice(0, 10)} à ${d.validTo ? d.validTo.slice(0, 10) : 'présent'}`
-        : '';
-      tooltip.html(
-        `${d.label}<br/><span style="color:#94a3b8">${d.type}</span>${validRange ? `<br/><span style="color:#64748b;font-size:10px">${validRange}</span>` : ''}`
-      )
+      tooltip.html(`${d.label}<br/><span style="color:#94a3b8">${d.type}</span>`)
         .style('left', (event.pageX + 10) + 'px')
         .style('top', (event.pageY - 10) + 'px');
     })
@@ -189,45 +130,18 @@ function renderGraph(
   link
     .on('mouseover', (event: any, d: any) => {
       tooltip.transition().duration(200).style('opacity', 1);
-      const validRange = d.validFrom
-        ? `Valide de ${d.validFrom.slice(0, 10)} à ${d.validTo ? d.validTo.slice(0, 10) : 'présent'}`
-        : '';
-      tooltip.html(
-        `<span style="color:#94a3b8">${String(d.type).replace('_', ' ')}</span>${d.strength != null ? `<br/>strength: ${d.strength}` : ''}${validRange ? `<br/><span style="color:#64748b;font-size:10px">${validRange}</span>` : ''}`
-      )
+      tooltip.html(`<span style="color:#94a3b8">${String(d.type).replace('_', ' ')}</span>${d.strength != null ? `<br/>strength: ${d.strength}` : ''}`)
         .style('left', (event.pageX + 10) + 'px')
         .style('top', (event.pageY - 10) + 'px');
     })
     .on('mouseout', () => tooltip.transition().duration(200).style('opacity', 0));
 
   simulation.on('tick', () => {
-    tickCount += 1;
-    if (tickCount >= SIMULATION_MAX_TICKS) simulation.stop();
     link
       .attr('x1', (d: any) => d.source.x)
       .attr('y1', (d: any) => d.source.y)
-      .attr('x2', (d: any) => {
-        const sx = d.source.x;
-        const sy = d.source.y;
-        const tx = d.target.x;
-        const ty = d.target.y;
-        const len = Math.hypot(tx - sx, ty - sy);
-        if (len === 0) return tx;
-        const r = getNodeSizeFromData(d.target);
-        if (len <= r) return tx;
-        return sx + ((tx - sx) * (len - r)) / len;
-      })
-      .attr('y2', (d: any) => {
-        const sx = d.source.x;
-        const sy = d.source.y;
-        const tx = d.target.x;
-        const ty = d.target.y;
-        const len = Math.hypot(tx - sx, ty - sy);
-        if (len === 0) return ty;
-        const r = getNodeSizeFromData(d.target);
-        if (len <= r) return ty;
-        return sy + ((ty - sy) * (len - r)) / len;
-      });
+      .attr('x2', (d: any) => d.target.x)
+      .attr('y2', (d: any) => d.target.y);
     node.attr('cx', (d: any) => d.x).attr('cy', (d: any) => d.y);
     label.attr('x', (d: any) => d.x).attr('y', (d: any) => d.y);
   });
@@ -238,7 +152,7 @@ function renderGraph(
   };
 }
 
-export default function KnowledgeGraph({ graph, query, searchMode, initialFocusNodeId, onNodeClick, onNodeExplore, onNodeContextMenu, height = 600 }: KnowledgeGraphProps) {
+export default function KnowledgeGraph({ graph, query, onNodeClick, onNodeExplore, height = 600 }: KnowledgeGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const fullscreenSvgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -249,79 +163,6 @@ export default function KnowledgeGraph({ graph, query, searchMode, initialFocusN
   const exitFullscreenButtonRef = useRef<HTMLButtonElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [legendOpen, setLegendOpen] = useState(false);
-  const [linkTypesFilter, setLinkTypesFilter] = useState<Set<string>>(() => new Set(LINK_TYPES));
-  const [nodeTypesFilter, setNodeTypesFilter] = useState<Set<string>>(() => new Set(NODE_TYPES));
-  const [searchInGraph, setSearchInGraph] = useState('');
-  const [searchInGraphDebounced, setSearchInGraphDebounced] = useState('');
-  const [focusedNodeId, setFocusedNodeId] = useState<string | null>(initialFocusNodeId ?? null);
-  const [selectedNodeIdInGraph, setSelectedNodeIdInGraph] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (initialFocusNodeId && graph.nodes.some((n) => n.id === initialFocusNodeId)) {
-      setFocusedNodeId(initialFocusNodeId);
-    }
-  }, [initialFocusNodeId, graph.nodes]);
-
-  useEffect(() => {
-    const t = setTimeout(() => setSearchInGraphDebounced(searchInGraph), 300);
-    return () => clearTimeout(t);
-  }, [searchInGraph]);
-
-  const toggleLinkType = useCallback((type: string) => {
-    setLinkTypesFilter((prev) => {
-      const next = new Set(prev);
-      if (next.has(type)) next.delete(type);
-      else next.add(type);
-      return next;
-    });
-  }, []);
-
-  const toggleNodeType = useCallback((type: string) => {
-    setNodeTypesFilter((prev) => {
-      const next = new Set(prev);
-      if (next.has(type)) next.delete(type);
-      else next.add(type);
-      return next;
-    });
-  }, []);
-
-  const filteredGraph = useMemo(() => {
-    if (!graph.nodes.length) return graph;
-    const nodesFiltered = graph.nodes.filter((n) => nodeTypesFilter.has(n.type));
-    const nodeIds = new Set(nodesFiltered.map((n) => n.id));
-    const linksFiltered = graph.links.filter(
-      (l) => linkTypesFilter.has(l.type) && nodeIds.has(l.source) && nodeIds.has(l.target)
-    );
-    return { nodes: nodesFiltered, links: linksFiltered };
-  }, [graph, linkTypesFilter, nodeTypesFilter]);
-
-  const neighborIds = useMemo(() => {
-    if (!focusedNodeId || !graphWithDegree.links.length) return new Set<string>();
-    const s = new Set<string>();
-    for (const l of graphWithDegree.links) {
-      if (l.source === focusedNodeId) s.add(typeof l.target === 'object' ? (l.target as { id: string }).id : l.target);
-      if (l.target === focusedNodeId) s.add(typeof l.source === 'object' ? (l.source as { id: string }).id : l.source);
-    }
-    return s;
-  }, [focusedNodeId, graphWithDegree.links]);
-
-  const searchMatchedIds = useMemo(() => {
-    if (!searchInGraphDebounced.trim()) return new Set<string>();
-    const q = searchInGraphDebounced.toLowerCase();
-    return new Set(
-      filteredGraph.nodes
-        .filter((n) => n.label.toLowerCase().includes(q) || n.id.toLowerCase().includes(q))
-        .map((n) => n.id)
-    );
-  }, [searchInGraphDebounced, filteredGraph.nodes]);
-
-  const handleNodeClickInternal = useCallback(
-    (nodeId: string, node?: GraphNode) => {
-      setSelectedNodeIdInGraph(nodeId);
-      onNodeClick?.(nodeId, node);
-    },
-    [onNodeClick]
-  );
 
   const toggleFullscreen = useCallback(() => {
     if (isFullscreen) {
@@ -344,14 +185,14 @@ export default function KnowledgeGraph({ graph, query, searchMode, initialFocusN
   useEffect(() => {
     const currentSvg = isFullscreen ? fullscreenSvgRef.current : svgRef.current;
     const currentContainer = isFullscreen ? fullscreenContainerRef.current : containerRef.current;
-    if (!currentSvg || !currentContainer || filteredGraph.nodes.length === 0) return;
+    if (!currentSvg || !currentContainer || graph.nodes.length === 0) return;
 
     const run = () => {
       cleanupRef.current?.();
       cleanupRef.current = renderGraph(currentSvg, currentContainer, {
         isFullscreen,
         height,
-        graph: filteredGraph,
+        graph,
         onNodeClick,
         onNodeExplore,
         zoomRef: isFullscreen ? fullscreenZoomRef : undefined,
@@ -365,29 +206,25 @@ export default function KnowledgeGraph({ graph, query, searchMode, initialFocusN
       cleanupRef.current = null;
       d3.selectAll('.kg-tooltip').remove();
     };
-  }, [graphWithDegree, handleNodeClickInternal, onNodeExplore, height, isFullscreen, focusedNodeId, neighborIds, searchMatchedIds]);
+  }, [graph, onNodeClick, onNodeExplore, height, isFullscreen]);
 
   useEffect(() => {
     if (!isFullscreen) return;
     const handleResize = () => {
-      if (!fullscreenSvgRef.current || !fullscreenContainerRef.current || graphWithDegree.nodes.length === 0) return;
+      if (!fullscreenSvgRef.current || !fullscreenContainerRef.current || graph.nodes.length === 0) return;
       cleanupRef.current?.();
       cleanupRef.current = renderGraph(fullscreenSvgRef.current, fullscreenContainerRef.current, {
         isFullscreen: true,
         height,
-        graph: graphWithDegree,
-        onNodeClick: handleNodeClickInternal,
+        graph,
+        onNodeClick,
         onNodeExplore,
-        onNodeContextMenu,
         zoomRef: fullscreenZoomRef,
-        focusedNodeId,
-        neighborIds,
-        searchMatchedIds,
       });
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [isFullscreen, graphWithDegree, handleNodeClickInternal, onNodeExplore, height, focusedNodeId, neighborIds, searchMatchedIds]);
+  }, [isFullscreen, graph, onNodeClick, onNodeExplore, height]);
 
   useEffect(() => {
     if (!isFullscreen) return;
@@ -572,80 +409,28 @@ export default function KnowledgeGraph({ graph, query, searchMode, initialFocusN
           </div>
           {legendOpen && (
             <div className="flex-shrink-0 border-b border-borders-subtle bg-background-elevated/80 px-4 py-3 flex flex-wrap gap-6 text-sm">
-              <p className="w-full text-text-muted text-xs">Taille / opacité = confiance et nombre de sources.</p>
-              {searchMode === 'fast' && (
-                <p className="w-full text-text-muted text-xs">Liens déduits des co-occurrences (mode rapide).</p>
-              )}
-              <div className="w-full flex flex-wrap items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="Rechercher dans le graphe..."
-                  value={searchInGraph}
-                  onChange={(e) => setSearchInGraph(e.target.value)}
-                  className="flex-1 min-w-[180px] px-3 py-1.5 bg-background-base border border-borders-subtle rounded-lg text-text-primary text-sm placeholder:text-text-muted"
-                />
-                {selectedNodeIdInGraph && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setFocusedNodeId(selectedNodeIdInGraph)}
-                      className="px-3 py-1.5 bg-accent/20 text-accent rounded-lg text-sm hover:bg-accent/30"
-                    >
-                      Focus
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFocusedNodeId(null)}
-                      className="px-3 py-1.5 bg-borders-subtle text-text-secondary rounded-lg text-sm hover:bg-borders-medium"
-                    >
-                      Reset focus
-                    </button>
-                  </>
-                )}
-                {focusedNodeId && !selectedNodeIdInGraph && (
-                  <button
-                    type="button"
-                    onClick={() => setFocusedNodeId(null)}
-                    className="px-3 py-1.5 bg-borders-subtle text-text-secondary rounded-lg text-sm hover:bg-borders-medium"
-                  >
-                    Reset focus
-                  </button>
-                )}
-              </div>
               <div className="flex flex-wrap items-center gap-3">
                 <span className="text-text-secondary font-medium">Nœuds</span>
                 {NODE_TYPES.map((t) => (
-                  <label key={t} className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={nodeTypesFilter.has(t)}
-                      onChange={() => toggleNodeType(t)}
-                      className="rounded border-borders-subtle"
-                    />
+                  <span key={t} className="flex items-center gap-1.5">
                     <span
                       className="w-3 h-3 rounded-full shrink-0"
                       style={{ backgroundColor: getNodeColor(t) }}
                     />
                     <span className="text-text-primary">{t}</span>
-                  </label>
+                  </span>
                 ))}
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <span className="text-text-secondary font-medium">Liens</span>
                 {LINK_TYPES.map((t) => (
-                  <label key={t} className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={linkTypesFilter.has(t)}
-                      onChange={() => toggleLinkType(t)}
-                      className="rounded border-borders-subtle"
-                    />
+                  <span key={t} className="flex items-center gap-1.5">
                     <span
                       className="w-6 h-0.5 shrink-0"
                       style={{ backgroundColor: getLinkColor(t) }}
                     />
                     <span className="text-text-primary">{t.replace('_', ' ')}</span>
-                  </label>
+                  </span>
                 ))}
               </div>
             </div>
@@ -688,8 +473,6 @@ function drag(simulation: d3.Simulation<any, undefined>) {
 function getNodeColor(type: string): string {
   const colors: Record<string, string> = {
     event: '#E1463E',
-    article: '#F97316',
-    document: '#9CA3AF',
     country: '#3B82F6',
     company: '#10B981',
     commodity: '#F59E0B',
@@ -699,11 +482,9 @@ function getNodeColor(type: string): string {
   return colors[type] || '#6B7280';
 }
 
-function getNodeBaseSize(type: string): number {
+function getNodeSize(type: string): number {
   const sizes: Record<string, number> = {
     event: 12,
-    article: 11,
-    document: 10,
     country: 10,
     company: 8,
     commodity: 8,
@@ -711,24 +492,6 @@ function getNodeBaseSize(type: string): number {
     person: 6,
   };
   return sizes[type] || 8;
-}
-
-function getNodeSizeFromData(d: {
-  type: string;
-  confidence?: number;
-  sourceCount?: number;
-  normalizedDegree?: number;
-}): number {
-  const base = getNodeBaseSize(d.type);
-  const normDeg = d.normalizedDegree ?? 0;
-  const conf = d.confidence ?? 0.5;
-  const sc = d.sourceCount ?? 0;
-  const importance = base * (0.5 + 0.3 * normDeg + 0.2 * conf) * Math.min(1.5, 1 + Math.log10(1 + sc) * 0.3);
-  return Math.max(NODE_SIZE_MIN, Math.min(NODE_SIZE_MAX, Math.round(importance)));
-}
-
-function isDirectionalLinkType(type: string): boolean {
-  return ['causes', 'precedes', 'operates_in', 'exposes_to', 'impacts'].includes(type);
 }
 
 function getLinkColor(type: string): string {

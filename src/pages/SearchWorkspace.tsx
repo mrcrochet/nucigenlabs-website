@@ -20,8 +20,7 @@ import InsightPanel from '../components/search/InsightPanel';
 import SuggestedQuestions from '../components/search/SuggestedQuestions';
 import SearchSessionHeader from '../components/search/SearchSessionHeader';
 import ResultDetailsDrawer from '../components/search/ResultDetailsDrawer';
-import EntityDetailsDrawer from '../components/search/EntityDetailsDrawer';
-import type { SearchResult, KnowledgeGraph as KnowledgeGraphType, GraphNode } from '../types/search';
+import type { SearchResult, KnowledgeGraph as KnowledgeGraphType } from '../types/search';
 
 interface SearchSession {
   id: string;
@@ -49,11 +48,7 @@ function SearchWorkspaceContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingFollowup, setIsLoadingFollowup] = useState(false);
   const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
-  const [selectedEntityNode, setSelectedEntityNode] = useState<GraphNode | null>(null);
-  const [graphContextMenu, setGraphContextMenu] = useState<{ x: number; y: number; node: GraphNode } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [searchParams] = useSearchParams();
-  const focusNodeIdFromUrl = searchParams.get('focus') ?? searchParams.get('highlight');
   const [impactBriefOpen, setImpactBriefOpen] = useState(false);
   const [impactBriefText, setImpactBriefText] = useState('');
 
@@ -180,10 +175,10 @@ function SearchWorkspaceContent() {
     return (
       <AppShell>
         <SEO title="Loading Search... | Nucigen Labs" />
-        <div className="col-span-1 sm:col-span-12 flex items-center justify-center min-h-[calc(100vh-8rem)] bg-background-base">
+        <div className="col-span-1 sm:col-span-12 flex items-center justify-center min-h-[600px]">
           <div className="text-center">
-            <Loader2 className="w-8 h-8 text-[#E1463E] animate-spin mx-auto mb-4" aria-hidden />
-            <p className="text-text-primary">Loading search session...</p>
+            <Loader2 className="w-8 h-8 text-[#E1463E] animate-spin mx-auto mb-4" />
+            <p className="text-text-secondary">Loading search session...</p>
           </div>
         </div>
       </AppShell>
@@ -194,7 +189,7 @@ function SearchWorkspaceContent() {
     return (
       <AppShell>
         <SEO title="Search Error | Nucigen Labs" />
-        <div className="col-span-1 sm:col-span-12 flex items-center justify-center min-h-[calc(100vh-8rem)] bg-background-base">
+        <div className="col-span-1 sm:col-span-12 flex items-center justify-center min-h-[600px]">
           <div className="text-center max-w-md">
             <p className="text-text-primary mb-2">Failed to load search session</p>
             <p className="text-text-secondary text-sm mb-6">{error || 'Session not found'}</p>
@@ -210,71 +205,12 @@ function SearchWorkspaceContent() {
     );
   }
 
-  const graph = session.graph && Array.isArray(session.graph.nodes) ? session.graph : { nodes: [] as any[], links: [] as any[] };
-  const results = Array.isArray(session.results) ? session.results : [];
-  const selectedResult = results.find(r => r.id === selectedResultId) || null;
-
-  const handleNodeClick = useCallback(
-    (nodeId: string, node?: GraphNode) => {
-      if (!node) {
-        setSelectedResultId(nodeId);
-        setSelectedEntityNode(null);
-        return;
-      }
-      const isResultNode =
-        (node.type === 'event' || node.type === 'article' || node.type === 'document') &&
-        session.results.some((r) => r.id === node.id);
-      if (isResultNode) {
-        setSelectedResultId(node.id);
-        setSelectedEntityNode(null);
-      } else {
-        setSelectedEntityNode(node);
-        setSelectedResultId(null);
-      }
-    },
-    [results]
-  );
-
-  const handleNodeContextMenu = useCallback((_nodeId: string, node: GraphNode, ev?: { clientX: number; clientY: number }) => {
-    setGraphContextMenu({ x: ev?.clientX ?? 0, y: ev?.clientY ?? 0, node });
-  }, []);
-
-  useEffect(() => {
-    const close = () => setGraphContextMenu(null);
-    if (graphContextMenu) {
-      const onGlobalClick = (e: MouseEvent) => {
-        const target = e.target as HTMLElement;
-        if (!target.closest('[data-graph-context-menu]')) close();
-      };
-      document.addEventListener('click', onGlobalClick);
-      return () => document.removeEventListener('click', onGlobalClick);
-    }
-  }, [graphContextMenu]);
-
-  const handleCreateInvestigationFromNode = useCallback(async () => {
-    if (!graphContextMenu?.node || !user?.id) return;
-    const { node } = graphContextMenu;
-    const isResultNode = ['event', 'article', 'document'].includes(node.type);
-    const hypothesis = isResultNode
-      ? `Vérifier et approfondir : ${node.label}.`
-      : `Explorer le rôle de ${node.label} (${node.type}) dans le contexte de la recherche : ${session.query || 'requête actuelle'}.`;
-    setGraphContextMenu(null);
-    const res = await createThread(
-      { initial_hypothesis: hypothesis, scope: 'geopolitics' },
-      { clerkUserId: user.id }
-    );
-    if (res.success && res.thread) {
-      toast.success('Enquête créée');
-      navigate(`/investigations/${res.thread.id}`);
-    } else {
-      toast.error(res.error || 'Erreur à la création');
-    }
-  }, [graphContextMenu, user?.id, session.query, navigate]);
+  const selectedResult = session.results.find(r => r.id === selectedResultId) || null;
 
   return (
     <AppShell>
       <SEO title={`${session.query} | Search | Nucigen Labs`} description="Search workspace with AI-powered intelligence" />
-      <div className="col-span-1 sm:col-span-12 min-h-[calc(100vh-6rem)] bg-background-base">
+      
       {/* Header with back button, query summary, and Answer tab */}
       <div className="col-span-1 sm:col-span-12 mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -288,7 +224,7 @@ function SearchWorkspaceContent() {
           <SearchSessionHeader
             query={session.query}
             inputType={session.inputType}
-            resultCount={results.length}
+            resultCount={session.results.length}
             createdAt={session.createdAt}
           />
         </div>
@@ -312,9 +248,9 @@ function SearchWorkspaceContent() {
             document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
           }}
           onGenerateImpactBrief={() => {
-            const briefResults = results;
+            const results = session.results || [];
             const buckets = session.buckets || { events: [], actors: [], assets: [], sources: [] };
-            const briefGraph = graph;
+            const graph = session.graph || { nodes: [], links: [] };
             const lines: string[] = [];
             if (results.length > 0) {
               const top = results[0];
@@ -343,13 +279,10 @@ function SearchWorkspaceContent() {
       <div className="col-span-1 sm:col-span-7">
         <div className="sticky top-24">
           <KnowledgeGraph
-            graph={graph}
+            graph={session.graph}
             query={session.query}
-            searchMode={session.meta?.mode ?? null}
-            initialFocusNodeId={focusNodeIdFromUrl}
-            onNodeClick={handleNodeClick}
+            onNodeClick={setSelectedResultId}
             onNodeExplore={handleNodeExplore}
-            onNodeContextMenu={handleNodeContextMenu}
             height={600}
           />
         </div>
@@ -358,8 +291,8 @@ function SearchWorkspaceContent() {
       {/* Results Section */}
       <div id="results-section" className="col-span-1 sm:col-span-12 mt-8">
         <ResultsPanel
-          results={results}
-          buckets={session.buckets ?? {}}
+          results={session.results}
+          buckets={session.buckets}
           isLoading={isLoadingFollowup}
           onResultClick={setSelectedResultId}
           onExploreDeeper={(resultId) => {
@@ -368,7 +301,7 @@ function SearchWorkspaceContent() {
               handleFollowup(`Tell me more about: ${result.title}`);
             }
           }}
-          graph={graph}
+          graph={session.graph}
           query={session.query}
           sessionId={session.id}
         />
@@ -379,12 +312,11 @@ function SearchWorkspaceContent() {
         <SuggestedQuestions
           query={session.query}
           inputType={session.inputType}
-          results={results}
-          graph={graph}
+          results={session.results}
+          graph={session.graph}
           onQuestionClick={handleFollowup}
           isLoading={isLoadingFollowup}
         />
-      </div>
       </div>
 
       {/* Result Details Drawer */}
@@ -397,31 +329,6 @@ function SearchWorkspaceContent() {
             handleFollowup(`Tell me more about: ${selectedResult.title}`);
           }}
         />
-      )}
-
-      {selectedEntityNode && (
-        <EntityDetailsDrawer
-          entityNode={selectedEntityNode}
-          results={results}
-          graph={graph}
-          isOpen={!!selectedEntityNode}
-          onClose={() => setSelectedEntityNode(null)}
-        />
-      )}
-
-      {graphContextMenu && (
-        <div
-          data-graph-context-menu
-          className="fixed z-[10002] min-w-[180px] py-1 bg-background-base border border-borders-subtle rounded-lg shadow-xl"
-          style={{ left: Math.min(graphContextMenu.x, typeof window !== 'undefined' ? window.innerWidth - 200 : graphContextMenu.x), top: graphContextMenu.y }}
-        >
-          <button type="button" onClick={handleCreateInvestigationFromNode} className="w-full px-4 py-2 text-left text-sm text-text-primary hover:bg-background-glass-subtle">
-            Créer une enquête
-          </button>
-          <button type="button" onClick={() => setGraphContextMenu(null)} className="w-full px-4 py-2 text-left text-sm text-text-secondary hover:bg-background-glass-subtle">
-            Fermer
-          </button>
-        </div>
       )}
 
       {/* Impact Brief Modal */}

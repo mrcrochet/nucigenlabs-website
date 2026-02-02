@@ -32,7 +32,7 @@ export async function buildGraph(
       
       nodeMap.set(nodeId, {
         id: nodeId,
-        type: result.type,
+        type: result.type === 'event' ? 'event' : 'event', // Treat articles as events for graph
         label: result.title,
         data: {
           ...result,
@@ -222,27 +222,6 @@ export async function buildGraph(
 
   // Convert map to array
   nodes.push(...Array.from(nodeMap.values()));
-
-  // Performance: limit graph size for large result sets
-  const MAX_NODES = 100;
-  const MAX_LINKS = 200;
-  if (nodes.length > MAX_NODES || links.length > MAX_LINKS) {
-    const degree = new Map<string, number>();
-    for (const n of nodes) degree.set(n.id, 0);
-    for (const l of links) {
-      degree.set(l.source, (degree.get(l.source) ?? 0) + 1);
-      degree.set(l.target, (degree.get(l.target) ?? 0) + 1);
-    }
-    const score = (n: (typeof nodes)[0]) => (degree.get(n.id) ?? 0) + (n.sourceCount ?? 0) * 2;
-    const sorted = [...nodes].sort((a, b) => score(b) - score(a));
-    const topNodes = sorted.slice(0, MAX_NODES);
-    const topIds = new Set(topNodes.map((n) => n.id));
-    const filteredLinks = links.filter((l) => topIds.has(l.source) && topIds.has(l.target)).slice(0, MAX_LINKS);
-    nodes.length = 0;
-    nodes.push(...topNodes);
-    links.length = 0;
-    links.push(...filteredLinks);
-  }
 
   // Merge with previous graph if provided (close old relationships that no longer exist)
   if (previousGraph) {
