@@ -16,7 +16,7 @@ import InvestigationChatPanel from '../components/investigation/InvestigationCha
 import InvestigationFlowView from '../components/investigation/InvestigationFlowView';
 import InvestigationTimelineView from '../components/investigation/InvestigationTimelineView';
 import InvestigationMapView from '../components/investigation/InvestigationMapView';
-import InvestigationDetailsPanel from '../components/investigation/InvestigationDetailsPanel';
+import InvestigationDetailsPanel, { type DetailsSelection } from '../components/investigation/InvestigationDetailsPanel';
 import type {
   InvestigationThread,
   InvestigationSignal,
@@ -54,16 +54,61 @@ function InvestigationWorkspaceContent() {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'signals' | 'flow' | 'timeline' | 'map'>('signals');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedEdgeKey, setSelectedEdgeKey] = useState<string | null>(null);
+  const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
 
   const graph = useMemo(() => {
     if (!thread || !signals.length) return null;
     return buildGraphFromSignals(thread, signals);
   }, [thread, signals]);
 
-  const selectedNode = useMemo(() => {
-    if (!graph || !selectedNodeId) return null;
-    return graph.nodes.find((n) => n.id === selectedNodeId) ?? null;
-  }, [graph, selectedNodeId]);
+  const detailsSelection = useMemo((): DetailsSelection => {
+    if (!graph) return null;
+    if (selectedNodeId) {
+      const node = graph.nodes.find((n) => n.id === selectedNodeId);
+      return node ? { type: 'node', node } : null;
+    }
+    if (selectedEdgeKey) {
+      const sep = selectedEdgeKey.indexOf('|');
+      const from = sep >= 0 ? selectedEdgeKey.slice(0, sep) : '';
+      const to = sep >= 0 ? selectedEdgeKey.slice(sep + 1) : '';
+      const edge = graph.edges.find((e) => e.from === from && e.to === to);
+      if (!edge) return null;
+      const fromNode = graph.nodes.find((n) => n.id === edge.from);
+      const toNode = graph.nodes.find((n) => n.id === edge.to);
+      if (!fromNode || !toNode) return null;
+      return { type: 'edge', edge, fromNode, toNode };
+    }
+    if (selectedPathId) {
+      const path = graph.paths.find((p) => p.id === selectedPathId);
+      return path ? { type: 'path', path } : null;
+    }
+    return null;
+  }, [graph, selectedNodeId, selectedEdgeKey, selectedPathId]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedNodeId(null);
+    setSelectedEdgeKey(null);
+    setSelectedPathId(null);
+  }, []);
+
+  const handleNodeClick = useCallback((id: string) => {
+    setSelectedNodeId(id);
+    setSelectedEdgeKey(null);
+    setSelectedPathId(null);
+  }, []);
+
+  const handleEdgeClick = useCallback((fromId: string, toId: string) => {
+    setSelectedEdgeKey(`${fromId}|${toId}`);
+    setSelectedNodeId(null);
+    setSelectedPathId(null);
+  }, []);
+
+  const handlePathClick = useCallback((pathId: string) => {
+    setSelectedPathId(pathId);
+    setSelectedNodeId(null);
+    setSelectedEdgeKey(null);
+  }, []);
 
   const apiOpts = { clerkUserId: user?.id ?? undefined };
 
@@ -284,7 +329,9 @@ function InvestigationWorkspaceContent() {
                     <InvestigationFlowView
                       graph={graph}
                       selectedNodeId={selectedNodeId}
-                      onNodeClick={setSelectedNodeId}
+                      selectedEdgeKey={selectedEdgeKey}
+                      onNodeClick={handleNodeClick}
+                      onEdgeClick={handleEdgeClick}
                     />
                   </div>
                 )}
@@ -293,7 +340,7 @@ function InvestigationWorkspaceContent() {
                     <InvestigationTimelineView
                       graph={graph}
                       selectedNodeId={selectedNodeId}
-                      onNodeClick={setSelectedNodeId}
+                      onNodeClick={handleNodeClick}
                     />
                   </div>
                 )}
@@ -302,7 +349,7 @@ function InvestigationWorkspaceContent() {
                     <InvestigationMapView
                       graph={graph}
                       selectedNodeId={selectedNodeId}
-                      onNodeClick={setSelectedNodeId}
+                      onNodeClick={handleNodeClick}
                     />
                   </div>
                 )}
@@ -342,14 +389,33 @@ function InvestigationWorkspaceContent() {
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {!thread ? (
               <p className="text-text-secondary text-sm">Select an investigation to see the hypothesis state.</p>
-            ) : selectedNodeId && graph && selectedNode ? (
-              <InvestigationDetailsPanel node={selectedNode} graph={graph} onClose={() => setSelectedNodeId(null)} />
+            ) : detailsSelection && graph ? (
+              <InvestigationDetailsPanel selection={detailsSelection} graph={graph} onClose={clearSelection} />
             ) : (
               <>
                 <div>
                   <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2">Hypothèse</h3>
                   <p className="text-sm text-text-primary leading-relaxed">{thread.initial_hypothesis}</p>
                 </div>
+                {graph && graph.paths.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2">Paths</h3>
+                    <ul className="space-y-1.5">
+                      {graph.paths.map((p) => (
+                        <li key={p.id}>
+                          <button
+                            type="button"
+                            onClick={() => handlePathClick(p.id)}
+                            className="w-full text-left px-3 py-2 rounded-lg border border-borders-subtle bg-background-base hover:border-[#E1463E]/40 hover:bg-[#E1463E]/5 text-sm text-text-primary transition-colors"
+                          >
+                            <span className="font-medium truncate block">{p.hypothesis_label || p.id}</span>
+                            <span className="text-xs text-text-muted">{p.status} · {p.confidence} %</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {thread.investigative_axes && thread.investigative_axes.length > 0 && (
                   <div>
                     <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2">Axes d'enquête</h3>

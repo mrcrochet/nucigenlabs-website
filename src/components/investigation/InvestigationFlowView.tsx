@@ -8,7 +8,9 @@ import type { InvestigationGraph, InvestigationGraphNode } from '../../types/inv
 export interface InvestigationFlowViewProps {
   graph: InvestigationGraph;
   selectedNodeId: string | null;
+  selectedEdgeKey?: string | null;
   onNodeClick: (nodeId: string) => void;
+  onEdgeClick?: (fromId: string, toId: string) => void;
   className?: string;
 }
 
@@ -24,7 +26,9 @@ function orderNodesForFlow(nodes: InvestigationGraphNode[]): InvestigationGraphN
 export default function InvestigationFlowView({
   graph,
   selectedNodeId,
+  selectedEdgeKey = null,
   onNodeClick,
+  onEdgeClick,
   className = '',
 }: InvestigationFlowViewProps) {
   const { nodes, edges } = graph;
@@ -74,11 +78,26 @@ export default function InvestigationFlowView({
                     const edge = edgeByFromTo.get(node.id)!;
                     const strokeW = Math.max(1, Math.round(edge.strength * 3));
                     const opacity = 0.4 + edge.strength * 0.5;
-                    return (
+                    const edgeKey = `${node.id}|${edge.to}`;
+                    const isSelected = selectedEdgeKey === edgeKey;
+                    const content = (
                       <svg width="32" height="24" viewBox="0 0 32 24" className="text-[#E1463E]" aria-hidden>
                         <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth={strokeW} strokeOpacity={opacity} />
                         <path d="M 22 8 L 30 12 L 22 16 Z" fill="currentColor" opacity={opacity} />
                       </svg>
+                    );
+                    return onEdgeClick ? (
+                      <button
+                        type="button"
+                        onClick={() => onEdgeClick(node.id, edge.to)}
+                        className={`shrink-0 rounded p-0.5 transition-colors ${isSelected ? 'ring-2 ring-[#E1463E] ring-offset-1 ring-offset-background-base' : 'hover:bg-borders-subtle'}`}
+                        title="View edge details"
+                        aria-label="View edge details"
+                      >
+                        {content}
+                      </button>
+                    ) : (
+                      content
                     );
                   })() : (
                     <span className="text-text-muted text-lg">→</span>
