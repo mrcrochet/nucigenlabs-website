@@ -3,6 +3,8 @@
 Document de conception détaillé pour le produit « Investigation Threads » (pistes d’enquête).  
 Référence vision : [NUCIGEN_INTELLIGENCE_DETECTIVE.md](NUCIGEN_INTELLIGENCE_DETECTIVE.md).
 
+**Moteur d'enquête (état unique, 3 vues) :** [CONCEPTION_INVESTIGATION_ENGINE.md](CONCEPTION_INVESTIGATION_ENGINE.md) — un graphe d'enquête ; Flow, Timeline, Map = projections. Types : `src/types/investigation-graph.ts`.
+
 ---
 
 ## 1. Modèle de données (Supabase)
@@ -199,6 +201,7 @@ Les étapes 1–6 couvrent la « conception » jusqu’à un workspace utilisabl
 |---------|------|
 | `supabase/migrations/20260124000000_create_investigation_tables.sql` | Tables threads, signals, messages (+ RLS). |
 | `src/types/investigation.ts` | Types InvestigationThread, Signal, Message, etc. |
+| `src/types/investigation-graph.ts` | Types moteur : Node, Edge, Path, InvestigationGraph (état unique pour Flow/Timeline/Map). |
 | `src/lib/api/investigation-api.ts` | Client API (createThread, getThreads, sendMessage, getSignals…). |
 | `src/server/api-server.ts` | Routes /api/investigations/*. |
 | `src/pages/InvestigationsPage.tsx` (ou équivalent) | Liste des pistes + entrée « Nouvelle piste ». |
@@ -214,6 +217,8 @@ Ce document sert de référence unique pour la conception et le découpage des t
 |----------|---------|------|
 | Schéma BDD | [supabase/migrations/20260124000000_create_investigation_tables.sql](supabase/migrations/20260124000000_create_investigation_tables.sql) | Tables `investigation_threads`, `investigation_signals`, `investigation_messages`, `investigation_causal_links` + RLS |
 | Types TS | [src/types/investigation.ts](src/types/investigation.ts) | `InvestigationThread`, `InvestigationSignal`, `InvestigationMessage`, payloads, enums |
-| Client API | [src/lib/api/investigation-api.ts](src/lib/api/investigation-api.ts) | `createThread`, `getThreads`, `getThread`, `sendMessage`, `getSignals`, `updateThread` (appels à implémenter côté backend) |
+| Client API | [src/lib/api/investigation-api.ts](src/lib/api/investigation-api.ts) | `createThread`, `getThreads`, `getThread`, `sendMessage`, `getSignals`, `updateThread` |
+| Moteur graphe | [CONCEPTION_INVESTIGATION_ENGINE.md](CONCEPTION_INVESTIGATION_ENGINE.md) | Un état = un graphe ; Flow, Timeline, Map = projections. |
+| Types graphe | [src/types/investigation-graph.ts](src/types/investigation-graph.ts) | `InvestigationGraphNode`, `InvestigationGraphEdge`, `InvestigationGraphPath`, `InvestigationGraph` |
 
-Prochaine étape : implémenter les routes `/api/investigations/*` dans l’API server et brancher l’UI (liste pistes + workspace).
+Prochaine étape : implémenter les routes `/api/investigations/*` dans l’API server et brancher l’UI (moteur (graphe) et les 3 vues synchronisées (Flow, Timeline, Map) + panel de détails commun).

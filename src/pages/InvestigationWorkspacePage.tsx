@@ -3,7 +3,7 @@
  * 3 colonnes : liste des pistes (gauche), feed des signaux + chat (centre), panel intelligence (droite).
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
 import { Loader2, FileSearch, ExternalLink, ArrowLeft, Target, AlertTriangle, Download, TrendingUp, TrendingDown, Minus } from 'lucide-react';
@@ -11,7 +11,12 @@ import AppShell from '../components/layout/AppShell';
 import SEO from '../components/SEO';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { getThreads, getThread, sendMessage, getBrief } from '../lib/api/investigation-api';
+import { buildGraphFromSignals } from '../lib/investigation/build-graph';
 import InvestigationChatPanel from '../components/investigation/InvestigationChatPanel';
+import InvestigationFlowView from '../components/investigation/InvestigationFlowView';
+import InvestigationTimelineView from '../components/investigation/InvestigationTimelineView';
+import InvestigationMapView from '../components/investigation/InvestigationMapView';
+import InvestigationDetailsPanel from '../components/investigation/InvestigationDetailsPanel';
 import type {
   InvestigationThread,
   InvestigationSignal,
@@ -47,6 +52,18 @@ function InvestigationWorkspaceContent() {
   const [loadingThreads, setLoadingThreads] = useState(true);
   const [loadingThread, setLoadingThread] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'signals' | 'flow' | 'timeline' | 'map'>('signals');
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+
+  const graph = useMemo(() => {
+    if (!thread || !signals.length) return null;
+    return buildGraphFromSignals(thread, signals);
+  }, [thread, signals]);
+
+  const selectedNode = useMemo(() => {
+    if (!graph || !selectedNodeId) return null;
+    return graph.nodes.find((n) => n.id === selectedNodeId) ?? null;
+  }, [graph, selectedNodeId]);
 
   const apiOpts = { clerkUserId: user?.id ?? undefined };
 
@@ -194,15 +211,24 @@ function InvestigationWorkspaceContent() {
             </div>
           ) : (
             <>
-              {/* Feed des signaux */}
-              <div className="shrink-0 border-b border-borders-subtle bg-background-elevated px-4 py-3">
-                <h2 className="text-sm font-semibold text-text-primary">Feed des signaux</h2>
-                <p className="text-xs text-text-secondary mt-0.5">
-                  Preuves et éléments collectés pour cette piste
-                </p>
+              {/* Tabs: Signals | Flow | Timeline | Map */}
+              <div className="shrink-0 border-b border-borders-subtle bg-background-elevated px-4 py-2 flex gap-1">
+                {(['signals', 'flow', 'timeline', 'map'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => setViewMode(mode)}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      viewMode === mode ? 'bg-[#E1463E]/10 text-[#E1463E]' : 'text-text-secondary hover:bg-borders-subtle hover:text-text-primary'
+                    }`}
+                  >
+                    {mode === 'signals' ? 'Signals' : mode === 'flow' ? 'Flow' : mode === 'timeline' ? 'Timeline' : 'Map'}
+                  </button>
+                ))}
               </div>
-              <div className="flex flex-col bg-background-base">
-                <div className="p-4 space-y-3">
+              <div className="flex flex-col bg-background-base flex-1 min-h-0">
+                {viewMode === 'signals' && (
+                  <div className="p-4 space-y-3 overflow-y-auto">
                   {signals.length === 0 && (
                     <p className="text-text-secondary text-sm py-4">Aucun signal pour l’instant. Envoyez un message dans le chat pour lancer la collecte.</p>
                   )}
@@ -251,7 +277,35 @@ function InvestigationWorkspaceContent() {
                       )}
                     </div>
                   ))}
-                </div>
+                  </div>
+                )}
+                {viewMode === 'flow' && graph && (
+                  <div className="flex-1 min-h-0 overflow-auto p-4">
+                    <InvestigationFlowView
+                      graph={graph}
+                      selectedNodeId={selectedNodeId}
+                      onNodeClick={setSelectedNodeId}
+                    />
+                  </div>
+                )}
+                {viewMode === 'timeline' && graph && (
+                  <div className="flex-1 min-h-0 overflow-auto p-4">
+                    <InvestigationTimelineView
+                      graph={graph}
+                      selectedNodeId={selectedNodeId}
+                      onNodeClick={setSelectedNodeId}
+                    />
+                  </div>
+                )}
+                {viewMode === 'map' && graph && (
+                  <div className="flex-1 min-h-0 overflow-auto p-4">
+                    <InvestigationMapView
+                      graph={graph}
+                      selectedNodeId={selectedNodeId}
+                      onNodeClick={setSelectedNodeId}
+                    />
+                  </div>
+                )}
                 {/* Chat */}
                 <div className="shrink-0 h-[320px] min-h-[320px] border-t border-borders-subtle bg-background-base p-4">
                   <InvestigationChatPanel
@@ -287,7 +341,9 @@ function InvestigationWorkspaceContent() {
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {!thread ? (
-              <p className="text-text-secondary text-sm">Sélectionnez une enquête pour afficher l’état de l’hypothèse.</p>
+              <p className="text-text-secondary text-sm">Select an investigation to see the hypothesis state.</p>
+            ) : selectedNodeId && graph && selectedNode ? (
+              <InvestigationDetailsPanel node={selectedNode} graph={graph} onClose={() => setSelectedNodeId(null)} />
             ) : (
               <>
                 <div>
