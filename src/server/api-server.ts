@@ -1178,6 +1178,75 @@ app.patch('/api/investigations/:threadId', async (req, res) => {
   }
 });
 
+// GET /api/investigations/:threadId/brief — Export Intelligence Brief (texte)
+app.get('/api/investigations/:threadId/brief', async (req, res) => {
+  try {
+    const { threadId } = req.params;
+    const clerkUserId = getInvestigationUserId(req);
+    if (!clerkUserId || !supabase) {
+      return res.status(400).json({ success: false, error: 'User ID required' });
+    }
+    const supabaseUserId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!supabaseUserId) {
+      return res.status(400).json({ success: false, error: 'Invalid user ID' });
+    }
+    const { data: thread, error: threadError } = await supabase
+      .from('investigation_threads')
+      .select('*')
+      .eq('id', threadId)
+      .eq('user_id', supabaseUserId)
+      .single();
+    if (threadError || !thread) {
+      return res.status(404).json({ success: false, error: 'Thread not found' });
+    }
+    const { data: signals } = await supabase
+      .from('investigation_signals')
+      .select('*')
+      .eq('thread_id', threadId)
+      .order('created_at', { ascending: false });
+    const lines: string[] = [
+      `# Intelligence Brief — ${thread.title}`,
+      '',
+      `Date: ${new Date(thread.updated_at).toISOString().slice(0, 10)}`,
+      '',
+      '## Hypothèse',
+      thread.initial_hypothesis,
+      '',
+    ];
+    if (thread.investigative_axes && thread.investigative_axes.length > 0) {
+      lines.push('## Axes d\'enquête', '');
+      thread.investigative_axes.forEach((a: string) => lines.push(`- ${a}`));
+      lines.push('');
+    }
+    if (thread.current_assessment) {
+      lines.push('## Évaluation', thread.current_assessment, '');
+    }
+    if (thread.confidence_score != null) {
+      lines.push('## Confiance', `${thread.confidence_score} %`, '');
+    }
+    if (thread.blind_spots && thread.blind_spots.length > 0) {
+      lines.push('## Zones d\'ombre', '');
+      thread.blind_spots.forEach((b: string) => lines.push(`- ${b}`));
+      lines.push('');
+    }
+    lines.push('## Signaux', '');
+    (signals || []).forEach((s: { source: string; date?: string; summary: string; url?: string; impact_on_hypothesis?: string }) => {
+      lines.push(`### ${s.source}${s.date ? ` (${s.date})` : ''}`);
+      if (s.impact_on_hypothesis) lines.push(`Impact: ${s.impact_on_hypothesis}`);
+      lines.push(s.summary);
+      if (s.url) lines.push(`Source: ${s.url}`);
+      lines.push('');
+    });
+    const text = lines.join('\n');
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="brief-${threadId.slice(0, 8)}.txt"`);
+    res.send(text);
+  } catch (err: any) {
+    console.error('[API] Investigation brief:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
+  }
+});
+
 // Enrich signal with Perplexity
 app.post('/api/signals/:id/enrich', async (req, res) => {
   try {

@@ -167,3 +167,25 @@ export async function updateThread(
     return { success: false, error: e?.message };
   }
 }
+
+/** Télécharger le brief (texte) d'une piste */
+export async function getBrief(
+  threadId: string,
+  apiOptions?: InvestigationApiOptions
+): Promise<{ success: boolean; blob?: Blob; filename?: string; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/investigations/${threadId}/brief`, {
+      headers: buildHeaders(apiOptions),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error((err as { error?: string }).error || 'Request failed');
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition');
+    const filename = disposition?.match(/filename="([^"]+)"/)?.[1] ?? `brief-${threadId.slice(0, 8)}.txt`;
+    return { success: true, blob, filename };
+  } catch (e: any) {
+    return { success: false, error: e?.message };
+  }
+}

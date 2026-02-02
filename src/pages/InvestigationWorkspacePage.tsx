@@ -6,11 +6,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
-import { Loader2, FileSearch, ExternalLink, ArrowLeft, Target, AlertTriangle } from 'lucide-react';
+import { Loader2, FileSearch, ExternalLink, ArrowLeft, Target, AlertTriangle, Download, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import AppShell from '../components/layout/AppShell';
 import SEO from '../components/SEO';
 import ProtectedRoute from '../components/ProtectedRoute';
-import { getThreads, getThread, sendMessage } from '../lib/api/investigation-api';
+import { getThreads, getThread, sendMessage, getBrief } from '../lib/api/investigation-api';
 import InvestigationChatPanel from '../components/investigation/InvestigationChatPanel';
 import type {
   InvestigationThread,
@@ -24,6 +24,17 @@ const ASSESSMENT_LABELS: Record<string, string> = {
   unclear: 'Incertaine',
   contradicted: 'Contredite',
 };
+
+function relativeTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const s = Math.floor((now.getTime() - d.getTime()) / 1000);
+  if (s < 60) return 'à l\'instant';
+  if (s < 3600) return `il y a ${Math.floor(s / 60)} min`;
+  if (s < 86400) return `il y a ${Math.floor(s / 3600)} h`;
+  if (s < 2592000) return `il y a ${Math.floor(s / 86400)} j`;
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+}
 
 function InvestigationWorkspaceContent() {
   const { threadId } = useParams<{ threadId: string }>();
@@ -87,6 +98,18 @@ function InvestigationWorkspaceContent() {
     [threadId, user?.id]
   );
 
+  const handleExportBrief = useCallback(async () => {
+    if (!threadId) return;
+    const res = await getBrief(threadId, apiOpts);
+    if (!res.success || !res.blob) return;
+    const url = URL.createObjectURL(res.blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = res.filename ?? `brief-${threadId.slice(0, 8)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [threadId, user?.id]);
+
   const loading = loadingThread;
 
   return (
@@ -122,13 +145,23 @@ function InvestigationWorkspaceContent() {
                   <li key={t.id}>
                     <Link
                       to={`/investigations/${t.id}`}
-                      className={`block px-3 py-2.5 rounded-lg text-sm truncate transition-colors ${
+                      className={`block px-3 py-2.5 rounded-lg text-sm transition-colors ${
                         t.id === threadId
                           ? 'bg-[#E1463E]/10 text-[#E1463E] font-medium'
                           : 'text-text-secondary hover:bg-borders-subtle hover:text-text-primary'
                       }`}
                     >
-                      {t.title}
+                      <span className="block truncate">{t.title}</span>
+                      <div className="flex items-center gap-2 mt-1 text-[10px] text-text-muted">
+                        {t.confidence_score != null && (
+                          <span title="Confiance">
+                            {t.confidence_score >= 0 && t.confidence_score <= 100
+                              ? `${t.confidence_score} %`
+                              : `${Math.round(Number(t.confidence_score) * 100)} %`}
+                          </span>
+                        )}
+                        <span>{relativeTime(t.updated_at)}</span>
+                      </div>
                     </Link>
                   </li>
                 ))}
@@ -176,21 +209,40 @@ function InvestigationWorkspaceContent() {
                   {signals.map((sig) => (
                     <div
                       key={sig.id}
-                      className="rounded-lg border border-borders-subtle bg-background-base p-3 space-y-2"
+                      className="rounded-lg border border-borders-subtle bg-background-base p-3 space-y-2 hover:border-[#E1463E]/30 transition-colors"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <span className="text-xs font-medium text-text-secondary uppercase">{sig.type}</span>
-                        {sig.url && (
-                          <a
-                            href={sig.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-xs text-[#E1463E] hover:underline"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                            Source
-                          </a>
-                        )}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {sig.impact_on_hypothesis === 'supports' && (
+                            <span className="inline-flex items-center gap-1 text-xs text-emerald-500" title="Renforce l'hypothèse">
+                              <TrendingUp className="w-3.5 h-3.5" />
+                              +
+                            </span>
+                          )}
+                          {sig.impact_on_hypothesis === 'weakens' && (
+                            <span className="inline-flex items-center gap-1 text-xs text-red-500" title="Affaiblit l'hypothèse">
+                              <TrendingDown className="w-3.5 h-3.5" />
+                              −
+                            </span>
+                          )}
+                          {sig.impact_on_hypothesis === 'neutral' && (
+                            <span className="inline-flex items-center gap-1 text-xs text-text-muted" title="Neutre">
+                              <Minus className="w-3.5 h-3.5" />
+                            </span>
+                          )}
+                          {sig.url && (
+                            <a
+                              href={sig.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-xs text-[#E1463E] hover:underline"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              Lire
+                            </a>
+                          )}
+                        </div>
                       </div>
                       <p className="text-sm font-medium text-text-primary">{sig.source}</p>
                       <p className="text-xs text-text-secondary line-clamp-2">{sig.summary}</p>
@@ -217,11 +269,21 @@ function InvestigationWorkspaceContent() {
 
         {/* Droite — Panel Intelligence */}
         <aside className="w-80 shrink-0 border-l border-borders-subtle bg-background-base flex flex-col min-h-[calc(100vh-64px)]">
-          <div className="px-4 py-3 border-b border-borders-subtle">
+          <div className="px-4 py-3 border-b border-borders-subtle flex items-center justify-between">
             <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
               <Target className="w-4 h-4 text-[#E1463E]" />
               Intelligence
             </h2>
+            {thread && (
+              <button
+                type="button"
+                onClick={handleExportBrief}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-borders-subtle text-xs font-medium text-text-secondary hover:bg-borders-subtle hover:text-text-primary transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export Brief
+              </button>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {!thread ? (
@@ -232,6 +294,16 @@ function InvestigationWorkspaceContent() {
                   <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2">Hypothèse</h3>
                   <p className="text-sm text-text-primary leading-relaxed">{thread.initial_hypothesis}</p>
                 </div>
+                {thread.investigative_axes && thread.investigative_axes.length > 0 && (
+                  <div>
+                    <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2">Axes d'enquête</h3>
+                    <ul className="list-disc list-inside text-sm text-text-secondary space-y-1">
+                      {thread.investigative_axes.map((a, i) => (
+                        <li key={i}>{a}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {thread.current_assessment && (
                   <div>
                     <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2">Évaluation</h3>
@@ -243,7 +315,11 @@ function InvestigationWorkspaceContent() {
                 {thread.confidence_score != null && (
                   <div>
                     <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2">Confiance</h3>
-                    <p className="text-sm text-text-primary">{Math.round(thread.confidence_score * 100)} %</p>
+                    <p className="text-sm text-text-primary">
+                      {thread.confidence_score >= 0 && thread.confidence_score <= 100
+                        ? `${thread.confidence_score} %`
+                        : `${Math.round(Number(thread.confidence_score) * 100)} %`}
+                    </p>
                   </div>
                 )}
                 {thread.blind_spots && thread.blind_spots.length > 0 && (
@@ -259,7 +335,7 @@ function InvestigationWorkspaceContent() {
                     </ul>
                   </div>
                 )}
-                {(!thread.current_assessment && thread.blind_spots?.length === 0) && (
+                {(!thread.current_assessment && !thread.blind_spots?.length) && (
                   <p className="text-text-muted text-xs">
                     Envoyez des messages pour que le detective collecte des preuves et mette à jour la synthèse.
                   </p>
