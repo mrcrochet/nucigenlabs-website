@@ -9,7 +9,7 @@ export default function CountdownTimer() {
   });
 
   useEffect(() => {
-    const targetDate = new Date('2026-01-30T15:00:00Z'); // January 30, 2026 at 15:00 UTC
+    const targetDate = new Date('2026-02-28T15:00:00Z'); // 28 février 2026 à 15:00 UTC
 
     const updateTimer = () => {
       const now = new Date().getTime();

@@ -127,11 +127,15 @@ export interface KnowledgeGraph {
 
 export interface GraphNode {
   id: string;
-  type: 'event' | 'country' | 'company' | 'commodity' | 'organization' | 'person';
+  type: 'event' | 'article' | 'document' | 'country' | 'company' | 'commodity' | 'organization' | 'person';
   label: string;
   data: any;
   x?: number;
   y?: number;
+  validFrom?: string;
+  validTo?: string | null;
+  confidence?: number;
+  sourceCount?: number;
 }
 
 export interface GraphLink {
@@ -139,6 +143,10 @@ export interface GraphLink {
   target: string;
   type: 'causes' | 'precedes' | 'related_to' | 'operates_in' | 'exposes_to' | 'impacts';
   strength: number;
+  validFrom?: string;
+  validTo?: string | null;
+  confidence?: number;
+  sourceCount?: number;
 }
 
 export interface SearchState {

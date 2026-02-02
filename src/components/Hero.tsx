@@ -22,7 +22,7 @@ export default function Hero() {
 
           <div className="relative">
             <div className="mb-16 text-center">
-              <p className="text-sm text-slate-400 mb-8 font-light tracking-wider">LAUNCH — JANUARY 30, 2026 • 15:00 UTC</p>
+              <p className="text-sm text-slate-400 mb-8 font-light tracking-wider">LAUNCH — FEBRUARY 28, 2026 • 15:00 UTC</p>
               <div className="py-6">
                 <CountdownTimer />
               </div>

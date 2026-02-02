@@ -99,6 +99,9 @@ function InvestigationsPageContent() {
             <p className="text-text-secondary text-sm mt-1">
               Pistes d'enquête : hypothèses, preuves et synthèse.
             </p>
+            <p className="text-text-secondary/90 text-sm mt-2 italic max-w-xl">
+              The only platform that shows you HOW events are connected, not just that they are.
+            </p>
           </div>
           <button
             type="button"

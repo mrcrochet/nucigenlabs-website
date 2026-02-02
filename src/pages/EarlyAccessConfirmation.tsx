@@ -17,7 +17,7 @@ export default function EarlyAccessConfirmation() {
   });
 
   useEffect(() => {
-    const targetDate = new Date('2026-01-30T15:00:00Z'); // January 30, 2026 at 15:00 UTC
+    const targetDate = new Date('2026-02-28T15:00:00Z'); // 28 février 2026 à 15:00 UTC
 
     const updateTimer = () => {
       const now = new Date().getTime();
@@ -51,7 +51,7 @@ export default function EarlyAccessConfirmation() {
     <main className="min-h-screen">
       <SEO 
         title="Early Access Confirmed — Nucigen Labs"
-        description="Your early access request has been confirmed. You're on the list for Nucigen Labs launch on January 30, 2026. We'll contact you soon with more details."
+        description="Your early access request has been confirmed. You're on the list for Nucigen Labs launch on February 28, 2026. We'll contact you soon with more details."
         keywords="early access confirmed, nucigen labs launch, market intelligence access"
       />
 
@@ -103,7 +103,7 @@ export default function EarlyAccessConfirmation() {
                 </p>
               </div>
               <div className="mb-4">
-                <p className="text-lg text-white font-light mb-2">January 30, 2026 at 15:00 UTC</p>
+                <p className="text-lg text-white font-light mb-2">February 28, 2026 at 15:00 UTC</p>
               </div>
               <div className="flex items-center justify-center gap-2 md:gap-3">
                 <div className="text-center">

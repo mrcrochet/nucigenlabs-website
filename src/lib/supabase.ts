@@ -66,7 +66,7 @@ export interface AccessRequest {
   updated_at?: string;
   // Early access fields
   early_access?: boolean;
-  launch_date?: string; // January 30, 2026
+  launch_date?: string; // February 28, 2026
   email_sent?: boolean;
   email_sent_at?: string;
   utm_source?: string;
@@ -172,7 +172,7 @@ export async function submitAccessRequest(data: AccessRequest) {
       id: 'mock-id',
       status: 'pending',
       early_access: true,
-      launch_date: '2026-01-30',
+      launch_date: '2026-02-28',
       created_at: new Date().toISOString(),
     };
   }
@@ -203,7 +203,7 @@ export async function submitAccessRequest(data: AccessRequest) {
     ...data,
     email: emailLower,
     early_access: true,
-    launch_date: '2026-01-30', // January 30, 2026
+    launch_date: '2026-02-28', // February 28, 2026
     status: 'pending' as const,
     utm_source: utmParams.utm_source,
     utm_medium: utmParams.utm_medium,

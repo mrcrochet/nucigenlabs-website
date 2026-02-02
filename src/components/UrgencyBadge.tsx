@@ -23,7 +23,7 @@ export default function UrgencyBadge({ type = 'spots', value, label }: UrgencyBa
         return {
           icon: Clock,
           text: 'Early access',
-          subtext: 'Apply before launch on January 30, 2026'
+          subtext: 'Apply before launch on February 28, 2026'
         };
       default:
         return {

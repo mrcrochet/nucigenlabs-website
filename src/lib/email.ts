@@ -57,7 +57,7 @@ export async function sendEarlyAccessConfirmationEmail(data: EmailData): Promise
 
 function generateEmailHTML(data: EmailData): string {
   const name = data.name || data.to.split('@')[0];
-  const launchDate = 'January 30, 2026';
+  const launchDate = 'February 28, 2026';
   
   return `
 <!DOCTYPE html>
@@ -140,7 +140,7 @@ function generateEmailHTML(data: EmailData): string {
 
 function generateEmailText(data: EmailData): string {
   const name = data.name || data.to.split('@')[0];
-  const launchDate = 'January 30, 2026';
+  const launchDate = 'February 28, 2026';
   
   return `
 Welcome to Nucigen Labs Early Access!

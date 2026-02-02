@@ -95,9 +95,14 @@ function InvestigationWorkspaceContent() {
       <div className="col-span-1 sm:col-span-12 flex">
         {/* Gauche — Liste des pistes */}
         <aside className="w-64 shrink-0 border-r border-borders-subtle bg-background-base flex flex-col min-h-[calc(100vh-64px)]">
-          <div className="px-3 py-3 border-b border-borders-subtle flex items-center gap-2">
-            <FileSearch className="w-5 h-5 text-[#E1463E]" />
-            <span className="text-sm font-semibold text-text-primary">Enquêtes</span>
+          <div className="px-3 py-3 border-b border-borders-subtle">
+            <div className="flex items-center gap-2 mb-1">
+              <FileSearch className="w-5 h-5 text-[#E1463E] shrink-0" />
+              <span className="text-sm font-semibold text-text-primary">Enquêtes</span>
+            </div>
+            <p className="text-[10px] text-text-secondary leading-tight italic">
+              The only platform that shows you HOW events are connected, not just that they are.
+            </p>
           </div>
           <div className="flex-1 overflow-y-auto p-2">
             <Link
