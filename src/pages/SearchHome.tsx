@@ -41,6 +41,7 @@ function SearchHomeContent() {
   const [query, setQuery] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUrl, setIsUrl] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const urlDetectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -75,6 +76,18 @@ function SearchHomeContent() {
     };
   }, [query]);
 
+  // Cmd+K / Ctrl+K to focus search input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Handle search submission
   const handleSearch = useCallback(async (e?: React.FormEvent) => {
     if (e) {
@@ -86,10 +99,7 @@ function SearchHomeContent() {
     }
 
     setIsProcessing(true);
-
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchHome.tsx:86',message:'handleSearch entry',data:{query:query.trim(),inputType:isValidUrl(query.trim())?'url':'text',hasUser:!!user,userId:user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C'})}).catch(()=>{});
-    // #endregion
+    setSearchError(null);
 
     try {
       const requestBody = {
@@ -101,43 +111,18 @@ function SearchHomeContent() {
         ...(user?.id && { 'x-clerk-user-id': user.id }),
       };
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchHome.tsx:95',message:'Before fetch',data:{url:'/api/search/session',method:'POST',headers:requestHeaders,body:requestBody},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B'})}).catch(()=>{});
-      // #endregion
-
-      // Create search session
-      let response;
-      try {
-        response = await fetch('/api/search/session', {
-          method: 'POST',
-          headers: requestHeaders,
-          body: JSON.stringify(requestBody),
-        });
-      } catch (fetchError: any) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchHome.tsx:103',message:'Fetch network error',data:{errorName:fetchError?.name,errorMessage:fetchError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B'})}).catch(()=>{});
-        // #endregion
-        
-        // Network error - likely API server not running
-        throw new Error('API server is not running. Please start it with: npm run api:server');
-      }
-
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchHome.tsx:110',message:'After fetch',data:{ok:response.ok,status:response.status,statusText:response.statusText,headers:Object.fromEntries(response.headers.entries())},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D,E'})}).catch(()=>{});
-      // #endregion
+      const response = await fetch('/api/search/session', {
+        method: 'POST',
+        headers: requestHeaders,
+        body: JSON.stringify(requestBody),
+      });
 
       if (!response.ok) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchHome.tsx:115',message:'Response not OK',data:{status:response.status,statusText:response.statusText},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D,E'})}).catch(()=>{});
-        // #endregion
-        
-        // Try to get error message from response
         let errorMessage = 'Failed to create search session';
         try {
           const errorData = await response.json();
           errorMessage = errorData.error || errorMessage;
         } catch {
-          // If JSON parsing fails, use status text
           errorMessage = `${response.status} ${response.statusText}`;
         }
         throw new Error(errorMessage);
@@ -145,34 +130,23 @@ function SearchHomeContent() {
 
       const data = await response.json();
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchHome.tsx:115',message:'Response data parsed',data:{success:data.success,sessionId:data.sessionId,hasSession:!!data.session,error:data.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D,E'})}).catch(()=>{});
-      // #endregion
-      
       if (data.success && data.sessionId && data.session) {
-        // Store session in localStorage (client-side for now)
         localStorage.setItem(`search-session-${data.sessionId}`, JSON.stringify(data.session));
-        
-        // Navigate to workspace
         navigate(`/search/session/${data.sessionId}`);
       } else {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchHome.tsx:123',message:'Invalid response format',data:{success:data.success,sessionId:data.sessionId,hasSession:!!data.session,error:data.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
         throw new Error(data.error || 'Failed to create session');
       }
     } catch (error: any) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchHome.tsx:128',message:'Error caught',data:{errorName:error?.name,errorMessage:error?.message,errorStack:error?.stack?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D'})}).catch(()=>{});
-      // #endregion
       console.error('[SearchHome] Error:', error);
+      const message = error.message || 'Please try again';
+      setSearchError(message);
       toast.error('Search failed', {
-        description: error.message || 'Please try again',
+        description: message,
         duration: 5000,
       });
       setIsProcessing(false);
     }
-  }, [query, navigate]);
+  }, [query, navigate, user?.id]);
 
   // Handle paste
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -212,7 +186,10 @@ function SearchHomeContent() {
                 ref={inputRef}
                 type="text"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                setQuery(e.target.value);
+                if (searchError) setSearchError(null);
+              }}
                 onPaste={handlePaste}
                 placeholder="Search anything, or paste a link"
                 disabled={isProcessing}
@@ -243,9 +220,19 @@ function SearchHomeContent() {
             </div>
           </form>
 
+          {/* Erreur inline (a11y + visibilité) */}
+          {searchError && (
+            <p
+              role="alert"
+              className="mt-3 text-center text-sm text-red-400"
+            >
+              {searchError}
+            </p>
+          )}
           {/* Helper text */}
           <p className="mt-3 text-center text-xs text-text-tertiary">
             Search events, actors, sectors, risks, or paste a URL to analyze
+            <span className="hidden sm:inline"> · <kbd className="px-1 py-0.5 rounded bg-borders-subtle text-text-tertiary font-mono text-[10px]">⌘K</kbd> focus</span>
           </p>
         </div>
       </div>

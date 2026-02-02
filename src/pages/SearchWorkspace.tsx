@@ -228,7 +228,17 @@ function SearchWorkspaceContent() {
             inputType={session.inputType}
             resultCount={session.results.length}
             createdAt={session.createdAt}
+            sessionId={sessionId ?? undefined}
           />
+          {/* Annonce pour lecteurs d'écran : nombre de résultats */}
+          <div
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            className="sr-only"
+          >
+            {session.results.length} résultat{session.results.length !== 1 ? 's' : ''}
+          </div>
         </div>
         <Link
           to={`/search/session/${sessionId}/reponse`}
