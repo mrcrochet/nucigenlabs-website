@@ -8,7 +8,10 @@ import type { InvestigationGraph } from '../../types/investigation-graph';
 interface InvestigationTimelineViewProps {
   graph: InvestigationGraph;
   selectedNodeId: string | null;
+  selectedPathId?: string | null;
+  showDeadPaths?: boolean;
   onNodeClick: (nodeId: string) => void;
+  onPathClick?: (pathId: string) => void;
   className?: string;
 }
 
@@ -28,10 +31,16 @@ function groupNodesByDate(nodes: InvestigationGraph['nodes']): Map<string, Inves
 export default function InvestigationTimelineView({
   graph,
   selectedNodeId,
+  selectedPathId = null,
+  showDeadPaths = true,
   onNodeClick,
+  onPathClick,
   className = '',
 }: InvestigationTimelineViewProps) {
-  const { nodes } = graph;
+  const { nodes, paths } = graph;
+  const visiblePaths = showDeadPaths ? paths : paths.filter((p) => p.status !== 'dead');
+  const selectedPath = selectedPathId ? paths.find((p) => p.id === selectedPathId) : null;
+  const pathNodeIds = new Set(selectedPath?.nodes ?? []);
 
   if (nodes.length === 0) {
     return (
@@ -55,6 +64,24 @@ export default function InvestigationTimelineView({
       <div className="p-3 border-b border-borders-subtle">
         <h2 className="text-sm font-semibold text-text-primary">Timeline View</h2>
         <p className="text-xs text-text-muted mt-0.5">Events by date.</p>
+        {visiblePaths.length > 0 && onPathClick && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {visiblePaths.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => onPathClick(p.id)}
+                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  selectedPathId === p.id
+                    ? 'bg-[#E1463E] text-white'
+                    : 'bg-borders-subtle text-text-secondary hover:bg-[#E1463E]/20 hover:text-text-primary'
+                } ${p.status === 'dead' ? 'opacity-70' : ''}`}
+              >
+                {p.hypothesis_label || p.id} ({p.status} {p.confidence}%)
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div className="p-4">
         <div className="relative pl-4 border-l border-borders-subtle space-y-4">
@@ -72,7 +99,9 @@ export default function InvestigationTimelineView({
                     className={`w-full text-left rounded-lg border p-3 transition-colors ${
                       selectedNodeId === node.id
                         ? 'border-[#E1463E] bg-[#E1463E]/10'
-                        : 'border-borders-subtle bg-background-elevated hover:border-[#E1463E]/40'
+                        : pathNodeIds.has(node.id)
+                          ? 'border-[#E1463E]/60 bg-[#E1463E]/5'
+                          : 'border-borders-subtle bg-background-elevated hover:border-[#E1463E]/40'
                     }`}
                   >
                     <span className="font-medium text-text-primary block">{node.label}</span>

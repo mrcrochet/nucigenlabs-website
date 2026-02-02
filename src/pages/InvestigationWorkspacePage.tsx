@@ -12,7 +12,9 @@ import SEO from '../components/SEO';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { getThreads, getThread, sendMessage, getBrief } from '../lib/api/investigation-api';
 import { buildGraphFromSignals } from '../lib/investigation/build-graph';
+import { buildBriefingPayload } from '../lib/investigation/build-briefing';
 import InvestigationChatPanel from '../components/investigation/InvestigationChatPanel';
+import InvestigationBriefingView from '../components/investigation/InvestigationBriefingView';
 import InvestigationFlowView from '../components/investigation/InvestigationFlowView';
 import InvestigationTimelineView from '../components/investigation/InvestigationTimelineView';
 import InvestigationMapView from '../components/investigation/InvestigationMapView';
@@ -52,15 +54,21 @@ function InvestigationWorkspaceContent() {
   const [loadingThreads, setLoadingThreads] = useState(true);
   const [loadingThread, setLoadingThread] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'signals' | 'flow' | 'timeline' | 'map'>('signals');
+  const [viewMode, setViewMode] = useState<'signals' | 'flow' | 'timeline' | 'map' | 'briefing'>('signals');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeKey, setSelectedEdgeKey] = useState<string | null>(null);
   const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
+  const [showDeadPaths, setShowDeadPaths] = useState(true);
 
   const graph = useMemo(() => {
     if (!thread || !signals.length) return null;
     return buildGraphFromSignals(thread, signals);
   }, [thread, signals]);
+
+  const briefingPayload = useMemo(() => {
+    if (!thread || !graph) return null;
+    return buildBriefingPayload(thread, graph);
+  }, [thread, graph]);
 
   const detailsSelection = useMemo((): DetailsSelection => {
     if (!graph) return null;
@@ -256,9 +264,9 @@ function InvestigationWorkspaceContent() {
             </div>
           ) : (
             <>
-              {/* Tabs: Signals | Flow | Timeline | Map */}
-              <div className="shrink-0 border-b border-borders-subtle bg-background-elevated px-4 py-2 flex gap-1">
-                {(['signals', 'flow', 'timeline', 'map'] as const).map((mode) => (
+              {/* Tabs: Signals | Flow | Timeline | Map | Briefing */}
+              <div className="shrink-0 border-b border-borders-subtle bg-background-elevated px-4 py-2 flex gap-1 flex-wrap">
+                {(['signals', 'flow', 'timeline', 'map', 'briefing'] as const).map((mode) => (
                   <button
                     key={mode}
                     type="button"
@@ -267,7 +275,7 @@ function InvestigationWorkspaceContent() {
                       viewMode === mode ? 'bg-[#E1463E]/10 text-[#E1463E]' : 'text-text-secondary hover:bg-borders-subtle hover:text-text-primary'
                     }`}
                   >
-                    {mode === 'signals' ? 'Signals' : mode === 'flow' ? 'Flow' : mode === 'timeline' ? 'Timeline' : 'Map'}
+                    {mode === 'signals' ? 'Signals' : mode === 'flow' ? 'Flow' : mode === 'timeline' ? 'Timeline' : mode === 'map' ? 'Map' : 'Briefing'}
                   </button>
                 ))}
               </div>
@@ -330,8 +338,11 @@ function InvestigationWorkspaceContent() {
                       graph={graph}
                       selectedNodeId={selectedNodeId}
                       selectedEdgeKey={selectedEdgeKey}
+                      selectedPathId={selectedPathId}
+                      showDeadPaths={showDeadPaths}
                       onNodeClick={handleNodeClick}
                       onEdgeClick={handleEdgeClick}
+                      onPathClick={handlePathClick}
                     />
                   </div>
                 )}
@@ -340,7 +351,10 @@ function InvestigationWorkspaceContent() {
                     <InvestigationTimelineView
                       graph={graph}
                       selectedNodeId={selectedNodeId}
+                      selectedPathId={selectedPathId}
+                      showDeadPaths={showDeadPaths}
                       onNodeClick={handleNodeClick}
+                      onPathClick={handlePathClick}
                     />
                   </div>
                 )}
@@ -349,8 +363,25 @@ function InvestigationWorkspaceContent() {
                     <InvestigationMapView
                       graph={graph}
                       selectedNodeId={selectedNodeId}
+                      selectedPathId={selectedPathId}
+                      showDeadPaths={showDeadPaths}
                       onNodeClick={handleNodeClick}
+                      onPathClick={handlePathClick}
                     />
+                  </div>
+                )}
+                {viewMode === 'briefing' && (
+                  <div className="flex-1 min-h-0 overflow-auto p-4">
+                    {briefingPayload ? (
+                      <InvestigationBriefingView
+                        payload={briefingPayload}
+                        onPathClick={handlePathClick}
+                      />
+                    ) : (
+                      <div className="rounded-xl border border-borders-subtle bg-background-base p-6 text-center text-text-muted text-sm">
+                        Add signals to build the graph and see the briefing.
+                      </div>
+                    )}
                   </div>
                 )}
                 {/* Chat */}
@@ -399,14 +430,29 @@ function InvestigationWorkspaceContent() {
                 </div>
                 {graph && graph.paths.length > 0 && (
                   <div>
-                    <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2">Paths</h3>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wider">Paths</h3>
+                      <label className="flex items-center gap-1.5 text-xs text-text-secondary cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showDeadPaths}
+                          onChange={(e) => setShowDeadPaths(e.target.checked)}
+                          className="rounded border-borders-subtle"
+                        />
+                        Show dead
+                      </label>
+                    </div>
                     <ul className="space-y-1.5">
-                      {graph.paths.map((p) => (
+                      {(showDeadPaths ? graph.paths : graph.paths.filter((p) => p.status !== 'dead')).map((p) => (
                         <li key={p.id}>
                           <button
                             type="button"
                             onClick={() => handlePathClick(p.id)}
-                            className="w-full text-left px-3 py-2 rounded-lg border border-borders-subtle bg-background-base hover:border-[#E1463E]/40 hover:bg-[#E1463E]/5 text-sm text-text-primary transition-colors"
+                            className={`w-full text-left px-3 py-2 rounded-lg border text-sm transition-colors ${
+                              selectedPathId === p.id
+                                ? 'border-[#E1463E] bg-[#E1463E]/10 text-text-primary'
+                                : 'border-borders-subtle bg-background-base hover:border-[#E1463E]/40 text-text-primary'
+                            } ${p.status === 'dead' ? 'opacity-75' : ''}`}
                           >
                             <span className="font-medium truncate block">{p.hypothesis_label || p.id}</span>
                             <span className="text-xs text-text-muted">{p.status} · {p.confidence} %</span>

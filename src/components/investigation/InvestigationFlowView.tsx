@@ -9,8 +9,11 @@ export interface InvestigationFlowViewProps {
   graph: InvestigationGraph;
   selectedNodeId: string | null;
   selectedEdgeKey?: string | null;
+  selectedPathId?: string | null;
+  showDeadPaths?: boolean;
   onNodeClick: (nodeId: string) => void;
   onEdgeClick?: (fromId: string, toId: string) => void;
+  onPathClick?: (pathId: string) => void;
   className?: string;
 }
 
@@ -27,11 +30,17 @@ export default function InvestigationFlowView({
   graph,
   selectedNodeId,
   selectedEdgeKey = null,
+  selectedPathId = null,
+  showDeadPaths = true,
   onNodeClick,
   onEdgeClick,
+  onPathClick,
   className = '',
 }: InvestigationFlowViewProps) {
-  const { nodes, edges } = graph;
+  const { nodes, edges, paths } = graph;
+  const visiblePaths = showDeadPaths ? paths : paths.filter((p) => p.status !== 'dead');
+  const selectedPath = selectedPathId ? paths.find((p) => p.id === selectedPathId) : null;
+  const pathNodeIds = new Set(selectedPath?.nodes ?? []);
 
   if (nodes.length === 0) {
     return (
@@ -52,6 +61,24 @@ export default function InvestigationFlowView({
       <div className="p-3 border-b border-borders-subtle">
         <h2 className="text-sm font-semibold text-text-primary">Flow View</h2>
         <p className="text-xs text-text-muted mt-0.5">Left to right = time. Arrow thickness = strength.</p>
+        {visiblePaths.length > 0 && onPathClick && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {visiblePaths.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => onPathClick(p.id)}
+                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  selectedPathId === p.id
+                    ? 'bg-[#E1463E] text-white'
+                    : 'bg-borders-subtle text-text-secondary hover:bg-[#E1463E]/20 hover:text-text-primary'
+                } ${p.status === 'dead' ? 'opacity-70' : ''}`}
+              >
+                {p.hypothesis_label || p.id} ({p.status} {p.confidence}%)
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       <div className="p-4 overflow-x-auto">
         <div className="flex items-center gap-0 min-w-max">
@@ -63,7 +90,9 @@ export default function InvestigationFlowView({
                 className={`shrink-0 w-28 px-3 py-2 rounded-lg border text-left text-sm transition-colors ${
                   selectedNodeId === node.id
                     ? 'border-[#E1463E] bg-[#E1463E]/10 text-text-primary'
-                    : 'border-borders-subtle bg-background-elevated hover:border-[#E1463E]/40 text-text-primary'
+                    : pathNodeIds.has(node.id)
+                      ? 'border-[#E1463E]/60 bg-[#E1463E]/5 text-text-primary'
+                      : 'border-borders-subtle bg-background-elevated hover:border-[#E1463E]/40 text-text-primary'
                 }`}
               >
                 <span className="font-medium truncate block">{node.label}</span>
