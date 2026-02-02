@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
 import { toast } from 'sonner';
 import { ArrowLeft, Loader2 } from 'lucide-react';
@@ -42,7 +42,9 @@ interface SearchSession {
 
 function SearchWorkspaceContent() {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const focusNodeId = searchParams.get('focus') || searchParams.get('highlight') || null;
   const { user } = useUser();
   const [session, setSession] = useState<SearchSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -284,6 +286,7 @@ function SearchWorkspaceContent() {
             onNodeClick={setSelectedResultId}
             onNodeExplore={handleNodeExplore}
             height={600}
+            focusNodeId={focusNodeId}
           />
         </div>
       </div>

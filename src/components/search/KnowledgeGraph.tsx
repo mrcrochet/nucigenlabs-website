@@ -15,12 +15,19 @@ const LABEL_MAX_LEN_FULLSCREEN = 30;
 const NODE_TYPES = ['event', 'country', 'company', 'commodity', 'organization', 'person'] as const;
 const LINK_TYPES = ['causes', 'precedes', 'related_to', 'operates_in', 'exposes_to', 'impacts'] as const;
 
+/** Zoom level above which node labels are shown */
+const LABEL_VISIBLE_ZOOM = 0.5;
+/** Simulation cools down faster to limit CPU (fewer ticks) */
+const ALPHA_DECAY = 0.06;
+
 interface KnowledgeGraphProps {
   graph: KnowledgeGraphType;
   query?: string;
   onNodeClick?: (nodeId: string) => void;
   onNodeExplore?: (nodeId: string, nodeLabel: string) => void;
   height?: number;
+  /** Optional node id to center the view on when the graph is ready */
+  focusNodeId?: string | null;
 }
 
 type ZoomRef = { zoom: d3.ZoomBehavior<SVGSVGElement, unknown>; svg: d3.Selection<SVGSVGElement, unknown, null, undefined> };
@@ -35,9 +42,10 @@ function renderGraph(
     onNodeClick?: (nodeId: string) => void;
     onNodeExplore?: (nodeId: string, nodeLabel: string) => void;
     zoomRef?: React.MutableRefObject<ZoomRef | null>;
+    focusNodeId?: string | null;
   }
 ): () => void {
-  const { isFullscreen, height, graph, onNodeClick, onNodeExplore, zoomRef } = opts;
+  const { isFullscreen, height, graph, onNodeClick, onNodeExplore, zoomRef, focusNodeId } = opts;
   const width = containerEl.clientWidth;
   const graphHeight = isFullscreen ? window.innerHeight - 80 : height;
   const labelMaxLen = isFullscreen ? LABEL_MAX_LEN_FULLSCREEN : LABEL_MAX_LEN_NORMAL;
@@ -47,20 +55,23 @@ function renderGraph(
   const svg = d3.select(svgEl).attr('width', width).attr('height', graphHeight);
   const g = svg.append('g');
 
+  let labelGroup: d3.Selection<SVGGElement, unknown, null, undefined> | null = null;
   const zoom = d3.zoom<SVGSVGElement, unknown>()
     .scaleExtent([0.1, 4])
     .on('zoom', (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => {
       g.attr('transform', event.transform);
+      if (labelGroup) labelGroup.attr('opacity', event.transform.k >= LABEL_VISIBLE_ZOOM ? 1 : 0);
     });
 
   svg.call(zoom);
-  if (isFullscreen && zoomRef) zoomRef.current = { zoom, svg };
+  if (zoomRef) zoomRef.current = { zoom, svg };
 
   const simulation = d3.forceSimulation(graph.nodes as d3.SimulationNodeDatum & { id: string; x?: number; y?: number }[])
     .force('link', d3.forceLink(graph.links).id((d: any) => d.id).distance(100))
     .force('charge', d3.forceManyBody().strength(-300))
     .force('center', d3.forceCenter(width / 2, graphHeight / 2))
-    .force('collision', d3.forceCollide().radius(30));
+    .force('collision', d3.forceCollide().radius(30))
+    .alphaDecay(ALPHA_DECAY);
 
   const link = g.append('g')
     .selectAll('line')
@@ -94,7 +105,9 @@ function renderGraph(
       onNodeExplore?.(d.id, d.label);
     });
 
-  const label = g.append('g')
+  const labelG = g.append('g');
+  labelGroup = labelG;
+  const label = labelG
     .selectAll('text')
     .data(graph.nodes)
     .enter()
@@ -103,7 +116,20 @@ function renderGraph(
     .attr('font-size', '10px')
     .attr('fill', '#fff')
     .attr('text-anchor', 'middle')
-    .attr('dy', (d: any) => getNodeSize(d.type) + 12);
+    .attr('dy', (d: any) => getNodeSize(d.type) + 12)
+    .attr('opacity', 1);
+
+  if (focusNodeId) {
+    simulation.on('end', () => {
+      const node = graph.nodes.find((n: any) => n.id === focusNodeId) as any;
+      if (node && node.x != null && node.y != null) {
+        const scale = 1;
+        const tx = width / 2 - node.x * scale;
+        const ty = graphHeight / 2 - node.y * scale;
+        svg.call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(scale));
+      }
+    });
+  }
 
   const tooltip = d3.select('body')
     .append('div')
@@ -145,6 +171,8 @@ function renderGraph(
     node.attr('cx', (d: any) => d.x).attr('cy', (d: any) => d.y);
     label.attr('x', (d: any) => d.x).attr('y', (d: any) => d.y);
   });
+  const currentTransform = d3.zoomTransform(svg.node()!);
+  if (labelGroup) labelGroup.attr('opacity', currentTransform.k >= LABEL_VISIBLE_ZOOM ? 1 : 0);
 
   return () => {
     simulation.stop();
@@ -152,11 +180,12 @@ function renderGraph(
   };
 }
 
-export default function KnowledgeGraph({ graph, query, onNodeClick, onNodeExplore, height = 600 }: KnowledgeGraphProps) {
+export default function KnowledgeGraph({ graph, query, onNodeClick, onNodeExplore, height = 600, focusNodeId }: KnowledgeGraphProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const fullscreenSvgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const fullscreenContainerRef = useRef<HTMLDivElement>(null);
+  const normalZoomRef = useRef<ZoomRef | null>(null);
   const fullscreenZoomRef = useRef<ZoomRef | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   const maximizeButtonRef = useRef<HTMLButtonElement>(null);
@@ -195,7 +224,8 @@ export default function KnowledgeGraph({ graph, query, onNodeClick, onNodeExplor
         graph,
         onNodeClick,
         onNodeExplore,
-        zoomRef: isFullscreen ? fullscreenZoomRef : undefined,
+        zoomRef: isFullscreen ? fullscreenZoomRef : normalZoomRef,
+        focusNodeId,
       });
     };
 
@@ -206,7 +236,7 @@ export default function KnowledgeGraph({ graph, query, onNodeClick, onNodeExplor
       cleanupRef.current = null;
       d3.selectAll('.kg-tooltip').remove();
     };
-  }, [graph, onNodeClick, onNodeExplore, height, isFullscreen]);
+  }, [graph, onNodeClick, onNodeExplore, height, isFullscreen, focusNodeId]);
 
   useEffect(() => {
     if (!isFullscreen) return;
@@ -220,6 +250,7 @@ export default function KnowledgeGraph({ graph, query, onNodeClick, onNodeExplor
         onNodeClick,
         onNodeExplore,
         zoomRef: fullscreenZoomRef,
+        focusNodeId,
       });
     };
     window.addEventListener('resize', handleResize);
@@ -232,10 +263,24 @@ export default function KnowledgeGraph({ graph, query, onNodeClick, onNodeExplor
     return () => cancelAnimationFrame(raf);
   }, [isFullscreen]);
 
+  const handleResetZoom = useCallback(() => {
+    if (fullscreenZoomRef.current) {
+      const { zoom, svg } = fullscreenZoomRef.current;
+      svg.call(zoom.transform, d3.zoomIdentity);
+    }
+  }, []);
+
   useEffect(() => {
     if (!isFullscreen) return;
     const container = fullscreenContainerRef.current;
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'r' || e.key === 'R') {
+        const target = document.activeElement as HTMLElement;
+        if (!target || target === document.body || (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA')) {
+          handleResetZoom();
+          return;
+        }
+      }
       if (e.key !== 'Tab' || !container) return;
       const focusable = container.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
       const first = focusable[0];
@@ -254,14 +299,7 @@ export default function KnowledgeGraph({ graph, query, onNodeClick, onNodeExplor
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen]);
-
-  const handleResetZoom = useCallback(() => {
-    if (fullscreenZoomRef.current) {
-      const { zoom, svg } = fullscreenZoomRef.current;
-      svg.call(zoom.transform, d3.zoomIdentity);
-    }
-  }, []);
+  }, [isFullscreen, handleResetZoom]);
 
   const handleExportPng = useCallback(() => {
     const svgEl = fullscreenSvgRef.current;
@@ -395,7 +433,7 @@ export default function KnowledgeGraph({ graph, query, onNodeClick, onNodeExplor
                 <Download className="w-4 h-4" />
                 SVG
               </button>
-              <span className="hidden sm:inline text-xs text-text-tertiary ml-1">ESC pour fermer</span>
+              <span className="hidden sm:inline text-xs text-text-tertiary ml-1">ESC fermer · R reset zoom</span>
               <button
                 ref={exitFullscreenButtonRef}
                 onClick={toggleFullscreen}

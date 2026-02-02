@@ -10,6 +10,7 @@
  */
 
 import { useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
 import { toast } from 'sonner';
 import AppShell from '../components/layout/AppShell';
@@ -25,7 +26,9 @@ import InsightPanel from '../components/search/InsightPanel';
 import type { SearchMode, SearchFilters, SearchResult, KnowledgeGraph as KnowledgeGraphType } from '../types/search';
 
 function SearchContent() {
+  const [searchParams] = useSearchParams();
   const { user } = useUser();
+  const focusNodeId = searchParams.get('focus') || searchParams.get('highlight') || null;
   const [query, setQuery] = useState('');
   const [mode, setMode] = useState<SearchMode>('standard');
   const [filters, setFilters] = useState<SearchFilters>({});
@@ -421,6 +424,7 @@ function SearchContent() {
             onNodeClick={setSelectedResultId}
             onNodeExplore={handleNodeExplore}
             height={600}
+            focusNodeId={focusNodeId}
           />
         </div>
       </div>

@@ -223,15 +223,52 @@ export async function buildGraph(
   // Convert map to array
   nodes.push(...Array.from(nodeMap.values()));
 
+  // Limit graph size for performance (top N nodes by degree/sourceCount, top M links)
+  const limited = limitGraphSize({ nodes, links }, { maxNodes: 100, maxLinks: 200 });
+
   // Merge with previous graph if provided (close old relationships that no longer exist)
   if (previousGraph) {
-    return mergeTemporalGraphs(previousGraph, { nodes, links });
+    return mergeTemporalGraphs(previousGraph, limited);
   }
 
-  return {
-    nodes,
-    links,
-  };
+  return limited;
+}
+
+const DEFAULT_MAX_NODES = 100;
+const DEFAULT_MAX_LINKS = 200;
+
+/**
+ * Limit graph to top N nodes (by degree + sourceCount) and top M links between them.
+ * Keeps the graph readable and performant.
+ */
+function limitGraphSize(
+  graph: { nodes: KnowledgeGraph['nodes']; links: KnowledgeGraph['links'] },
+  opts: { maxNodes?: number; maxLinks?: number } = {}
+): { nodes: KnowledgeGraph['nodes']; links: KnowledgeGraph['links'] } {
+  const maxNodes = opts.maxNodes ?? DEFAULT_MAX_NODES;
+  const maxLinks = opts.maxLinks ?? DEFAULT_MAX_LINKS;
+  if (graph.nodes.length <= maxNodes && graph.links.length <= maxLinks) {
+    return graph;
+  }
+
+  const degree = new Map<string, number>();
+  for (const n of graph.nodes) degree.set(n.id, 0);
+  for (const l of graph.links) {
+    degree.set(l.source, (degree.get(l.source) ?? 0) + 1);
+    degree.set(l.target, (degree.get(l.target) ?? 0) + 1);
+  }
+
+  const score = (n: KnowledgeGraph['nodes'][0]) =>
+    (degree.get(n.id) ?? 0) * 2 + (n.sourceCount ?? 0) + (n.confidence ?? 0.5) * 5;
+  const sorted = [...graph.nodes].sort((a, b) => score(b) - score(a));
+  const topNodes = sorted.slice(0, maxNodes);
+  const topIds = new Set(topNodes.map((n) => n.id));
+
+  const topLinks = graph.links.filter(
+    (l) => topIds.has(l.source) && topIds.has(l.target)
+  ).slice(0, maxLinks);
+
+  return { nodes: topNodes, links: topLinks };
 }
 
 /**
