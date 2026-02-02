@@ -414,3 +414,5 @@ export default function DiscoverCard({ item, onSave, onView, onShare, initialSav
         </div>
       </div>
     </Card>
+  );
+}

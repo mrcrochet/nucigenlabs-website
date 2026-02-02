@@ -104,73 +104,73 @@ export default function CorporateImpactFilters({
   ];
 
   return (
-    <div 
+    <div
       ref={headerRef}
-      className="col-span-1 sm:col-span-12 backdrop-blur-xl bg-gradient-to-br from-background-overlay to-background-glass-subtle border-b border-borders-subtle sticky z-50"
+      className="col-span-1 sm:col-span-12 bg-black border-b border-gray-900 sticky z-50"
       style={{ top: `${headerHeight}px` }}
     >
-      <div className="px-6 py-4">
-        {/* Main Filters Row */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+        {/* Main Filters Row — mockup style; no overlap: type buttons don't grow/shrink into dropdown */}
         <div className="flex items-center gap-3 flex-wrap">
-          <Filter className="w-5 h-5 text-slate-400 flex-shrink-0" />
-          
-          {/* Type Filters */}
-          <div className="flex gap-2 flex-1 min-w-0">
+          <Filter className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
+
+          {/* Type Filters — flex-none so they don't overlap with Industries */}
+          <div className="flex gap-2 flex-none flex-wrap items-center">
             <button
               onClick={() => onFilterChange('all')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded border text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                 selectedFilter === 'all'
-                  ? 'backdrop-blur-xl bg-gradient-to-br from-white/[0.12] to-white/[0.04] border border-white/[0.2] text-white'
-                  : 'backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] text-slate-400 hover:from-white/[0.08] hover:to-white/[0.04]'
+                  ? 'border-gray-600 bg-gray-800 text-gray-200'
+                  : 'border-gray-800 text-gray-500 hover:bg-gray-900 hover:text-gray-400'
               }`}
             >
               All ({totalCount})
             </button>
             <button
               onClick={() => onFilterChange('opportunity')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded border text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                 selectedFilter === 'opportunity'
-                  ? 'backdrop-blur-xl bg-gradient-to-br from-green-500/20 to-green-500/10 border border-green-500/30 text-green-400'
-                  : 'backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] text-slate-400 hover:from-green-500/10 hover:to-green-500/5'
+                  ? 'border-green-500/40 bg-green-500/10 text-green-400'
+                  : 'border-gray-800 text-gray-500 hover:bg-gray-900 hover:text-gray-400'
               }`}
             >
               ↑ Opportunities ({opportunitiesCount})
             </button>
             <button
               onClick={() => onFilterChange('risk')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded border text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
                 selectedFilter === 'risk'
-                  ? 'backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/20 to-[#E1463E]/10 border border-[#E1463E]/30 text-[#E1463E]'
-                  : 'backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] text-slate-400 hover:from-[#E1463E]/10 hover:to-[#E1463E]/5'
+                  ? 'border-[#E1463E]/40 bg-[#E1463E]/10 text-[#E1463E]'
+                  : 'border-gray-800 text-gray-500 hover:bg-gray-900 hover:text-gray-400'
               }`}
             >
               ↓ Risks ({risksCount})
             </button>
           </div>
 
-          {/* Industries multi-select */}
+          {/* Industries multi-select — shrink-0 to avoid being overlapped */}
           {onSectorsChange && (
-            <div className="relative min-w-[180px]" ref={industryDropdownRef}>
+            <div className="relative min-w-[160px] shrink-0" ref={industryDropdownRef}>
               <button
                 type="button"
                 onClick={() => setShowIndustryDropdown(!showIndustryDropdown)}
-                className="inline-flex items-center gap-2 px-4 py-2 backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 w-full justify-between"
+                className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-900/50 border border-gray-800 rounded text-xs font-medium text-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-600 w-full justify-between hover:bg-gray-900"
               >
-                <Building2 className="w-4 h-4 text-slate-400" />
+                <Building2 className="w-3.5 h-3.5 text-gray-500" aria-hidden />
                 <span className="truncate">
-                  {selectedSectors.length === 0 ? 'Toutes industries' : `${selectedSectors.length} industrie(s)`}
+                  {selectedSectors.length === 0 ? 'All industries' : `${selectedSectors.length} industrie${selectedSectors.length > 1 ? 's' : ''}`}
                 </span>
-                <ChevronDown className={`w-4 h-4 flex-shrink-0 transition-transform ${showIndustryDropdown ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 text-gray-500 transition-transform ${showIndustryDropdown ? 'rotate-180' : ''}`} aria-hidden />
               </button>
               {showIndustryDropdown && (
-                <div className="absolute left-0 right-0 top-full mt-1 py-2 backdrop-blur-xl bg-[#0A0A0A] border border-white/[0.15] rounded-lg shadow-xl z-50 max-h-[280px] flex flex-col">
-                  <div className="px-2 pb-2 border-b border-white/[0.08]">
+                <div className="absolute left-0 right-0 top-full mt-1 py-2 bg-gray-900 border border-gray-800 rounded-lg shadow-xl z-50 max-h-[280px] flex flex-col">
+                  <div className="px-2 pb-2 border-b border-gray-800">
                     <input
                       type="text"
                       value={industrySearch}
                       onChange={(e) => setIndustrySearch(e.target.value)}
-                      placeholder="Rechercher une industrie..."
-                      className="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.1] text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50"
+                      placeholder="Search industry..."
+                      className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-600"
                     />
                   </div>
                   <div className="overflow-y-auto max-h-[220px] px-2 pt-2">
@@ -187,10 +187,8 @@ export default function CorporateImpactFilters({
                               onSectorsChange([...selectedSectors, ind]);
                             }
                           }}
-                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all ${
-                            isSelected
-                              ? 'bg-[#E1463E]/20 text-[#E1463E]'
-                              : 'text-slate-300 hover:bg-white/[0.06]'
+                          className={`w-full text-left px-3 py-2 rounded text-xs transition-colors ${
+                            isSelected ? 'bg-[#E1463E]/20 text-[#E1463E]' : 'text-gray-400 hover:bg-gray-800'
                           }`}
                         >
                           {ind}
@@ -207,10 +205,10 @@ export default function CorporateImpactFilters({
           <select
             value={selectedSector}
             onChange={(e) => onSectorChange(e.target.value)}
-            className="px-4 py-2 backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 min-w-[140px]"
+            className="shrink-0 px-3 py-1.5 bg-gray-900/50 border border-gray-800 rounded text-xs font-medium text-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-600 min-w-[120px]"
           >
             {sectors.map((sector) => (
-              <option key={sector} value={sector === 'All Sectors' ? 'all' : sector} className="bg-[#0A0A0A]">
+              <option key={sector} value={sector === 'All Sectors' ? 'all' : sector} className="bg-gray-900">
                 {sector}
               </option>
             ))}
@@ -220,10 +218,10 @@ export default function CorporateImpactFilters({
           <select
             value={selectedCategory}
             onChange={(e) => onCategoryChange(e.target.value)}
-            className="px-4 py-2 backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-lg text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 min-w-[140px]"
+            className="shrink-0 px-3 py-1.5 bg-gray-900/50 border border-gray-800 rounded text-xs font-medium text-gray-300 focus:outline-none focus:ring-1 focus:ring-gray-600 min-w-[120px]"
           >
             {categories.map((category) => (
-              <option key={category} value={categoryMap[category] || 'all'} className="bg-[#0A0A0A]">
+              <option key={category} value={categoryMap[category] || 'all'} className="bg-gray-900">
                 {category}
               </option>
             ))}
@@ -231,19 +229,19 @@ export default function CorporateImpactFilters({
 
           {/* Search Toggle */}
           <button
+            type="button"
             onClick={() => {
               setShowSearch(!showSearch);
-              if (showSearch) {
-                onSearchChange('');
-              }
+              if (showSearch) onSearchChange('');
             }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`p-2 rounded border transition-colors ${
               showSearch || searchQuery
-                ? 'backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/20 to-[#E1463E]/10 border border-[#E1463E]/30 text-[#E1463E]'
-                : 'backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] text-slate-400 hover:from-white/[0.08] hover:to-white/[0.04]'
+                ? 'border-[#E1463E]/40 bg-[#E1463E]/10 text-[#E1463E]'
+                : 'border-gray-800 text-gray-500 hover:bg-gray-900 hover:text-gray-400'
             }`}
+            aria-label={showSearch ? 'Hide search' : 'Show search'}
           >
-            <Search className="w-4 h-4" />
+            <Search className="w-3.5 h-3.5" aria-hidden />
           </button>
         </div>
 
@@ -253,16 +251,16 @@ export default function CorporateImpactFilters({
             {selectedSectors.map((ind) => (
               <span
                 key={ind}
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#E1463E]/15 border border-[#E1463E]/30 text-[#E1463E] text-xs font-medium"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-gray-800 border border-gray-700 text-gray-300 text-xs font-medium"
               >
                 {ind}
                 <button
                   type="button"
                   onClick={() => onSectorsChange(selectedSectors.filter((s) => s !== ind))}
-                  className="hover:bg-[#E1463E]/20 rounded p-0.5"
+                  className="hover:bg-gray-700 rounded p-0.5"
                   aria-label={`Remove ${ind}`}
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3 h-3" aria-hidden />
                 </button>
               </span>
             ))}
@@ -273,21 +271,23 @@ export default function CorporateImpactFilters({
         {showSearch && (
           <div className="mt-3 flex items-center gap-2">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" aria-hidden />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
                 placeholder="Search by company name..."
-                className="w-full pl-10 pr-10 py-2 backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50"
+                className="w-full pl-9 pr-9 py-1.5 bg-gray-900 border border-gray-800 rounded text-xs text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-600"
                 autoFocus
               />
               {searchQuery && (
                 <button
+                  type="button"
                   onClick={() => onSearchChange('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                  aria-label="Clear search"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3.5 h-3.5" aria-hidden />
                 </button>
               )}
             </div>

@@ -23,45 +23,45 @@ export default function CorporateImpactReportCard({
   if (industries.length === 0) return null;
 
   return (
-    <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.1] rounded-xl p-4 sm:p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <FileText className="w-5 h-5 text-[#E1463E]" />
-        <h3 className="font-semibold text-white text-sm">Rapport Corporate Impact</h3>
+    <div className="bg-gray-900/50 border border-gray-800 rounded-lg p-4 sm:p-6">
+      <div className="flex items-center gap-2 mb-3">
+        <FileText className="w-4 h-4 text-[#E1463E]" aria-hidden />
+        <h3 className="text-xs text-gray-500 uppercase tracking-wider font-medium">Rapport Corporate Impact</h3>
       </div>
-      <p className="text-slate-400 text-xs font-light mb-4">
-        Filtre : <span className="text-slate-300 font-medium">{industries.join(', ')}</span>
+      <p className="text-xs text-gray-500 mb-4">
+        Filtre : <span className="text-gray-300 font-medium">{industries.join(', ')}</span>
       </p>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-        <div className="p-3 rounded-lg bg-white/[0.04] border border-white/[0.06]">
-          <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Signaux</p>
-          <p className="text-lg font-semibold text-white">{totalSignals}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4">
+        <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-800">
+          <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">Signaux</p>
+          <p className="text-lg font-semibold text-gray-200 font-mono">{totalSignals}</p>
         </div>
         <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
           <div className="flex items-center gap-1.5 mb-1">
-            <TrendingUp className="w-3.5 h-3.5 text-green-400" />
-            <p className="text-xs text-slate-500 uppercase tracking-wide">Opportunités</p>
+            <TrendingUp className="w-3.5 h-3.5 text-green-400" aria-hidden />
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Opportunités</p>
           </div>
-          <p className="text-lg font-semibold text-green-400">{opportunities}</p>
+          <p className="text-lg font-semibold text-green-400 font-mono">{opportunities}</p>
         </div>
         <div className="p-3 rounded-lg bg-[#E1463E]/10 border border-[#E1463E]/20">
           <div className="flex items-center gap-1.5 mb-1">
-            <TrendingDown className="w-3.5 h-3.5 text-[#E1463E]" />
-            <p className="text-xs text-slate-500 uppercase tracking-wide">Risques</p>
+            <TrendingDown className="w-3.5 h-3.5 text-[#E1463E]" aria-hidden />
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Risques</p>
           </div>
-          <p className="text-lg font-semibold text-[#E1463E]">{risks}</p>
+          <p className="text-lg font-semibold text-[#E1463E] font-mono">{risks}</p>
         </div>
-        <div className="p-3 rounded-lg bg-white/[0.04] border border-white/[0.06] col-span-2 sm:col-span-1">
+        <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-800 col-span-2 sm:col-span-1">
           <div className="flex items-center gap-1.5 mb-1">
-            <Building2 className="w-3.5 h-3.5 text-slate-400" />
-            <p className="text-xs text-slate-500 uppercase tracking-wide">Industries</p>
+            <Building2 className="w-3.5 h-3.5 text-gray-500" aria-hidden />
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium">Industries</p>
           </div>
-          <p className="text-lg font-semibold text-white">{industries.length}</p>
+          <p className="text-lg font-semibold text-gray-200 font-mono">{industries.length}</p>
         </div>
       </div>
       {topCompanies.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Entreprises concernées (aperçu)</p>
-          <p className="text-sm text-slate-400 font-light">{topCompanies.slice(0, 8).join(', ')}{topCompanies.length > 8 ? '…' : ''}</p>
+          <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-2">Entreprises concernées (aperçu)</p>
+          <p className="text-sm text-gray-400">{topCompanies.slice(0, 8).join(', ')}{topCompanies.length > 8 ? '…' : ''}</p>
         </div>
       )}
     </div>

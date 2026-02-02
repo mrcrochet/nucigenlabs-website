@@ -40,7 +40,6 @@ import CorporateImpactFilters from '../components/corporate-impact/CorporateImpa
 import SignalCard from '../components/corporate-impact/SignalCard';
 import EmptyState from '../components/corporate-impact/EmptyState';
 import CorporateImpactReportCard from '../components/corporate-impact/CorporateImpactReportCard';
-import CorporateImpactPerplexityQuery from '../components/corporate-impact/CorporateImpactPerplexityQuery';
 import WatchlistButton from '../components/watchlist/WatchlistButton';
 import { AlertTriangle, Info } from 'lucide-react';
 
@@ -514,9 +513,6 @@ function SignalsPageContent() {
                 topCompanies={[...new Set(companySignals.map((s) => s.company?.name).filter(Boolean))] as string[]}
               />
             )}
-            <div className="mb-6">
-              <CorporateImpactPerplexityQuery industries={selectedSectors} />
-            </div>
             {companyLoading ? (
               <div className="text-center py-12">
                 <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>

@@ -206,264 +206,170 @@ export default function SignalCard({ signal }: SignalCardProps) {
   };
 
   const confidencePercent = getConfidencePercent(signal.prediction.confidence);
+  const isCritical = !isOpportunity; // Risk = critical for timeline dot
 
   return (
     <>
-      <div
-        className={`backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border transition-all rounded-2xl overflow-hidden ${
-          isOpportunity
-            ? 'border-green-500/30 hover:border-green-500/50'
-            : 'border-[#E1463E]/30 hover:border-[#E1463E]/50'
-        }`}
-      >
-        {/* Header Bar */}
+      <div className="relative ml-6 sm:ml-12 mb-6 sm:mb-8">
+        {/* Timeline: vertical line + dot — less margin on mobile */}
+        <div className="absolute -left-6 sm:-left-12 top-0 h-full w-px bg-gray-800" aria-hidden />
         <div
-          className={`h-1 ${
-            isOpportunity
-              ? 'bg-gradient-to-r from-green-500 to-emerald-500'
-              : 'bg-gradient-to-r from-[#E1463E] to-red-600'
+          className={`absolute -left-[25px] sm:-left-[49px] top-6 w-2 h-2 border border-gray-900 rounded-full ${
+            isCritical ? 'bg-[#E1463E]' : 'bg-gray-500'
           }`}
+          aria-hidden
         />
 
-        <div className="p-6">
-          {/* Signal Type Badge */}
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              {isOpportunity ? (
-                <div className="flex items-center gap-2 px-3 py-1.5 backdrop-blur-xl bg-gradient-to-br from-green-500/20 to-green-500/10 border border-green-500/30 rounded-full">
-                  <TrendingUp className="w-4 h-4 text-green-400" />
-                  <span className="text-xs font-semibold text-green-400 tracking-wide">↑ LIKELY UPSIDE</span>
+        <div
+          className={`bg-gray-900/50 border cursor-pointer transition-colors hover:bg-gray-900/80 ${
+            isCritical ? 'border-gray-700' : 'border-gray-800'
+          } ${expanded ? 'border-gray-600' : ''}`}
+          onClick={() => setExpanded(!expanded)}
+        >
+          <div className="p-5">
+            {/* Header: type label + badge + chevron */}
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-xs text-gray-500 uppercase tracking-wider font-medium">
+                    {isOpportunity ? 'Opportunity' : 'Risk'}
+                  </span>
+                  {isCritical && (
+                    <span className="text-xs text-gray-400 border border-gray-700 px-2 py-0.5 rounded">
+                      Critical
+                    </span>
+                  )}
                 </div>
-              ) : (
-                <div className="flex items-center gap-2 px-3 py-1.5 backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/20 to-[#E1463E]/10 border border-[#E1463E]/30 rounded-full">
-                  <TrendingDown className="w-4 h-4 text-[#E1463E]" />
-                  <span className="text-xs font-semibold text-[#E1463E] tracking-wide">↓ DOWNSIDE RISK</span>
+                <h3 className="text-base font-semibold text-gray-200 mb-2">{signal.company.name}</h3>
+                <div className="flex items-center gap-4 text-xs text-gray-500">
+                  {signal.company.ticker && (
+                    <span className="font-mono text-gray-400">{signal.company.ticker}</span>
+                  )}
+                  {signal.company.sector && <span>{signal.company.sector}</span>}
+                  <span>{signal.prediction.timeframe}</span>
                 </div>
-              )}
+              </div>
+              <ChevronDown
+                className={`w-4 h-4 text-gray-600 transition-transform shrink-0 ${expanded ? 'rotate-180' : ''}`}
+                aria-hidden
+              />
+            </div>
+
+            {/* Description */}
+            <p className="text-sm text-gray-400 leading-relaxed mb-3">
+              {signal.reasoning.summary}
+            </p>
+
+            {/* Impact line — mockup style */}
+            <div className="flex items-baseline gap-2 text-xs mb-3 pt-3 border-t border-gray-800">
+              <span className="text-gray-500">Impact:</span>
+              <span className="text-gray-300">
+                {isOpportunity ? '+' : ''}{signal.prediction.magnitude}
+                {signal.prediction.target_price && ` · Target range: ${signal.prediction.target_price}`}
+              </span>
+            </div>
+
+            {/* Confidence bar — mockup style */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Confidence:</span>
+              <div className="flex-1 bg-gray-800 h-1 rounded overflow-hidden">
+                <div
+                  className={`h-1 ${isOpportunity ? 'bg-green-500/80' : 'bg-gray-400'}`}
+                  style={{ width: `${confidencePercent}%` }}
+                  aria-hidden
+                />
+              </div>
               <button
-                onClick={() => setShowConfidence(true)}
-                className="px-2.5 py-1 backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded text-xs font-semibold text-white hover:from-white/[0.12] hover:to-white/[0.04] transition-all cursor-pointer"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowConfidence(true);
+                }}
+                className="text-xs text-gray-400 font-mono hover:text-gray-300 transition-colors"
               >
                 {confidencePercent}%
               </button>
-              <span className="px-2.5 py-1 backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] rounded text-xs font-medium text-slate-400">
-                {signal.prediction.timeframe}
-              </span>
             </div>
-            <Sparkles className="w-5 h-5 text-[#E1463E]" />
-          </div>
 
-          {/* Company Info */}
-          <div className="mb-4">
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <h3 className="text-xl font-light text-white">{signal.company.name}</h3>
-                  {/* Underground Badge - for small cap companies */}
-                  {signal.company.market_cap && isUndergroundCompany(signal.company.market_cap) && (
-                    <span className="px-2 py-0.5 backdrop-blur-xl bg-gradient-to-br from-purple-500/20 to-purple-500/10 border border-purple-500/30 rounded text-xs font-semibold text-purple-400">
-                      UNDERGROUND
-                    </span>
+            {/* Linked Event — compact */}
+            <div className="mt-4 p-3 bg-gray-800/50 border border-gray-800 rounded-lg">
+              <div className="flex items-start gap-2">
+                <LinkIcon className="w-3.5 h-3.5 text-gray-500 flex-shrink-0 mt-0.5" aria-hidden />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">Triggered by</p>
+                  {signal.catalyst_event.event_id ? (
+                    <Link
+                      to={`/events-feed/${signal.catalyst_event.event_id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="group flex items-center gap-2 text-sm text-gray-200 hover:text-[#E1463E] transition-colors"
+                    >
+                      <span className="font-medium">{signal.catalyst_event.title}</span>
+                      <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" aria-hidden />
+                    </Link>
+                  ) : (
+                    <p className="text-sm text-gray-200 font-medium">{signal.catalyst_event.title}</p>
                   )}
-                </div>
-                <div className="flex items-center gap-3 text-sm text-slate-400 flex-wrap">
-                  {signal.company.ticker && (
-                    <>
-                      <span className="font-mono font-medium text-slate-300">{signal.company.ticker}</span>
-                      <span className="text-slate-600">•</span>
-                    </>
-                  )}
-                  {signal.company.exchange && (
-                    <>
-                      <span>{signal.company.exchange}</span>
-                      <span className="text-slate-600">•</span>
-                    </>
-                  )}
-                  {signal.company.market_cap && <span>{signal.company.market_cap}</span>}
-                </div>
-              </div>
-              <div className="text-right ml-4">
-                {signal.company.current_price && !isDataUnavailable(signal.company.current_price) && (
-                  <div className="text-2xl font-light text-white">{signal.company.current_price}</div>
-                )}
-                {signal.prediction.target_price && (
-                  <div
-                    className={`text-sm font-medium ${isOpportunity ? 'text-green-400' : 'text-[#E1463E]'}`}
-                  >
-                    Observed Range: {signal.prediction.target_price}
-                  </div>
-                )}
-              </div>
-            </div>
-            {signal.company.sector && (
-              <span className="inline-block px-2 py-1 backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] rounded text-xs font-medium text-slate-400">
-                {signal.company.sector}
-              </span>
-            )}
-          </div>
-
-          {/* Observed Impact Range */}
-          <div
-            className={`p-4 rounded-xl border mb-4 backdrop-blur-xl ${
-              isOpportunity
-                ? 'bg-gradient-to-br from-green-500/10 to-green-500/5 border-green-500/20'
-                : 'bg-gradient-to-br from-[#E1463E]/10 to-[#E1463E]/5 border-[#E1463E]/20'
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <DollarSign className={`w-5 h-5 ${isOpportunity ? 'text-green-400' : 'text-[#E1463E]'}`} />
-              <span className={`font-semibold text-sm ${isOpportunity ? 'text-green-400' : 'text-[#E1463E]'}`}>
-                Observed Impact Range: {isOpportunity ? '+' : ''}{signal.prediction.magnitude}
-              </span>
-            </div>
-            <div className="flex items-center gap-4 text-sm text-slate-400 mb-2">
-              <span>⏱ Observed timeframe: {signal.prediction.timeframe}</span>
-            </div>
-            <div className="text-xs text-slate-500 italic mb-2">
-              Median outcome across comparable post-event cases
-            </div>
-            <div className="mt-2 flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-slate-500 italic">
-                Based on prior comparable events
-              </span>
-              <span className={`px-2 py-0.5 backdrop-blur-xl border rounded text-xs font-semibold ${
-                isOpportunity
-                  ? 'bg-gradient-to-br from-green-500/20 to-green-500/10 border-green-500/30 text-green-400'
-                  : 'bg-gradient-to-br from-[#E1463E]/20 to-[#E1463E]/10 border-[#E1463E]/30 text-[#E1463E]'
-              }`}>
-                Replay-validated
-              </span>
-              {signal.trade_impact && (
-                <span className="px-2 py-0.5 backdrop-blur-xl bg-gradient-to-br from-blue-500/20 to-blue-500/10 border border-blue-500/30 rounded text-xs font-semibold text-blue-400">
-                  Trade-Validated
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Linked Event - Key Feature */}
-          <div className="mb-4 p-3 backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.15] rounded-xl">
-            <div className="flex items-start gap-2">
-              <LinkIcon className="w-4 h-4 text-[#E1463E] flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-slate-400 mb-1 tracking-wide">TRIGGERED BY</p>
-                {signal.catalyst_event.event_id ? (
-                  <Link
-                    to={`/events-feed/${signal.catalyst_event.event_id}`}
-                    className="group flex items-center gap-2 text-sm text-white hover:text-[#E1463E] transition-colors"
-                  >
-                    <span className="font-medium">{signal.catalyst_event.title}</span>
-                    <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </Link>
-                ) : (
-                  <p className="text-sm text-white font-medium">{signal.catalyst_event.title}</p>
-                )}
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <span className="text-xs text-slate-500">
-                    Signal detected: {new Date(signal.catalyst_event.published).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  <span className="text-xs text-gray-500 mt-1 block">
+                    {new Date(signal.catalyst_event.published).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </span>
-                  {signal.catalyst_event.tier && (
-                    <span className="px-1.5 py-0.5 backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/20 to-[#E1463E]/10 border border-[#E1463E]/30 rounded text-xs font-semibold text-[#E1463E]">
-                      {signal.catalyst_event.tier}
-                    </span>
-                  )}
-                  {signal.catalyst_event.category && (
-                    <span className="px-1.5 py-0.5 backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.02] border border-white/[0.08] rounded text-xs font-medium text-slate-400">
-                      {signal.catalyst_event.category}
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Summary */}
-          <div className="mb-4">
-            <p className="text-sm text-slate-300 leading-relaxed">{signal.reasoning.summary}</p>
-          </div>
-
-          {/* Expand/Collapse Button */}
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="w-full py-3 px-4 backdrop-blur-xl bg-gradient-to-br from-white/[0.08] to-white/[0.02] border border-white/[0.15] rounded-lg text-white hover:from-white/[0.12] hover:to-white/[0.04] transition-all flex items-center justify-center gap-2 font-medium text-sm"
-          >
-            {expanded ? 'Show Less' : 'Deep Dive Analysis'}
-            <ChevronDown className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-          </button>
-
-          {/* Expanded Content */}
-          {expanded && (
-            <div className="mt-4 pt-4 border-t border-white/[0.08] space-y-4">
-              {/* Key Factors */}
-              <div>
-                <h4 className="font-semibold text-white mb-3 flex items-center gap-2 text-sm">
-                  <TrendingUp className="w-4 h-4 text-green-400" />
-                  Key Bullish Factors
-                </h4>
-                <ul className="space-y-2">
-                  {signal.reasoning.key_factors.map((factor, idx) => {
-                    // Classify factor type (simple heuristic)
-                    const isStructural = /structural|long.?term|permanent|fundamental/i.test(factor);
-                    const isCyclical = /cyclical|seasonal|cycle|periodic/i.test(factor);
-                    const isEventDriven = /event|immediate|short.?term|temporary|one.?off/i.test(factor);
-                    
-                    let factorType = 'Event-driven';
-                    if (isStructural) factorType = 'Structural';
-                    else if (isCyclical) factorType = 'Cyclical';
-                    
-                    return (
-                      <li key={idx} className="text-sm text-slate-300 flex items-start gap-2">
-                        <span className="text-green-400 font-bold flex-shrink-0 mt-0.5">✓</span>
-                        <div className="flex-1">
-                          <span>{factor}</span>
-                          <span className="ml-2 px-1.5 py-0.5 backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded text-xs font-medium text-slate-500">
-                            {factorType}
-                          </span>
-                        </div>
+            {/* Expanded Content — mockup style */}
+            {expanded && (
+              <div className="mt-5 pt-5 border-t border-gray-800 space-y-4" onClick={(e) => e.stopPropagation()}>
+                {/* Key Facts */}
+                <div>
+                  <h4 className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-2">
+                    Key Factors
+                  </h4>
+                  <ul className="space-y-1.5">
+                    {signal.reasoning.key_factors.map((factor, idx) => (
+                      <li key={idx} className="text-xs text-gray-400 flex items-start gap-2 leading-relaxed">
+                        <span className="text-gray-600 mt-1 shrink-0">•</span>
+                        <span>{factor}</span>
                       </li>
-                    );
-                  })}
-                </ul>
-              </div>
+                    ))}
+                  </ul>
+                </div>
 
-              {/* Risks */}
-              <div>
-                <h4 className="font-semibold text-white mb-3 flex items-center gap-2 text-sm">
-                  <AlertTriangle className="w-4 h-4 text-orange-400" />
-                  Key Risks
-                </h4>
-                <ul className="space-y-2">
-                  {signal.reasoning.risks.map((risk, idx) => {
-                    // Classify risk type (simple heuristic)
-                    const isStructural = /structural|long.?term|permanent|fundamental/i.test(risk);
-                    const isCyclical = /cyclical|seasonal|cycle|periodic/i.test(risk);
-                    const isEventDriven = /event|immediate|short.?term|temporary|one.?off/i.test(risk);
-                    const isExecution = /execution|operational|delivery|implementation/i.test(risk);
-                    
-                    let riskType = 'Event-driven';
-                    if (isStructural) riskType = 'Structural';
-                    else if (isCyclical) riskType = 'Cyclical';
-                    else if (isExecution) riskType = 'Execution risk';
-                    
-                    return (
-                      <li key={idx} className="text-sm text-slate-300 flex items-start gap-2">
-                        <span className="text-orange-400 font-bold flex-shrink-0 mt-0.5">⚠</span>
-                        <div className="flex-1">
-                          <span>{risk}</span>
-                          <span className="ml-2 px-1.5 py-0.5 backdrop-blur-xl bg-gradient-to-br from-white/[0.03] to-white/[0.01] border border-white/[0.08] rounded text-xs font-medium text-slate-500">
-                            {riskType}
-                          </span>
-                        </div>
+                {/* Key Risks */}
+                <div>
+                  <h4 className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-2">
+                    Key Risks
+                  </h4>
+                  <ul className="space-y-1.5">
+                    {signal.reasoning.risks.map((risk, idx) => (
+                      <li key={idx} className="text-xs text-gray-400 flex items-start gap-2 leading-relaxed">
+                        <span className="text-gray-600 mt-1 shrink-0">•</span>
+                        <span>{risk}</span>
                       </li>
-                    );
-                  })}
-                </ul>
-              </div>
+                    ))}
+                  </ul>
+                </div>
 
-              {/* Event-level causal analysis (event_impact_analyses) */}
-              {signal.catalyst_event.event_id && (
-                <EventImpactAnalysisSection eventId={signal.catalyst_event.event_id} />
-              )}
+                {/* Event-level causal analysis */}
+                {signal.catalyst_event.event_id && (
+                  <EventImpactAnalysisSection eventId={signal.catalyst_event.event_id} />
+                )}
+
+                {/* View Source Materials — mockup style */}
+                {signal.sources && signal.sources.length > 0 && (
+                  <button
+                    type="button"
+                    className="w-full px-4 py-2 border border-gray-700 text-gray-400 text-xs hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const firstWithUrl = signal.sources.find(s => typeof s === 'object' && (s as { url?: string }).url);
+                      const url = firstWithUrl && typeof firstWithUrl === 'object' ? (firstWithUrl as { url?: string }).url : null;
+                      if (url) window.open(url, '_blank');
+                    }}
+                  >
+                    <ExternalLink className="w-3 h-3" aria-hidden />
+                    View Source Materials
+                  </button>
+                )}
 
               {/* Trade Impact Section */}
               {signal.trade_impact && (
@@ -676,6 +582,7 @@ export default function SignalCard({ signal }: SignalCardProps) {
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
 
