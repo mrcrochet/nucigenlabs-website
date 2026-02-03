@@ -12,6 +12,8 @@ export type InvestigationEdgeRelation =
   | 'influences'
   | 'funds'
   | 'restricts'
+  | 'supports'
+  | 'weakens'
   | 'triggers';
 
 /**

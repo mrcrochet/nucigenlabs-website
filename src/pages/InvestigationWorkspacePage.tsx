@@ -10,7 +10,7 @@ import { Loader2, FileSearch, ExternalLink, ArrowLeft, Target, AlertTriangle, Do
 import AppShell from '../components/layout/AppShell';
 import SEO from '../components/SEO';
 import ProtectedRoute from '../components/ProtectedRoute';
-import { getThreads, getThread, sendMessage, getBrief } from '../lib/api/investigation-api';
+import { getThreads, getThread, getDetectiveGraph, sendMessage, getBrief } from '../lib/api/investigation-api';
 import { buildGraphFromSignals } from '../lib/investigation/build-graph';
 import { buildBriefingPayload, formatBriefingPayloadAsText } from '../lib/investigation/build-briefing';
 import { DEMO_THREAD_ID, getDemoGraphFixture, DEMO_THREAD_PAYLOAD } from '../lib/investigation/demo-graph-fixture';
@@ -25,6 +25,7 @@ import type {
   InvestigationSignal,
   InvestigationMessage,
 } from '../types/investigation';
+import type { InvestigationGraph } from '../types/investigation-graph';
 
 const ASSESSMENT_LABELS: Record<string, string> = {
   supported: 'Confirmée',
@@ -52,6 +53,7 @@ function InvestigationWorkspaceContent() {
   const [thread, setThread] = useState<InvestigationThread | null>(null);
   const [messages, setMessages] = useState<InvestigationMessage[]>([]);
   const [signals, setSignals] = useState<InvestigationSignal[]>([]);
+  const [detectiveGraph, setDetectiveGraph] = useState<InvestigationGraph | null>(null);
   const [loadingThreads, setLoadingThreads] = useState(true);
   const [loadingThread, setLoadingThread] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,9 +66,10 @@ function InvestigationWorkspaceContent() {
   const graph = useMemo(() => {
     if (!thread) return null;
     if (thread.id === DEMO_THREAD_ID) return getDemoGraphFixture();
+    if (detectiveGraph) return detectiveGraph;
     if (!signals.length) return null;
     return buildGraphFromSignals(thread, signals);
-  }, [thread, signals]);
+  }, [thread, signals, detectiveGraph]);
 
   const briefingPayload = useMemo(() => {
     if (!thread || !graph) return null;
@@ -135,18 +138,27 @@ function InvestigationWorkspaceContent() {
       setLoadingThread(true);
       setError(null);
       const res = await getThread(id, apiOpts);
-    if (res.success && res.thread) {
-      setThread(res.thread);
-      setMessages(res.messages ?? []);
-      setSignals(res.signals ?? []);
-    } else {
-      setError(res.error || 'Piste introuvable');
-      setThread(null);
-      setMessages([]);
-      setSignals([]);
-    }
-    setLoadingThread(false);
-  }, [user?.id]);
+      if (res.success && res.thread) {
+        setThread(res.thread);
+        setMessages(res.messages ?? []);
+        setSignals(res.signals ?? []);
+        if (id !== DEMO_THREAD_ID) {
+          const graphRes = await getDetectiveGraph(id, apiOpts);
+          setDetectiveGraph(graphRes.success && graphRes.graph ? graphRes.graph : null);
+        } else {
+          setDetectiveGraph(null);
+        }
+      } else {
+        setError(res.error || 'Piste introuvable');
+        setThread(null);
+        setMessages([]);
+        setSignals([]);
+        setDetectiveGraph(null);
+      }
+      setLoadingThread(false);
+    },
+    [user?.id]
+  );
 
   useEffect(() => {
     if (!user?.id) return;
@@ -166,6 +178,10 @@ function InvestigationWorkspaceContent() {
       if (res.message) setMessages((prev) => [...prev, res.message!]);
       if (res.newSignals && res.newSignals.length > 0) {
         setSignals((prev) => [...res.newSignals!, ...prev]);
+      }
+      if (threadId !== DEMO_THREAD_ID) {
+        const graphRes = await getDetectiveGraph(threadId, apiOpts);
+        if (graphRes.success && graphRes.graph) setDetectiveGraph(graphRes.graph);
       }
     },
     [threadId, user?.id]

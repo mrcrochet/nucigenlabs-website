@@ -12,6 +12,7 @@ import type {
   CreateThreadPayload,
   SendMessagePayload,
 } from '../../types/investigation';
+import type { InvestigationGraph } from '../../types/investigation-graph';
 
 const API_BASE = import.meta.env.DEV ? '/api' : '/api';
 
@@ -163,6 +164,22 @@ export async function updateThread(
       { method: 'PATCH', headers: buildHeaders(apiOptions), body: JSON.stringify(patch) }
     );
     return { success: true, thread: data.thread };
+  } catch (e: any) {
+    return { success: false, error: e?.message };
+  }
+}
+
+/** Graphe Detective (nodes, edges, paths) depuis les tables detective_* — null si pas encore de graphe. */
+export async function getDetectiveGraph(
+  threadId: string,
+  apiOptions?: InvestigationApiOptions
+): Promise<{ success: boolean; graph?: InvestigationGraph | null; error?: string }> {
+  try {
+    const data = await fetchJson<{ success: boolean; graph: InvestigationGraph | null }>(
+      `${API_BASE}/investigations/${threadId}/detective-graph`,
+      { headers: buildHeaders(apiOptions) }
+    );
+    return { success: true, graph: data.graph };
   } catch (e: any) {
     return { success: false, error: e?.message };
   }

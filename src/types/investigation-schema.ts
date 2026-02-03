@@ -30,6 +30,30 @@ export interface Signal {
   raw_text: string;
 }
 
+/** Polarité du claim par rapport à l'hypothèse d'enquête. */
+export type ClaimPolarity = 'supports' | 'weakens' | 'neutral';
+
+/**
+ * Claim structuré — couche canonique entre Signal et Node/Edge.
+ * Le graphe Detective ne consomme que des claims, jamais du texte brut.
+ * Produit par le pipeline d'extraction (OpenAI) ; ensuite Claim → Node/Edge est déterministe.
+ */
+export interface Claim {
+  id: string;
+  investigation_id: string;
+  text: string;
+  subject: string;   // acteur / entité
+  action: string;    // fait / événement
+  object: string;   // cible / ressource / impact
+  polarity: ClaimPolarity;
+  confidence: number; // 0..1
+  date?: string | null;
+  source_url?: string | null;
+  source_name?: string | null;
+  signal_id?: string | null; // traçabilité vers le signal source
+  created_at: string;
+}
+
 export type NodeType = 'event' | 'actor' | 'resource' | 'decision' | 'impact';
 
 /** Faits / événements / acteurs normalisés — matière du graphe. */

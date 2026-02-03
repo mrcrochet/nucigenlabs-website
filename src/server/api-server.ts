@@ -13,6 +13,8 @@ import { predictRelevance } from './ml/relevance-predictor.js';
 import { getRealTimePrice, getTimeSeries } from './services/twelvedata-service.js';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseUserId } from './utils/auth-helpers.js';
+import { buildGraphFromSignals } from '../lib/investigation/build-graph.js';
+import { buildBriefingPayload, formatBriefingPayloadAsText } from '../lib/investigation/build-briefing.js';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -1021,7 +1023,7 @@ app.post('/api/investigations/:threadId/messages', async (req, res) => {
     }
     const { data: thread } = await supabase
       .from('investigation_threads')
-      .select('id, initial_hypothesis')
+      .select('id, title, initial_hypothesis')
       .eq('id', threadId)
       .eq('user_id', supabaseUserId)
       .single();
@@ -1095,6 +1097,34 @@ app.post('/api/investigations/:threadId/messages', async (req, res) => {
       .from('investigation_threads')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', threadId);
+
+    // Pipeline Detective : evidence → claims → graphe (detective_*)
+    if (evidence.length > 0 && thread?.title != null && thread?.initial_hypothesis) {
+      try {
+        const { getOrCreateDetectiveInvestigation } = await import('./services/detective-graph-persistence.js');
+        const { runDetectiveIngestion } = await import('./services/detective-ingestion-pipeline.js');
+        await getOrCreateDetectiveInvestigation(supabase, threadId, {
+          title: thread.title,
+          hypothesis: thread.initial_hypothesis,
+        });
+        const rawTextChunks = evidence.map((ev: { excerpt?: string; content?: string; title?: string; url?: string }) => ({
+          text: (ev.excerpt || ev.content || ev.title || '').slice(0, 15000),
+          sourceUrl: ev.url,
+          sourceName: ev.title,
+        }));
+        await runDetectiveIngestion({
+          investigationId: threadId,
+          hypothesis: thread.initial_hypothesis,
+          skipTavily: true,
+          rawTextChunks,
+          runGraphRebuild: true,
+          supabase,
+        });
+      } catch (detectiveErr: any) {
+        console.error('[API] Detective pipeline (claims/graph):', detectiveErr?.message);
+      }
+    }
+
     res.status(200).json({
       success: true,
       message: assistantMsg || { role: 'assistant', content: assistantContent, citations, evidence_snapshot: evidence },
@@ -1138,6 +1168,39 @@ app.get('/api/investigations/:threadId/signals', async (req, res) => {
     res.status(200).json({ success: true, signals: signals || [] });
   } catch (err: any) {
     console.error('[API] Investigation signals:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
+  }
+});
+
+// GET /api/investigations/:threadId/detective-graph — graphe depuis tables detective_* (nodes, edges, paths)
+app.get('/api/investigations/:threadId/detective-graph', async (req, res) => {
+  try {
+    const { threadId } = req.params;
+    const clerkUserId = getInvestigationUserId(req);
+    if (!clerkUserId || !supabase) {
+      return res.status(400).json({ success: false, error: 'User ID required' });
+    }
+    const supabaseUserId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!supabaseUserId) {
+      return res.status(400).json({ success: false, error: 'Invalid user ID' });
+    }
+    const { data: thread } = await supabase
+      .from('investigation_threads')
+      .select('id')
+      .eq('id', threadId)
+      .eq('user_id', supabaseUserId)
+      .single();
+    if (!thread) {
+      return res.status(404).json({ success: false, error: 'Thread not found' });
+    }
+    const { loadGraphForInvestigation } = await import('./services/detective-graph-persistence.js');
+    const graph = await loadGraphForInvestigation(supabase, threadId);
+    if (!graph) {
+      return res.status(200).json({ success: true, graph: null });
+    }
+    res.status(200).json({ success: true, graph });
+  } catch (err: any) {
+    console.error('[API] Detective graph:', err);
     res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
   }
 });
@@ -1204,40 +1267,10 @@ app.get('/api/investigations/:threadId/brief', async (req, res) => {
       .select('*')
       .eq('thread_id', threadId)
       .order('created_at', { ascending: false });
-    const lines: string[] = [
-      `# Intelligence Brief — ${thread.title}`,
-      '',
-      `Date: ${new Date(thread.updated_at).toISOString().slice(0, 10)}`,
-      '',
-      '## Hypothèse',
-      thread.initial_hypothesis,
-      '',
-    ];
-    if (thread.investigative_axes && thread.investigative_axes.length > 0) {
-      lines.push('## Axes d\'enquête', '');
-      thread.investigative_axes.forEach((a: string) => lines.push(`- ${a}`));
-      lines.push('');
-    }
-    if (thread.current_assessment) {
-      lines.push('## Évaluation', thread.current_assessment, '');
-    }
-    if (thread.confidence_score != null) {
-      lines.push('## Confiance', `${thread.confidence_score} %`, '');
-    }
-    if (thread.blind_spots && thread.blind_spots.length > 0) {
-      lines.push('## Zones d\'ombre', '');
-      thread.blind_spots.forEach((b: string) => lines.push(`- ${b}`));
-      lines.push('');
-    }
-    lines.push('## Signaux', '');
-    (signals || []).forEach((s: { source: string; date?: string; summary: string; url?: string; impact_on_hypothesis?: string }) => {
-      lines.push(`### ${s.source}${s.date ? ` (${s.date})` : ''}`);
-      if (s.impact_on_hypothesis) lines.push(`Impact: ${s.impact_on_hypothesis}`);
-      lines.push(s.summary);
-      if (s.url) lines.push(`Source: ${s.url}`);
-      lines.push('');
-    });
-    const text = lines.join('\n');
+    const signalsList = (signals || []) as any[];
+    const graph = buildGraphFromSignals(thread as any, signalsList);
+    const payload = buildBriefingPayload(thread as any, graph);
+    const text = formatBriefingPayloadAsText(payload);
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="brief-${threadId.slice(0, 8)}.txt"`);
     res.send(text);

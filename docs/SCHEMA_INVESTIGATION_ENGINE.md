@@ -42,6 +42,30 @@ Le moteur raisonne **à partir des signaux**. Les signaux sont neutres et peuven
 
 ---
 
+## 2b. `claims` (faits structurés — couche canonique)
+
+| Champ             | Type     | Contrainte |
+|-------------------|----------|------------|
+| id                | string   | PK         |
+| investigation_id  | string   | FK → investigations |
+| text              | string   | énoncé brut du claim |
+| subject           | string   | acteur / entité |
+| action            | string   | fait / événement |
+| object            | string   | cible / ressource / impact |
+| polarity          | enum     | supports \| weakens \| neutral |
+| confidence        | number   | 0..1       |
+| date              | string?  | date du fait si connue |
+| source_url        | string?  | URL de la source |
+| source_name       | string?  | nom de la source |
+| signal_id         | string?  | FK → signals (optionnel, traçabilité) |
+| created_at        | Date     |            |
+
+**Règle d’or :** Le graphe Detective ne consomme jamais des articles, résumés ou réponses LLM brutes. Il consomme **uniquement des claims structurés**.
+
+Les claims sont produits par le **pipeline d’extraction** (OpenAI) à partir du texte (Signal ou contenu Firecrawl). Ensuite, la logique **Claim → Node/Edge** est déterministe (1 claim → 1 node ; compatibilité / contradiction entre claims → edges).
+
+---
+
 ## 3. `nodes` (faits / événements / acteurs normalisés)
 
 | Champ           | Type   | Contrainte |
@@ -105,7 +129,8 @@ Un node peut appartenir à plusieurs paths ; l’ordre est contextuel au path.
 
 ```
 Investigation
- ├─ Signals (1..N)
+ ├─ Signals (1..N)     →  Claims (1..N)  [extraction]
+ ├─ Claims (1..N)      →  Nodes / Edges  [logique déterministe]
  ├─ Nodes (1..N)
  ├─ Edges (1..N)
  └─ Paths (1..N)
