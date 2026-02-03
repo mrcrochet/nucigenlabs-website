@@ -3,7 +3,13 @@
  * Same graph as Timeline and Map. See CONCEPTION_INVESTIGATION_ENGINE.md section 8.1.
  */
 
-import type { InvestigationGraph, InvestigationGraphNode } from '../../types/investigation-graph';
+import type { InvestigationGraph, InvestigationGraphNode, InvestigationEdgeRelation } from '../../types/investigation-graph';
+
+function edgeColorClass(relation: InvestigationEdgeRelation): string {
+  if (relation === 'supports') return 'text-emerald-600';
+  if (relation === 'weakens') return 'text-amber-500';
+  return 'text-[#E1463E]';
+}
 
 export interface InvestigationFlowViewProps {
   graph: InvestigationGraph;
@@ -53,14 +59,14 @@ export default function InvestigationFlowView({
   }
 
   const ordered = orderNodesForFlow(nodes);
-  const edgeByFromTo = new Map<string, { to: string; strength: number; confidence: number }>();
-  edges.forEach((e) => edgeByFromTo.set(e.from, { to: e.to, strength: e.strength, confidence: e.confidence }));
+  const edgeByFromTo = new Map<string, { to: string; relation: InvestigationEdgeRelation; strength: number; confidence: number }>();
+  edges.forEach((e) => edgeByFromTo.set(e.from, { to: e.to, relation: e.relation, strength: e.strength, confidence: e.confidence }));
 
   return (
     <div className={`rounded-xl border border-borders-subtle bg-background-base overflow-hidden ${className}`}>
       <div className="p-3 border-b border-borders-subtle">
         <h2 className="text-sm font-semibold text-text-primary">Flow View</h2>
-        <p className="text-xs text-text-muted mt-0.5">Left to right = time. Arrow thickness = strength.</p>
+        <p className="text-xs text-text-muted mt-0.5">Left → right = time. Arrow thickness = strength. Green = supports, amber = weakens.</p>
         {visiblePaths.length > 0 && onPathClick && (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {visiblePaths.map((p) => (
@@ -109,8 +115,9 @@ export default function InvestigationFlowView({
                     const opacity = 0.4 + edge.strength * 0.5;
                     const edgeKey = `${node.id}|${edge.to}`;
                     const isSelected = selectedEdgeKey === edgeKey;
+                    const colorClass = edgeColorClass(edge.relation);
                     const content = (
-                      <svg width="32" height="24" viewBox="0 0 32 24" className="text-[#E1463E]" aria-hidden>
+                      <svg width="32" height="24" viewBox="0 0 32 24" className={colorClass} aria-hidden>
                         <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth={strokeW} strokeOpacity={opacity} />
                         <path d="M 22 8 L 30 12 L 22 16 Z" fill="currentColor" opacity={opacity} />
                       </svg>

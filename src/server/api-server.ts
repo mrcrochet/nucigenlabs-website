@@ -934,6 +934,26 @@ app.post('/api/investigations', async (req, res) => {
       console.error('[API] Investigation create error:', error);
       return res.status(500).json({ success: false, error: error.message || 'Database error' });
     }
+    // Génération du graphe dès la première question (hypothèse) — comme le knowledge graph Search
+    const threadId = thread.id;
+    const invTitle = (thread as { title?: string }).title ?? titleVal;
+    const invHypothesis = (thread as { initial_hypothesis?: string }).initial_hypothesis ?? initial_hypothesis.trim();
+    setImmediate(async () => {
+      try {
+        const { getOrCreateDetectiveInvestigation } = await import('./services/detective-graph-persistence.js');
+        const { runDetectiveIngestion } = await import('./services/detective-ingestion-pipeline.js');
+        await getOrCreateDetectiveInvestigation(supabase, threadId, { title: invTitle, hypothesis: invHypothesis });
+        await runDetectiveIngestion({
+          investigationId: threadId,
+          hypothesis: invHypothesis,
+          runGraphRebuild: true,
+          supabase,
+        });
+        console.log('[API] Investigation graph generated for', threadId);
+      } catch (e: any) {
+        console.error('[API] Investigation graph generation (create):', e?.message);
+      }
+    });
     res.status(200).json({ success: true, thread });
   } catch (err: any) {
     console.error('[API] Investigations create:', err);
@@ -1201,6 +1221,55 @@ app.get('/api/investigations/:threadId/detective-graph', async (req, res) => {
     res.status(200).json({ success: true, graph });
   } catch (err: any) {
     console.error('[API] Detective graph:', err);
+    res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
+  }
+});
+
+// POST /api/investigations/:threadId/generate-graph — lance la génération du graphe (Tavily → claims → graph)
+app.post('/api/investigations/:threadId/generate-graph', async (req, res) => {
+  try {
+    const { threadId } = req.params;
+    const clerkUserId = getInvestigationUserId(req);
+    if (!clerkUserId || !supabase) {
+      return res.status(400).json({ success: false, error: 'User ID required' });
+    }
+    const supabaseUserId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!supabaseUserId) {
+      return res.status(400).json({ success: false, error: 'Invalid user ID' });
+    }
+    const { data: thread } = await supabase
+      .from('investigation_threads')
+      .select('id, title, initial_hypothesis')
+      .eq('id', threadId)
+      .eq('user_id', supabaseUserId)
+      .single();
+    if (!thread) {
+      return res.status(404).json({ success: false, error: 'Thread not found' });
+    }
+    const hypothesis = (thread as { initial_hypothesis?: string }).initial_hypothesis;
+    const title = (thread as { title?: string }).title;
+    if (!hypothesis) {
+      return res.status(400).json({ success: false, error: 'Thread has no hypothesis' });
+    }
+    setImmediate(async () => {
+      try {
+        const { getOrCreateDetectiveInvestigation } = await import('./services/detective-graph-persistence.js');
+        const { runDetectiveIngestion } = await import('./services/detective-ingestion-pipeline.js');
+        await getOrCreateDetectiveInvestigation(supabase, threadId, { title: title ?? threadId, hypothesis });
+        await runDetectiveIngestion({
+          investigationId: threadId,
+          hypothesis,
+          runGraphRebuild: true,
+          supabase,
+        });
+        console.log('[API] Investigation graph generated for', threadId);
+      } catch (e: any) {
+        console.error('[API] Generate graph:', e?.message);
+      }
+    });
+    res.status(200).json({ success: true, message: 'Graph generation started' });
+  } catch (err: any) {
+    console.error('[API] Generate graph:', err);
     res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
   }
 });
@@ -4073,8 +4142,25 @@ app.post('/api/search/session', async (req, res) => {
       userId: userId || null,
     };
 
-    // In a real implementation, store in database
-    // For now, we'll return it and the frontend will manage state
+    // Persist to search_history for logged-in users (ChatGPT-style history)
+    if (userId && supabase) {
+      try {
+        const title = query.trim().length > 80 ? query.trim().slice(0, 77) + '...' : query.trim();
+        await supabase.from('search_history').upsert(
+          {
+            user_id: userId,
+            session_id: sessionId,
+            query: session.query,
+            title: title || null,
+            input_type: session.inputType || 'text',
+            session_snapshot: session,
+          },
+          { onConflict: 'user_id,session_id' }
+        );
+      } catch (historyErr: any) {
+        console.error('[API] Failed to save search history:', historyErr?.message || historyErr);
+      }
+    }
 
     // #region agent log
     fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3317',message:'Before response',data:{sessionId,resultsCount:session.results?.length||0,hasGraph:!!session.graph},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
@@ -4111,22 +4197,84 @@ app.post('/api/search/session', async (req, res) => {
   }
 });
 
-// GET /api/search/session/:id - Get search session
+// GET /api/search/session/:id - Get search session (from DB if user has history)
 app.get('/api/search/session/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = getSupabaseUserId(req);
-
-    // TODO: Load from database
-    // For now, return error (session should be managed by frontend state)
-    // In production, store sessions in database
-    
-    res.status(404).json({
-      success: false,
-      error: 'Session not found. Sessions are currently managed client-side.',
+    const clerkUserId = req.headers['x-clerk-user-id'] as string || null;
+    if (!clerkUserId || !supabase) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found.',
+      });
+    }
+    const userId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!userId) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found.',
+      });
+    }
+    const { data: row, error } = await supabase
+      .from('search_history')
+      .select('session_snapshot')
+      .eq('user_id', userId)
+      .eq('session_id', id)
+      .maybeSingle();
+    if (error || !row?.session_snapshot) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found.',
+      });
+    }
+    res.json({
+      success: true,
+      session: row.session_snapshot,
     });
   } catch (error: any) {
     console.error('[API] Get session error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/search/history - List current user's search history (ChatGPT-style)
+app.get('/api/search/history', async (req, res) => {
+  try {
+    const clerkUserId = req.headers['x-clerk-user-id'] as string || null;
+    const limit = Math.min(Number(req.query.limit) || 50, 100);
+    if (!clerkUserId || !supabase) {
+      return res.json({ success: true, history: [] });
+    }
+    const userId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!userId) {
+      return res.json({ success: true, history: [] });
+    }
+    const { data: rows, error } = await supabase
+      .from('search_history')
+      .select('id, session_id, query, title, input_type, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) {
+      console.error('[API] Search history list error:', error);
+      return res.json({ success: true, history: [] });
+    }
+    res.json({
+      success: true,
+      history: (rows || []).map((r) => ({
+        id: r.id,
+        sessionId: r.session_id,
+        query: r.query,
+        title: r.title || r.query,
+        inputType: r.input_type,
+        createdAt: r.created_at,
+      })),
+    });
+  } catch (error: any) {
+    console.error('[API] Search history error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Internal server error',

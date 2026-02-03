@@ -9,7 +9,18 @@ import type {
   InvestigationGraphNode,
   InvestigationGraphEdge,
   InvestigationGraphPath,
+  InvestigationEdgeRelation,
 } from '../../types/investigation-graph';
+
+const RELATION_LABEL: Record<InvestigationEdgeRelation, string> = {
+  supports: "Renforce l'hypothèse",
+  weakens: "Affaiblit l'hypothèse",
+  influences: 'Influence',
+  causes: 'Cause',
+  restricts: 'Restreint',
+  funds: 'Finance',
+  triggers: 'Déclenche',
+};
 
 export type DetailsSelection =
   | { type: 'node'; node: InvestigationGraphNode }
@@ -186,7 +197,9 @@ function EdgeDetails({
       </div>
       <div className="p-4 space-y-4 flex-1 overflow-y-auto max-h-[60vh]">
         <Section title="Relation">
-          <p className="text-sm text-text-primary">{edge.relation}</p>
+          <p className="text-sm text-text-primary">
+            {RELATION_LABEL[edge.relation] ?? edge.relation}
+          </p>
         </Section>
         <Section title="Strength">
           <p className="text-sm text-text-primary">{Math.round(edge.strength * 100)} %</p>

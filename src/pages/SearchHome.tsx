@@ -15,6 +15,7 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import AnimatedEventsBackground from '../components/search/AnimatedEventsBackground';
 import SearchNavMenu from '../components/search/SearchNavMenu';
+import SearchHistorySidebar from '../components/search/SearchHistorySidebar';
 
 // Robust URL regex pattern
 const URL_REGEX = /^https?:\/\/.+/i;
@@ -170,6 +171,11 @@ function SearchHomeContent() {
       
       {/* Animated Events Background */}
       <AnimatedEventsBackground />
+      
+      {/* Left sidebar: search history (ChatGPT-style) */}
+      <div className="fixed left-0 top-0 bottom-0 w-56 sm:w-64 pl-14 pt-20 pb-6 z-20 hidden md:block overflow-y-auto">
+        <SearchHistorySidebar className="px-2" />
+      </div>
       
       {/* Centered Search Bar */}
       <div className="fixed inset-0 flex items-center justify-center z-20 pointer-events-none">

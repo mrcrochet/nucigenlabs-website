@@ -42,9 +42,9 @@ export default function SearchSessionHeader({
   }, [sessionId]);
 
   return (
-    <div className="bg-background-glass-subtle border border-borders-subtle rounded-lg p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
+    <div className="bg-background-glass-subtle border border-borders-subtle rounded-lg p-4 sm:p-6 min-w-0 overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="flex-1 min-w-0 overflow-hidden">
           <div className="flex items-center gap-3 mb-2">
             {isUrl ? (
               <Link className="w-5 h-5 text-[#E1463E] shrink-0" aria-hidden />
@@ -80,24 +80,24 @@ export default function SearchSessionHeader({
           )}
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 shrink-0 flex-wrap">
           {sessionId && (
             <button
               type="button"
               onClick={handleCopyLink}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-borders-subtle text-text-secondary hover:text-text-primary hover:bg-background-glass-subtle text-sm transition-colors"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-borders-subtle text-text-secondary hover:text-text-primary hover:bg-background-glass-subtle text-sm transition-colors whitespace-nowrap"
               title="Copier le lien du workspace"
               aria-label={copied ? 'Lien copié' : 'Copier le lien du workspace'}
             >
               {copied ? (
-                <Check className="w-4 h-4 text-green-500" aria-hidden />
+                <Check className="w-4 h-4 text-green-500 shrink-0" aria-hidden />
               ) : (
-                <Copy className="w-4 h-4" aria-hidden />
+                <Copy className="w-4 h-4 shrink-0" aria-hidden />
               )}
               <span>{copied ? 'Copié' : 'Copier le lien'}</span>
             </button>
           )}
-          <div className="text-right">
+          <div className="text-right shrink-0">
             <div className="text-2xl font-light text-text-primary" aria-hidden>{resultCount}</div>
             <div className="text-xs text-text-secondary">results</div>
           </div>

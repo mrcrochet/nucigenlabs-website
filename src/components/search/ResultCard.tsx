@@ -49,10 +49,10 @@ export default function ResultCard({ result, onClick, onExploreDeeper }: ResultC
 
   return (
     <div
-      className="bg-background-glass-subtle border border-borders-subtle rounded-lg p-4 hover:border-borders-medium transition-colors cursor-pointer group"
+      className="bg-background-glass-subtle border border-borders-subtle rounded-lg p-4 hover:border-borders-medium transition-colors cursor-pointer group min-w-0"
       onClick={onClick}
     >
-      <div className="space-y-3">
+      <div className="space-y-3 min-w-0">
         {/* Source Header - Perplexity Style */}
         <div className="flex items-center gap-2">
           {/* Favicon */}
@@ -96,15 +96,15 @@ export default function ResultCard({ result, onClick, onExploreDeeper }: ResultC
         </div>
 
         {/* Title - Bold and prominent */}
-        <div className="flex items-start gap-2">
-          <h3 className="text-base font-semibold text-text-primary line-clamp-2 leading-snug group-hover:text-primary transition-colors flex-1">
+        <div className="flex items-start gap-2 min-w-0">
+          <h3 className="text-base font-semibold text-text-primary line-clamp-2 leading-snug group-hover:text-primary transition-colors flex-1 min-w-0 break-words">
             {result.title}
           </h3>
           <CredibilityBadge result={result} />
         </div>
 
         {/* Snippet - Perplexity style */}
-        <p className="text-sm text-text-secondary leading-relaxed line-clamp-3">
+        <p className="text-sm text-text-secondary leading-relaxed line-clamp-3 break-words">
           {result.summary}
         </p>
 

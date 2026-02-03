@@ -169,6 +169,22 @@ export async function updateThread(
   }
 }
 
+/** Déclencher la génération du graphe (Tavily → claims → graph). Retourne dès le démarrage; le graphe est à récupérer via getDetectiveGraph (polling). */
+export async function triggerGenerateGraph(
+  threadId: string,
+  apiOptions?: InvestigationApiOptions
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await fetchJson<{ success: boolean; message?: string }>(
+      `${API_BASE}/investigations/${threadId}/generate-graph`,
+      { method: 'POST', headers: buildHeaders(apiOptions) }
+    );
+    return { success: true };
+  } catch (e: any) {
+    return { success: false, error: e?.message };
+  }
+}
+
 /** Graphe Detective (nodes, edges, paths) depuis les tables detective_* — null si pas encore de graphe. */
 export async function getDetectiveGraph(
   threadId: string,

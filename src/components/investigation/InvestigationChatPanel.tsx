@@ -13,6 +13,7 @@ interface InvestigationChatPanelProps {
   messages: InvestigationMessage[];
   onSendMessage: (content: string) => Promise<void>;
   loading?: boolean;
+  readOnly?: boolean;
   className?: string;
 }
 

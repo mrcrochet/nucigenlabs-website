@@ -20,6 +20,7 @@ import InsightPanel from '../components/search/InsightPanel';
 import SuggestedQuestions from '../components/search/SuggestedQuestions';
 import SearchSessionHeader from '../components/search/SearchSessionHeader';
 import ResultDetailsDrawer from '../components/search/ResultDetailsDrawer';
+import SearchHistorySidebar from '../components/search/SearchHistorySidebar';
 import type { SearchResult, KnowledgeGraph as KnowledgeGraphType } from '../types/search';
 
 interface SearchSession {
@@ -54,42 +55,56 @@ function SearchWorkspaceContent() {
   const [impactBriefOpen, setImpactBriefOpen] = useState(false);
   const [impactBriefText, setImpactBriefText] = useState('');
 
-  // Load session from localStorage (client-side for now)
+  // Load session from localStorage or from API (search history)
   useEffect(() => {
     if (!sessionId) {
       navigate('/search');
       return;
     }
 
+    let cancelled = false;
     setIsLoading(true);
     setError(null);
 
-    // Load from localStorage
     const storedSession = localStorage.getItem(`search-session-${sessionId}`);
-    
     if (storedSession) {
       try {
         const parsed = JSON.parse(storedSession);
-        setSession(parsed);
-      } catch (error: any) {
-        console.error('[SearchWorkspace] Error parsing stored session:', error);
-        setError('Invalid session data');
-        toast.error('Failed to load session', {
-          description: 'Session data is corrupted',
-          duration: 5000,
-        });
-      } finally {
-        setIsLoading(false);
+        if (!cancelled) setSession(parsed);
+      } catch (err: any) {
+        if (!cancelled) {
+          setError('Invalid session data');
+          toast.error('Failed to load session', { description: 'Session data is corrupted', duration: 5000 });
+        }
       }
-    } else {
-      // Session not found, redirect to search
-      setError('Session not found');
-      setIsLoading(false);
-      setTimeout(() => {
-        navigate('/search');
-      }, 2000);
+      if (!cancelled) setIsLoading(false);
+      return;
     }
-  }, [sessionId, navigate]);
+
+    // Try loading from API (per-user search history)
+    const loadFromApi = async () => {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (user?.id) headers['x-clerk-user-id'] = user.id;
+      const res = await fetch(`/api/search/session/${sessionId}`, { headers });
+      if (cancelled) return;
+      if (res.ok) {
+        const data = await res.json();
+        if (data.session) {
+          setSession(data.session);
+          localStorage.setItem(`search-session-${sessionId}`, JSON.stringify(data.session));
+        } else {
+          setError('Session not found');
+          setTimeout(() => navigate('/search'), 2000);
+        }
+      } else {
+        setError('Session not found');
+        setTimeout(() => navigate('/search'), 2000);
+      }
+      setIsLoading(false);
+    };
+    loadFromApi();
+    return () => { cancelled = true; };
+  }, [sessionId, navigate, user?.id]);
 
   // Handle followup question
   const handleFollowup = useCallback(async (question: string) => {
@@ -213,8 +228,16 @@ function SearchWorkspaceContent() {
     <AppShell>
       <SEO title={`${session.query} | Search | Nucigen Labs`} description="Search workspace with AI-powered intelligence" />
       
+      <div className="flex gap-6">
+        {/* Left: search history (ChatGPT-style) — hidden on small screens */}
+        <aside className="hidden lg:block w-52 shrink-0 pt-2">
+          <SearchHistorySidebar currentSessionId={sessionId ?? null} compact />
+        </aside>
+        {/* Content area: restore grid so col-span-* layout works (header, panels, results) */}
+        <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4">
+      
       {/* Header with back button, query summary, and Answer tab */}
-      <div className="col-span-1 sm:col-span-12 mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <div className="col-span-1 sm:col-span-12 mb-2 sm:mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
         <div className="flex-1 min-w-0">
           <button
             onClick={() => navigate('/search')}
@@ -361,6 +384,9 @@ function SearchWorkspaceContent() {
           </div>
         </div>
       )}
+
+        </div>
+      </div>
     </AppShell>
   );
 }

@@ -10,7 +10,7 @@ import { Loader2, FileSearch, ExternalLink, ArrowLeft, Target, AlertTriangle, Do
 import AppShell from '../components/layout/AppShell';
 import SEO from '../components/SEO';
 import ProtectedRoute from '../components/ProtectedRoute';
-import { getThreads, getThread, getDetectiveGraph, sendMessage, getBrief } from '../lib/api/investigation-api';
+import { getThreads, getThread, getDetectiveGraph, triggerGenerateGraph, sendMessage, getBrief } from '../lib/api/investigation-api';
 import { buildGraphFromSignals } from '../lib/investigation/build-graph';
 import { buildBriefingPayload, formatBriefingPayloadAsText } from '../lib/investigation/build-briefing';
 import { DEMO_THREAD_ID, getDemoGraphFixture, DEMO_THREAD_PAYLOAD } from '../lib/investigation/demo-graph-fixture';
@@ -54,10 +54,12 @@ function InvestigationWorkspaceContent() {
   const [messages, setMessages] = useState<InvestigationMessage[]>([]);
   const [signals, setSignals] = useState<InvestigationSignal[]>([]);
   const [detectiveGraph, setDetectiveGraph] = useState<InvestigationGraph | null>(null);
+  const [graphRefreshing, setGraphRefreshing] = useState(false);
+  const [graphGenerating, setGraphGenerating] = useState(false);
   const [loadingThreads, setLoadingThreads] = useState(true);
   const [loadingThread, setLoadingThread] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'signals' | 'flow' | 'timeline' | 'map' | 'briefing'>('signals');
+  const [viewMode, setViewMode] = useState<'signals' | 'flow' | 'timeline' | 'map' | 'briefing'>('flow');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeKey, setSelectedEdgeKey] = useState<string | null>(null);
   const [selectedPathId, setSelectedPathId] = useState<string | null>(null);
@@ -144,7 +146,12 @@ function InvestigationWorkspaceContent() {
         setSignals(res.signals ?? []);
         if (id !== DEMO_THREAD_ID) {
           const graphRes = await getDetectiveGraph(id, apiOpts);
-          setDetectiveGraph(graphRes.success && graphRes.graph ? graphRes.graph : null);
+          const hasGraph = graphRes.success && graphRes.graph;
+          setDetectiveGraph(hasGraph ? graphRes.graph! : null);
+          if (!hasGraph) {
+            await triggerGenerateGraph(id, apiOpts);
+            setGraphGenerating(true);
+          }
         } else {
           setDetectiveGraph(null);
         }
@@ -170,6 +177,28 @@ function InvestigationWorkspaceContent() {
     loadThread(threadId);
   }, [threadId, loadThread, user?.id]);
 
+  // Poll pour le graphe quand génération en cours (première question = hypothèse)
+  useEffect(() => {
+    if (!graphGenerating || !threadId || threadId === DEMO_THREAD_ID || !user?.id) return;
+    const POLL_INTERVAL_MS = 2500;
+    const POLL_TIMEOUT_MS = 90000;
+    const start = Date.now();
+    const t = setInterval(async () => {
+      if (Date.now() - start > POLL_TIMEOUT_MS) {
+        clearInterval(t);
+        setGraphGenerating(false);
+        return;
+      }
+      const res = await getDetectiveGraph(threadId, apiOpts);
+      if (res.success && res.graph) {
+        setDetectiveGraph(res.graph);
+        setGraphGenerating(false);
+        clearInterval(t);
+      }
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(t);
+  }, [graphGenerating, threadId, user?.id]);
+
   const handleSendMessage = useCallback(
     async (content: string) => {
       if (!threadId) return;
@@ -180,8 +209,13 @@ function InvestigationWorkspaceContent() {
         setSignals((prev) => [...res.newSignals!, ...prev]);
       }
       if (threadId !== DEMO_THREAD_ID) {
-        const graphRes = await getDetectiveGraph(threadId, apiOpts);
-        if (graphRes.success && graphRes.graph) setDetectiveGraph(graphRes.graph);
+        setGraphRefreshing(true);
+        try {
+          const graphRes = await getDetectiveGraph(threadId, apiOpts);
+          if (graphRes.success && graphRes.graph) setDetectiveGraph(graphRes.graph);
+        } finally {
+          setGraphRefreshing(false);
+        }
       }
     },
     [threadId, user?.id]
@@ -372,42 +406,96 @@ function InvestigationWorkspaceContent() {
                   ))}
                   </div>
                 )}
-                {viewMode === 'flow' && graph && (
-                  <div className="flex-1 min-h-0 overflow-auto p-4">
-                    <InvestigationFlowView
-                      graph={graph}
-                      selectedNodeId={selectedNodeId}
-                      selectedEdgeKey={selectedEdgeKey}
-                      selectedPathId={selectedPathId}
-                      showDeadPaths={showDeadPaths}
-                      onNodeClick={handleNodeClick}
-                      onEdgeClick={handleEdgeClick}
-                      onPathClick={handlePathClick}
-                    />
+                {viewMode === 'flow' && (
+                  <div className="flex-1 min-h-0 overflow-auto flex flex-col">
+                    {(graphRefreshing || graphGenerating) && (
+                      <div className="shrink-0 flex items-center gap-2 px-4 py-2 bg-[#E1463E]/5 border-b border-borders-subtle text-sm text-text-secondary">
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        {graphGenerating ? 'Génération du graphe en cours…' : 'Mise à jour du graphe…'}
+                      </div>
+                    )}
+                    {graph ? (
+                      <div className="flex-1 min-h-0 overflow-auto p-4">
+                        <InvestigationFlowView
+                          graph={graph}
+                          selectedNodeId={selectedNodeId}
+                          selectedEdgeKey={selectedEdgeKey}
+                          selectedPathId={selectedPathId}
+                          showDeadPaths={showDeadPaths}
+                          onNodeClick={handleNodeClick}
+                          onEdgeClick={handleEdgeClick}
+                          onPathClick={handlePathClick}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex items-center justify-center p-6">
+                        <p className="text-text-secondary text-sm text-center max-w-md">
+                          {graphGenerating
+                            ? 'Génération du graphe en cours (Tavily → preuves → graphe). Affichage sous peu…'
+                            : "Aucun graphe pour l'instant. Envoyez un message dans le chat pour lancer la collecte et afficher le Flow."}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
-                {viewMode === 'timeline' && graph && (
-                  <div className="flex-1 min-h-0 overflow-auto p-4">
-                    <InvestigationTimelineView
-                      graph={graph}
-                      selectedNodeId={selectedNodeId}
-                      selectedPathId={selectedPathId}
-                      showDeadPaths={showDeadPaths}
-                      onNodeClick={handleNodeClick}
-                      onPathClick={handlePathClick}
-                    />
+                {viewMode === 'timeline' && (
+                  <div className="flex-1 min-h-0 overflow-auto flex flex-col">
+                    {(graphRefreshing || graphGenerating) && (
+                      <div className="shrink-0 flex items-center gap-2 px-4 py-2 bg-[#E1463E]/5 border-b border-borders-subtle text-sm text-text-secondary">
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        {graphGenerating ? 'Génération du graphe en cours…' : 'Mise à jour du graphe…'}
+                      </div>
+                    )}
+                    {graph ? (
+                      <div className="flex-1 min-h-0 overflow-auto p-4">
+                        <InvestigationTimelineView
+                          graph={graph}
+                          selectedNodeId={selectedNodeId}
+                          selectedPathId={selectedPathId}
+                          showDeadPaths={showDeadPaths}
+                          onNodeClick={handleNodeClick}
+                          onPathClick={handlePathClick}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex items-center justify-center p-6">
+                        <p className="text-text-secondary text-sm text-center max-w-md">
+                          {graphGenerating
+                            ? 'Génération du graphe en cours…'
+                            : "Aucun graphe pour l'instant. Envoyez un message dans le chat pour lancer la collecte et afficher la Timeline."}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
-                {viewMode === 'map' && graph && (
-                  <div className="flex-1 min-h-0 overflow-auto p-4">
-                    <InvestigationMapView
-                      graph={graph}
-                      selectedNodeId={selectedNodeId}
-                      selectedPathId={selectedPathId}
-                      showDeadPaths={showDeadPaths}
-                      onNodeClick={handleNodeClick}
-                      onPathClick={handlePathClick}
-                    />
+                {viewMode === 'map' && (
+                  <div className="flex-1 min-h-0 overflow-auto flex flex-col">
+                    {(graphRefreshing || graphGenerating) && (
+                      <div className="shrink-0 flex items-center gap-2 px-4 py-2 bg-[#E1463E]/5 border-b border-borders-subtle text-sm text-text-secondary">
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        {graphGenerating ? 'Génération du graphe en cours…' : 'Mise à jour du graphe…'}
+                      </div>
+                    )}
+                    {graph ? (
+                      <div className="flex-1 min-h-0 overflow-auto p-4">
+                        <InvestigationMapView
+                          graph={graph}
+                          selectedNodeId={selectedNodeId}
+                          selectedPathId={selectedPathId}
+                          showDeadPaths={showDeadPaths}
+                          onNodeClick={handleNodeClick}
+                          onPathClick={handlePathClick}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex items-center justify-center p-6">
+                        <p className="text-text-secondary text-sm text-center max-w-md">
+                          {graphGenerating
+                            ? 'Génération du graphe en cours…'
+                            : "Aucun graphe pour l'instant. Envoyez un message dans le chat pour lancer la collecte et afficher la Map."}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
                 {viewMode === 'briefing' && (
@@ -419,7 +507,7 @@ function InvestigationWorkspaceContent() {
                       />
                     ) : (
                       <div className="rounded-xl border border-borders-subtle bg-background-base p-6 text-center text-text-muted text-sm">
-                        Add signals to build the graph and see the briefing.
+                        Aucun graphe pour l'instant. Envoyez un message dans le chat pour lancer la collecte et générer le briefing.
                       </div>
                     )}
                   </div>
