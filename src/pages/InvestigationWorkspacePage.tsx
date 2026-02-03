@@ -12,7 +12,8 @@ import SEO from '../components/SEO';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { getThreads, getThread, sendMessage, getBrief } from '../lib/api/investigation-api';
 import { buildGraphFromSignals } from '../lib/investigation/build-graph';
-import { buildBriefingPayload } from '../lib/investigation/build-briefing';
+import { buildBriefingPayload, formatBriefingPayloadAsText } from '../lib/investigation/build-briefing';
+import { DEMO_THREAD_ID, getDemoGraphFixture, DEMO_THREAD_PAYLOAD } from '../lib/investigation/demo-graph-fixture';
 import InvestigationChatPanel from '../components/investigation/InvestigationChatPanel';
 import InvestigationBriefingView from '../components/investigation/InvestigationBriefingView';
 import InvestigationFlowView from '../components/investigation/InvestigationFlowView';
@@ -61,7 +62,9 @@ function InvestigationWorkspaceContent() {
   const [showDeadPaths, setShowDeadPaths] = useState(true);
 
   const graph = useMemo(() => {
-    if (!thread || !signals.length) return null;
+    if (!thread) return null;
+    if (thread.id === DEMO_THREAD_ID) return getDemoGraphFixture();
+    if (!signals.length) return null;
     return buildGraphFromSignals(thread, signals);
   }, [thread, signals]);
 
@@ -169,7 +172,19 @@ function InvestigationWorkspaceContent() {
   );
 
   const handleExportBrief = useCallback(async () => {
-    if (!threadId) return;
+    if (!threadId || !thread) return;
+    if (threadId === DEMO_THREAD_ID && graph) {
+      const payload = buildBriefingPayload(thread, graph);
+      const text = formatBriefingPayloadAsText(payload);
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `brief-demo-${threadId.slice(0, 8)}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
     const res = await getBrief(threadId, apiOpts);
     if (!res.success || !res.blob) return;
     const url = URL.createObjectURL(res.blob);
@@ -178,7 +193,7 @@ function InvestigationWorkspaceContent() {
     a.download = res.filename ?? `brief-${threadId.slice(0, 8)}.txt`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [threadId, user?.id]);
+  }, [threadId, thread, graph, user?.id]);
 
   const loading = loadingThread;
 
@@ -204,6 +219,15 @@ function InvestigationWorkspaceContent() {
             >
               <ArrowLeft className="w-4 h-4" />
               Toutes les enquêtes
+            </Link>
+            <Link
+              to={`/investigations/${DEMO_THREAD_ID}`}
+              className={`flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm mb-2 transition-colors ${
+                threadId === DEMO_THREAD_ID ? 'bg-[#E1463E]/10 text-[#E1463E] font-medium' : 'bg-[#E1463E]/5 text-[#E1463E] hover:bg-[#E1463E]/10 border border-[#E1463E]/30'
+              }`}
+            >
+              <Target className="w-4 h-4 shrink-0" />
+              Voir la démo analyste
             </Link>
             {loadingThreads ? (
               <div className="flex items-center justify-center py-8">
@@ -392,6 +416,7 @@ function InvestigationWorkspaceContent() {
                     messages={messages}
                     onSendMessage={handleSendMessage}
                     loading={loading}
+                    readOnly={threadId === DEMO_THREAD_ID}
                   />
                 </div>
               </div>

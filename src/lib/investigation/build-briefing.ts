@@ -149,3 +149,55 @@ export function buildBriefingPayload(thread: InvestigationThread, graph: Investi
     disclaimer: DISCLAIMER,
   };
 }
+
+/** Format a Briefing payload as plain text for export (e.g. demo or future API). */
+export function formatBriefingPayloadAsText(payload: BriefingPayload): string {
+  const lines: string[] = [
+    `# Intelligence Brief — ${payload.investigation.title}`,
+    '',
+    `Date: ${new Date(payload.investigation.updated_at).toISOString().slice(0, 10)}`,
+    '',
+    '## What is being investigated',
+    payload.investigation.hypothesis,
+    '',
+    `Status: ${payload.investigation.status}`,
+    '',
+  ];
+  if (payload.investigation.investigative_axes.length > 0) {
+    lines.push('Investigative axes:', '');
+    payload.investigation.investigative_axes.forEach((a) => lines.push(`- ${a}`));
+    lines.push('');
+  }
+  if (payload.primary_path) {
+    lines.push('## Primary path (current best explanation)', '');
+    lines.push(payload.primary_path.hypothesis_label);
+    lines.push(`${payload.primary_path.status} · ${payload.primary_path.confidence} %`);
+    lines.push('');
+  }
+  if (payload.turning_points.length > 0) {
+    lines.push('## Key turning points', '');
+    payload.turning_points.forEach((tp) => {
+      lines.push(`- ${tp.label}${tp.date ? ` (${tp.date})` : ''} · ${tp.confidence} %`);
+    });
+    lines.push('');
+  }
+  if (payload.alternative_paths.length > 0) {
+    lines.push('## Alternative explanations', '');
+    payload.alternative_paths.forEach((p) => {
+      lines.push(`- ${p.hypothesis_label} (${p.status} · ${p.confidence} %)`);
+    });
+    lines.push('');
+  }
+  lines.push('## What is uncertain', '');
+  if (payload.uncertainty.blind_spots.length > 0) {
+    payload.uncertainty.blind_spots.forEach((b) => lines.push(`- ${b}`));
+  }
+  if (payload.uncertainty.low_confidence_node_ids.length > 0) {
+    lines.push(`${payload.uncertainty.low_confidence_node_ids.length} node(s) with low confidence`);
+  }
+  if (payload.uncertainty.has_contradictions) {
+    lines.push('Contradictions or weak evidence detected.');
+  }
+  lines.push('', '## Disclaimer', '', payload.disclaimer);
+  return lines.join('\n');
+}

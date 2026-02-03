@@ -15,6 +15,7 @@
     "verify:supabase": "node verify-supabase-config.js",
     "audit:functionality": "node scripts/audit-functionality.js",
     "seed:test-data": "npx tsx src/server/scripts/seed-test-data.ts",
+    "seed:demo-investigation": "npx tsx src/server/scripts/seed-demo-investigation.ts",
     "phase1:insert-test": "npx tsx src/server/phase1/insert-test-events.ts",
     "phase1:validate": "npx tsx src/server/phase1/phase1_validate.ts",
     "phase2b:validate": "npx tsx src/server/phase2b/phase2b_validate.ts",

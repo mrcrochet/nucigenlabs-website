@@ -22,6 +22,7 @@ export default function InvestigationChatPanel({
   messages,
   onSendMessage,
   loading = false,
+  readOnly = false,
   className = '',
 }: InvestigationChatPanelProps) {
   const [input, setInput] = useState('');
@@ -196,25 +197,31 @@ export default function InvestigationChatPanel({
           </div>
         ))}
       </div>
-      <form onSubmit={handleSubmit} className="p-4 border-t border-borders-subtle shrink-0">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Affiner la piste, explorer un angle…"
-            className="flex-1 px-3 py-2.5 rounded-lg border border-borders-subtle bg-background-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 text-sm"
-            disabled={sending}
-          />
-          <button
-            type="submit"
-            disabled={sending || !input.trim()}
-            className="flex-shrink-0 p-2.5 rounded-lg bg-[#E1463E] hover:bg-[#E1463E]/90 text-white disabled:opacity-50 transition-colors"
-          >
-            {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-          </button>
+      {readOnly ? (
+        <div className="p-4 border-t border-borders-subtle shrink-0 text-center text-xs text-text-muted">
+          Démo : lecture seule. Explorez Flow, Timeline, Map et le Briefing.
         </div>
-      </form>
+      ) : (
+        <form onSubmit={handleSubmit} className="p-4 border-t border-borders-subtle shrink-0">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Affiner la piste, explorer un angle…"
+              className="flex-1 px-3 py-2.5 rounded-lg border border-borders-subtle bg-background-base text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-[#E1463E]/50 text-sm"
+              disabled={sending}
+            />
+            <button
+              type="submit"
+              disabled={sending || !input.trim()}
+              className="flex-shrink-0 p-2.5 rounded-lg bg-[#E1463E] hover:bg-[#E1463E]/90 text-white disabled:opacity-50 transition-colors"
+            >
+              {sending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* Drawer Creuser cette source */}
       {sourceDrawer && (
