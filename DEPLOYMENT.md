@@ -84,3 +84,5 @@ L’API Express a déjà `cors()` activé. Si ton front est sur un domaine Verce
 
 3. **Erreur mémoire (OOM)** : si les logs indiquent un crash mémoire, dans Vercel → Settings → General → **Build Command** override avec :  
    `NODE_OPTIONS=--max-old-space-size=4096 npm run build`
+
+4. **« Hobby accounts are limited to daily cron jobs »** : sur le plan Hobby, les crons ne peuvent s’exécuter qu’**une fois par jour**. Dans `vercel.json`, les crons sont donc en `0 2 * * *` et `0 3 * * *` (une fois par jour). Si vous passez en Pro, vous pouvez remettre par ex. `0 */2 * * *` (toutes les 2 h) et `0 * * * *` (toutes les heures).
