@@ -70,3 +70,17 @@ L’API Express a déjà `cors()` activé. Si ton front est sur un domaine Verce
 
 - **Frontend** : ouvre le site Vercel, va sur Corporate Impact → Recherche en temps réel, pose une question.
 - Si tu vois encore « Erreur 404 / le serveur API ne répond pas », vérifie que `VITE_API_URL` est bien défini en Production et qu’un redeploy a été fait après l’ajout.
+
+---
+
+## 6. Si le build Vercel échoue (Deployment failed)
+
+1. **Voir l’erreur exacte** : Vercel → Deployments → cliquer sur le déploiement en échec → **Building** → ouvrir les logs et lire la dernière erreur (souvent une ligne en rouge).
+
+2. **Vérifications courantes** :
+   - **Node** : le projet impose Node 20 (`.nvmrc` + `engines` dans `package.json`). Si besoin, dans Vercel → Settings → General → **Node.js Version** = 20.x.
+   - **Install** : la commande d’install est `npm install --legacy-peer-deps` (déjà dans `vercel.json`). Ne pas la changer sauf si tu as une raison.
+   - **Variables au build** : le build Vite n’a pas besoin de secrets pour réussir. Tu peux définir `VITE_API_URL` et `VITE_CLERK_PUBLISHABLE_KEY` dans Vercel (Settings → Environment Variables) pour que l’app les utilise en prod ; si elles manquent, le build passe quand même (l’app peut afficher des warnings en console).
+
+3. **Erreur mémoire (OOM)** : si les logs indiquent un crash mémoire, dans Vercel → Settings → General → **Build Command** override avec :  
+   `NODE_OPTIONS=--max-old-space-size=4096 npm run build`

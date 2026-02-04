@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "npx vite",
     "dev:all": "npx concurrently -n api,web -c yellow,cyan \"npx tsx src/server/api-server.ts\" \"npm run dev\"",
