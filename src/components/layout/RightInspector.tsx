@@ -46,7 +46,7 @@ export default function RightInspector({
           {onMobileClose && (
             <button
               onClick={onMobileClose}
-              className="p-2 text-text-secondary hover:text-text-primary hover:bg-background-glass-subtle rounded-lg transition-colors"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center p-2 text-text-secondary hover:text-text-primary hover:bg-background-glass-subtle rounded-lg transition-colors touch-manipulation"
               aria-label="Close panel"
             >
               <X className="w-5 h-5" />

@@ -55,8 +55,8 @@ export default function SignalsTable({ signals, loading, onSignalClick }: Signal
     <Card>
       <SectionHeader title="Signals" />
       
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full">
+      <div className="mt-4 table-scroll">
+        <table className="w-full min-w-[600px]">
           <thead>
             <tr className="border-b border-borders-subtle">
               <th className="text-left py-3 px-4 text-sm font-medium text-text-secondary">Signal</th>

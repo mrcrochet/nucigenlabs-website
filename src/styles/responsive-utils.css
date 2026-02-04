@@ -92,3 +92,22 @@
     @apply text-sm leading-relaxed;
   }
 }
+
+/* Table scroll on mobile - use on wrapper around <table> */
+.table-scroll {
+  @apply overflow-x-auto overflow-y-hidden;
+  -webkit-overflow-scrolling: touch;
+}
+.table-scroll table {
+  min-width: 600px;
+}
+
+/* Smooth touch scrolling on iOS */
+.scroll-touch {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Safe area for fixed bottom CTAs (notch / home indicator) */
+.safe-area-bottom {
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+}

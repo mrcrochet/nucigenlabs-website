@@ -320,39 +320,39 @@ function SignalsPageContent() {
           </div>
 
           {/* View Mode Toggle */}
-          <div className="flex items-center gap-2 p-1 bg-white/[0.02] border border-white/[0.05] rounded-xl w-fit">
+          <div className="flex flex-wrap items-center gap-2 p-1 bg-white/[0.02] border border-white/[0.05] rounded-xl w-full sm:w-fit overflow-x-auto">
             <button
               onClick={() => setViewMode('general')}
-              className={`px-4 py-2 rounded-lg transition-all text-sm font-light flex items-center gap-2 ${
+              className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-xs sm:text-sm font-light flex items-center gap-1.5 sm:gap-2 min-h-[44px] ${
                 viewMode === 'general'
                   ? 'bg-[#E1463E] text-white'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Sparkles className="w-4 h-4" />
-              General
+              <Sparkles className="w-4 h-4 flex-shrink-0" />
+              <span>General</span>
             </button>
             <button
               onClick={() => setViewMode('companies')}
-              className={`px-4 py-2 rounded-lg transition-all text-sm font-light flex items-center gap-2 ${
+              className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-xs sm:text-sm font-light flex items-center gap-1.5 sm:gap-2 min-h-[44px] ${
                 viewMode === 'companies'
                   ? 'bg-[#E1463E] text-white'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Building2 className="w-4 h-4" />
-              Company Impact
+              <Building2 className="w-4 h-4 flex-shrink-0" />
+              <span className="whitespace-nowrap">Company Impact</span>
             </button>
             <button
               onClick={() => setViewMode('table')}
-              className={`px-4 py-2 rounded-lg transition-all text-sm font-light flex items-center gap-2 ${
+              className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-xs sm:text-sm font-light flex items-center gap-1.5 sm:gap-2 min-h-[44px] ${
                 viewMode === 'table'
                   ? 'bg-[#E1463E] text-white'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Table2 className="w-4 h-4" />
-              Table
+              <Table2 className="w-4 h-4 flex-shrink-0" />
+              <span>Table</span>
             </button>
           </div>
         </header>

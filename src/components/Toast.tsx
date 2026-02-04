@@ -19,12 +19,12 @@ export default function Toast({ message, type, onClose, duration = 5000 }: Toast
 
   return (
     <div 
-      className="fixed top-24 right-6 z-[100] animate-in slide-in-from-top-5 fade-in duration-300"
+      className="fixed top-20 left-4 right-4 sm:left-auto sm:right-6 sm:top-24 z-[100] animate-in slide-in-from-top-5 fade-in duration-300"
       role="alert"
       aria-live={type === 'error' ? 'assertive' : 'polite'}
       aria-atomic="true"
     >
-      <div className={`backdrop-blur-xl border rounded-xl px-6 py-4 shadow-2xl min-w-[320px] max-w-md transition-all duration-300 ${
+      <div className={`backdrop-blur-xl border rounded-xl px-4 sm:px-6 py-4 shadow-2xl w-[calc(100vw-2rem)] max-w-md min-w-0 transition-all duration-300 ${
         type === 'success'
           ? 'bg-green-950/40 border-green-500/30'
           : 'bg-red-950/40 border-red-500/30'

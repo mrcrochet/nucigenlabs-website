@@ -30,7 +30,7 @@ export default function ImpactFilters({
     <Card>
       <SectionHeader title="Filters" />
       
-      <div className="mt-4 grid grid-cols-5 gap-4">
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {/* Probability Min */}
         <div>
           <label className="text-sm font-medium text-text-secondary mb-2 block">

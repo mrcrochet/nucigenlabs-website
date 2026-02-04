@@ -113,7 +113,7 @@ export default function MarketMetrics({ data, className = '' }: MarketMetricsPro
       )}
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {/* Volatility */}
         <div className="bg-white/[0.02] border border-white/[0.05] rounded-lg p-3">
           <div className="text-xs text-slate-500 font-light mb-1">Volatilité</div>

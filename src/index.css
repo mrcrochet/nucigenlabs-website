@@ -328,14 +328,16 @@
       cursor: auto !important;
     }
     
-    /* Improve touch targets on mobile */
+    /* Touch targets: buttons and links get 44px min; inputs only min-height so full-width works */
     button,
-    a,
-    input,
+    a[href] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    input:not([type="range"]),
     select,
     textarea {
       min-height: 44px;
-      min-width: 44px;
     }
     
     /* Better text readability on mobile */

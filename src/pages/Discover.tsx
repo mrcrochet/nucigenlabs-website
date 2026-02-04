@@ -624,30 +624,30 @@ function DiscoverContent() {
 
       {/* Segment toggle: Discover | Actualité */}
       <div className="col-span-1 sm:col-span-12 mb-4">
-        <div className="flex items-center gap-1 p-1 bg-white/[0.03] rounded-lg border border-white/[0.06] w-fit">
+        <div className="flex items-center gap-1 p-1 bg-white/[0.03] rounded-lg border border-white/[0.06] w-full sm:w-fit">
           <button
             type="button"
             onClick={() => setSourceMode('discover')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-light transition-colors ${
+            className={`flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-md text-sm font-light transition-colors min-h-[44px] ${
               sourceMode === 'discover'
                 ? 'bg-white/10 text-white'
                 : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <Sparkles className="w-4 h-4" />
-            Discover
+            <Sparkles className="w-4 h-4 flex-shrink-0" />
+            <span>Discover</span>
           </button>
           <button
             type="button"
             onClick={() => setSourceMode('actualite')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-light transition-colors ${
+            className={`flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-md text-sm font-light transition-colors min-h-[44px] ${
               sourceMode === 'actualite'
                 ? 'bg-white/10 text-white'
                 : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <Newspaper className="w-4 h-4" />
-            Actualité
+            <Newspaper className="w-4 h-4 flex-shrink-0" />
+            <span>Actualité</span>
           </button>
         </div>
       </div>
@@ -720,8 +720,8 @@ function DiscoverContent() {
       {sourceMode === 'discover' && (
         <>
           {/* Filters + View Mode Toggle */}
-          <div className="col-span-1 sm:col-span-12 mb-6 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-wrap">
+          <div className="col-span-1 sm:col-span-12 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3 flex-wrap min-w-0">
               <DiscoverFilters 
                 filters={filters} 
                 onFiltersChange={(newFilters) => setFilters({
@@ -746,7 +746,9 @@ function DiscoverContent() {
                 )}
               </button>
             </div>
-            <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+            <div className="shrink-0">
+              <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+            </div>
           </div>
 
           {/* Main Content + Sidebar */}

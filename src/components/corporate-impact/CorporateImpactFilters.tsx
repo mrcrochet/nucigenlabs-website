@@ -109,16 +109,16 @@ export default function CorporateImpactFilters({
       className="col-span-1 sm:col-span-12 bg-black border-b border-gray-900 sticky z-50"
       style={{ top: `${headerHeight}px` }}
     >
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3 sm:py-4 min-w-0">
         {/* Main Filters Row — mockup style; no overlap: type buttons don't grow/shrink into dropdown */}
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap overflow-x-auto pb-1 scroll-touch">
           <Filter className="w-4 h-4 text-gray-500 flex-shrink-0" aria-hidden />
 
           {/* Type Filters — flex-none so they don't overlap with Industries */}
           <div className="flex gap-2 flex-none flex-wrap items-center">
             <button
               onClick={() => onFilterChange('all')}
-              className={`px-3 py-1.5 rounded border text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+              className={`px-3 py-2 sm:py-1.5 rounded border text-xs font-medium transition-colors whitespace-nowrap shrink-0 min-h-[44px] sm:min-h-0 ${
                 selectedFilter === 'all'
                   ? 'border-gray-600 bg-gray-800 text-gray-200'
                   : 'border-gray-800 text-gray-500 hover:bg-gray-900 hover:text-gray-400'
@@ -128,7 +128,7 @@ export default function CorporateImpactFilters({
             </button>
             <button
               onClick={() => onFilterChange('opportunity')}
-              className={`px-3 py-1.5 rounded border text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+              className={`px-3 py-2 sm:py-1.5 rounded border text-xs font-medium transition-colors whitespace-nowrap shrink-0 min-h-[44px] sm:min-h-0 ${
                 selectedFilter === 'opportunity'
                   ? 'border-green-500/40 bg-green-500/10 text-green-400'
                   : 'border-gray-800 text-gray-500 hover:bg-gray-900 hover:text-gray-400'
@@ -138,7 +138,7 @@ export default function CorporateImpactFilters({
             </button>
             <button
               onClick={() => onFilterChange('risk')}
-              className={`px-3 py-1.5 rounded border text-xs font-medium transition-colors whitespace-nowrap shrink-0 ${
+              className={`px-3 py-2 sm:py-1.5 rounded border text-xs font-medium transition-colors whitespace-nowrap shrink-0 min-h-[44px] sm:min-h-0 ${
                 selectedFilter === 'risk'
                   ? 'border-[#E1463E]/40 bg-[#E1463E]/10 text-[#E1463E]'
                   : 'border-gray-800 text-gray-500 hover:bg-gray-900 hover:text-gray-400'

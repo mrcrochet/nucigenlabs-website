@@ -286,8 +286,8 @@ export default function PricingPreview() {
           </div>
 
           <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/[0.08] rounded-2xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
+            <div className="table-scroll">
+              <table className="w-full min-w-[520px]">
                 <thead>
                   <tr className="border-b border-white/[0.08]">
                     <th className="text-left p-6 text-sm font-light text-slate-400 uppercase tracking-wider">Feature</th>

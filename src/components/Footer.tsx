@@ -85,7 +85,7 @@ export default function Footer() {
           </div>
 
           {/* Right: Navigation Links */}
-          <div className="md:col-span-4 grid grid-cols-3 gap-8 sm:gap-12">
+          <div className="md:col-span-4 grid grid-cols-2 sm:grid-cols-3 gap-6 sm:gap-8 lg:gap-12">
             {/* Product */}
             <div>
               <h4 className="text-sm font-light text-white mb-4 tracking-wider uppercase">Product</h4>

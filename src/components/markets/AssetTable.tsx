@@ -124,8 +124,8 @@ export default function AssetTable({ selectedSymbol, onSymbolSelect }: AssetTabl
     <Card>
       <SectionHeader title="Watchlist" />
       
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full">
+      <div className="mt-4 table-scroll">
+        <table className="w-full min-w-[560px]">
           <thead>
             <tr className="border-b border-borders-subtle">
               <th className="text-left py-3 px-4 text-sm font-medium text-text-secondary">Symbol</th>
