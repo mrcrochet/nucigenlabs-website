@@ -15,6 +15,7 @@ import CorporateImpactFilters from '../components/corporate-impact/CorporateImpa
 import CorporateImpactReportCard from '../components/corporate-impact/CorporateImpactReportCard';
 import SignalCard from '../components/corporate-impact/SignalCard';
 import EmptyState from '../components/corporate-impact/EmptyState';
+import { apiUrl } from '../lib/api-base';
 import type { MarketSignal, MarketSignalStats } from '../types/corporate-impact';
 
 function CorporateImpactPageContent() {
@@ -59,18 +60,49 @@ function CorporateImpactPageContent() {
       }
       params.append('limit', '50');
 
-      const url = `/api/corporate-impact/signals?${params.toString()}`;
+      const path = `/api/corporate-impact/signals?${params.toString()}`;
+      const url = apiUrl(path);
       console.log('[Corporate Impact] Fetching signals from:', url);
 
       const response = await fetch(url);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[Corporate Impact] API error:', response.status, errorText);
-        throw new Error(`API error: ${response.status} - ${errorText.substring(0, 100)}`);
+      const contentType = response.headers.get('content-type') ?? '';
+      const rawText = await response.text();
+      const isHtml = !contentType.includes('application/json') || rawText.trimStart().startsWith('<');
+
+      // Réponse HTML = SPA fallback (ex. Vercel sans backend) → message clair
+      if (isHtml) {
+        const isProd = import.meta.env.PROD;
+        const hasApiUrl = !!(import.meta.env.VITE_API_URL as string)?.trim();
+        let msg = 'La réponse reçue est une page web au lieu des données. ';
+        if (isProd && !hasApiUrl) {
+          msg += "Configurez VITE_API_URL dans Vercel vers l'URL de votre backend (ex. Railway), ou déployez les routes API.";
+        } else if (isProd && hasApiUrl) {
+          msg += "Vérifiez que l'URL du backend (VITE_API_URL) est correcte et que le serveur répond en JSON.";
+        } else {
+          msg += 'En local, lancez le backend : npm run api:server (port 3001).';
+        }
+        console.error('[Corporate Impact] Non-JSON response (HTML?). Content-Type:', contentType, 'body start:', rawText.substring(0, 80));
+        throw new Error(msg);
       }
 
-      const data = await response.json();
+      if (!response.ok) {
+        let errMsg = `API error: ${response.status}`;
+        try {
+          const errJson = JSON.parse(rawText);
+          if (errJson?.error) errMsg = errJson.error;
+        } catch {
+          if (rawText.length) errMsg = rawText.substring(0, 200);
+        }
+        console.error('[Corporate Impact] API error:', response.status, rawText);
+        throw new Error(errMsg);
+      }
+
+      let data: { success?: boolean; data?: any; error?: string };
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error('Réponse API invalide (pas du JSON). Vérifiez la configuration du backend et les clés API (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY).');
+      }
       console.log('[Corporate Impact] API response:', { success: data.success, signalsCount: data.data?.signals?.length || 0 });
 
       if (data.success && data.data) {
@@ -84,18 +116,24 @@ function CorporateImpactPageContent() {
         if (data.data.available_categories) {
           setAvailableCategories(data.data.available_categories);
         }
-      } else if (data.error) {
-        console.error('[Corporate Impact] API returned error:', data.error);
+        setError(null);
+      } else {
+        const apiError = data?.error || 'Réponse API invalide';
+        console.error('[Corporate Impact] API returned error:', apiError);
         setSignals([]);
+        setError(apiError);
       }
     } catch (error: any) {
       console.error('[Corporate Impact] Error loading signals:', error);
       setSignals([]);
-      // Show error to user
-      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
-        setError('API server not available. Please start it with: npm run api:server');
+      const isProd = import.meta.env.PROD;
+      const isNetwork = error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError');
+      if (isNetwork && isProd) {
+        setError('Le service de données est temporairement indisponible. Réessayez plus tard.');
+      } else if (isNetwork) {
+        setError('API non joignable. En local, lancez le backend : npm run api:server (port 3001).');
       } else {
-        setError(error.message || 'Failed to load signals');
+        setError(error.message || 'Échec du chargement des signaux.');
       }
     } finally {
       setLoading(false);
@@ -231,6 +269,11 @@ function CorporateImpactPageContent() {
               <AlertTriangle className="w-12 h-12 text-[#E1463E] mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-white mb-2">Error Loading Signals</h3>
               <p className="text-slate-400 mb-4">{error}</p>
+              {error.includes('Supabase not configured') && (
+                <p className="text-xs text-slate-500 mb-4 text-left max-w-md mx-auto">
+                  Backend : vérifiez SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY dans les variables d’environnement du serveur API.
+                </p>
+              )}
               <button
                 onClick={() => {
                   setError(null);

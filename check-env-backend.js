@@ -28,15 +28,16 @@ try {
   // Check required variables
   console.log('📋 Variables requises:');
   for (const [varName, description] of Object.entries(requiredVars)) {
-    const hasVar = envContent.includes(`${varName}=`) && 
-                  !envContent.includes(`${varName}=your_`) &&
-                  !envContent.includes(`${varName}=votre-`) &&
-                  !envContent.includes(`${varName}=`);
-    
+    const hasLine = envContent.includes(`${varName}=`);
+    const isPlaceholder = envContent.includes(`${varName}=your_`) ||
+      envContent.includes(`${varName}=votre-`) ||
+      /^\s*#/.test(envContent.split('\n').find(l => l.includes(varName)) || '');
+    const hasVar = hasLine && !isPlaceholder;
+
     if (hasVar) {
       const match = envContent.match(new RegExp(`${varName}=(.+)`));
-      if (match && match[1].trim().length > 10) {
-        const value = match[1].trim();
+      const value = match ? match[1].trim().replace(/#.*$/, '').trim() : '';
+      if (value.length > 10) {
         console.log(`   ✅ ${varName}: ${value.substring(0, 20)}...`);
       } else {
         console.log(`   ❌ ${varName}: Valeur vide ou invalide`);

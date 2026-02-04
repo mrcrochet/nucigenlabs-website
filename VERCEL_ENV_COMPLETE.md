@@ -46,6 +46,20 @@ VITE_NEWS_API_KEY=3f496fd50f0040f3a3ebdf569047834c
 
 ---
 
+### 4. 🌐 Backend API (Corporate Impact, Signals, Search, etc.) - SI BACKEND DÉPLOYÉ AILLEURS
+
+Sur Vercel, le frontend est servi en statique. Les routes `/api/*` n’existent pas côté Vercel (sauf crons). Pour que les pages **Corporate Impact**, **Signals**, **Search**, etc. chargent les données, il faut déployer le backend (Express) ailleurs (Railway, Render, Fly.io, etc.) et indiquer son URL au frontend :
+
+```env
+VITE_API_URL=https://votre-backend.railway.app
+```
+
+**Sans cette variable** : en prod, les appels restent relatifs (`/api/...`) et Vercel renvoie la page HTML du SPA au lieu du JSON → erreur « Le service de données est temporairement indisponible » ou « Error Loading Signals ».
+
+**Après ajout** : redéployer le projet Vercel (les variables `VITE_*` sont injectées au build).
+
+---
+
 ## 🔧 Variables Backend (Sans VITE_*) - REQUISES
 
 Ces variables sont utilisées uniquement côté serveur et ne doivent **JAMAIS** être exposées au client.
