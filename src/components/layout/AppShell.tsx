@@ -14,10 +14,13 @@
  */
 
 import { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
 import TopNav from './TopNav';
 import AppNavMenu from './AppNavMenu';
 import MainContent from './MainContent';
 import RightInspector from './RightInspector';
+
+const BETA_BANNER_KEY = 'nucigen-beta-banner-dismissed';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -32,6 +35,22 @@ export default function AppShell({
 }: AppShellProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
+  const [betaBannerVisible, setBetaBannerVisible] = useState(false);
+
+  useEffect(() => {
+    try {
+      setBetaBannerVisible(sessionStorage.getItem(BETA_BANNER_KEY) !== '1');
+    } catch {
+      setBetaBannerVisible(true);
+    }
+  }, []);
+
+  const dismissBetaBanner = () => {
+    try {
+      sessionStorage.setItem(BETA_BANNER_KEY, '1');
+    } catch {}
+    setBetaBannerVisible(false);
+  };
 
   return (
     <div className="min-h-screen bg-background-base flex flex-col">
@@ -40,6 +59,23 @@ export default function AppShell({
         onMenuClick={() => setMenuOpen(!menuOpen)}
         mobileMenuOpen={menuOpen}
       />
+
+      {/* Beta / Early adopter banner */}
+      {betaBannerVisible && (
+        <div className="flex items-center justify-center gap-3 px-4 py-2.5 bg-[#E1463E]/10 border-b border-[#E1463E]/20 text-text-primary text-sm">
+          <span className="text-center sm:text-left">
+            🚀 Thank you for being an early adopter! Nucigen Labs is currently in beta.
+          </span>
+          <button
+            type="button"
+            onClick={dismissBetaBanner}
+            className="shrink-0 min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg text-text-tertiary hover:text-text-primary hover:bg-background-glass-subtle transition-colors touch-manipulation"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Navigation Menu Drawer */}
       <AppNavMenu 
