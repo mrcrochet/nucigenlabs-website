@@ -18,9 +18,19 @@ import { buildBriefingPayload, formatBriefingPayloadAsText } from '../lib/invest
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+const DEBUG_LOG_PATH = join(__dirname, '../../.cursor/debug.log');
+function debugLog(payload: Record<string, unknown>) {
+  try {
+    const dir = dirname(DEBUG_LOG_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(DEBUG_LOG_PATH, JSON.stringify(payload) + '\n');
+  } catch (_) {}
+}
 // Try multiple paths for .env file
 dotenv.config({ path: join(__dirname, '../../.env') });
 dotenv.config({ path: join(__dirname, '../../../.env') });
@@ -4199,10 +4209,20 @@ app.post('/api/search/session', async (req, res) => {
 
 // GET /api/search/session/:id - Get search session (from DB if user has history)
 app.get('/api/search/session/:id', async (req, res) => {
+  // #region agent log
+  const entryPayload = { location: 'api-server.ts:GET session entry', message: 'GET search session', data: { id: req.params?.id, hasClerk: !!(req.headers['x-clerk-user-id']), hasSupabase: !!supabase }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1,H2' };
+  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entryPayload) }).catch(() => {});
+  debugLog(entryPayload);
+  // #endregion
   try {
     const { id } = req.params;
     const clerkUserId = req.headers['x-clerk-user-id'] as string || null;
     if (!clerkUserId || !supabase) {
+      // #region agent log
+      const p404 = { location: 'api-server.ts:GET session 404 no clerk/supabase', message: 'Early 404', data: {}, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1' };
+      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p404) }).catch(() => {});
+      debugLog(p404);
+      // #endregion
       return res.status(404).json({
         success: false,
         error: 'Session not found.',
@@ -4210,6 +4230,11 @@ app.get('/api/search/session/:id', async (req, res) => {
     }
     const userId = await getSupabaseUserId(clerkUserId, supabase);
     if (!userId) {
+      // #region agent log
+      const p404u = { location: 'api-server.ts:GET session 404 no userId', message: 'No supabase userId', data: {}, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1' };
+      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p404u) }).catch(() => {});
+      debugLog(p404u);
+      // #endregion
       return res.status(404).json({
         success: false,
         error: 'Session not found.',
@@ -4221,6 +4246,11 @@ app.get('/api/search/session/:id', async (req, res) => {
       .eq('user_id', userId)
       .eq('session_id', id)
       .maybeSingle();
+    // #region agent log
+    const qPayload = { location: 'api-server.ts:GET session query', message: 'Supabase query result', data: { hasRow: !!row, hasSnapshot: !!row?.session_snapshot, dbError: error?.message }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H2,H3' };
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(qPayload) }).catch(() => {});
+    debugLog(qPayload);
+    // #endregion
     if (error || !row?.session_snapshot) {
       return res.status(404).json({
         success: false,
@@ -4232,6 +4262,11 @@ app.get('/api/search/session/:id', async (req, res) => {
       session: row.session_snapshot,
     });
   } catch (error: any) {
+    // #region agent log
+    const catchPayload = { location: 'api-server.ts:GET session catch', message: 'Exception', data: { err: error?.message }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H2' };
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(catchPayload) }).catch(() => {});
+    debugLog(catchPayload);
+    // #endregion
     console.error('[API] Get session error:', error);
     res.status(500).json({
       success: false,

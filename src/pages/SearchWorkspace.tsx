@@ -20,7 +20,7 @@ import InsightPanel from '../components/search/InsightPanel';
 import SuggestedQuestions from '../components/search/SuggestedQuestions';
 import SearchSessionHeader from '../components/search/SearchSessionHeader';
 import ResultDetailsDrawer from '../components/search/ResultDetailsDrawer';
-import SearchHistorySidebar from '../components/search/SearchHistorySidebar';
+import SearchHistoryMenu from '../components/search/SearchHistoryMenu';
 import type { SearchResult, KnowledgeGraph as KnowledgeGraphType } from '../types/search';
 
 interface SearchSession {
@@ -57,6 +57,9 @@ function SearchWorkspaceContent() {
 
   // Load session from localStorage or from API (search history)
   useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:effect',message:'Load session effect entry',data:{sessionId,hasUser:!!user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H4'})}).catch(()=>{});
+    // #endregion
     if (!sessionId) {
       navigate('/search');
       return;
@@ -67,15 +70,24 @@ function SearchWorkspaceContent() {
     setError(null);
 
     const storedSession = localStorage.getItem(`search-session-${sessionId}`);
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:storedSession',message:'Stored session check',data:{sessionId,hasStoredSession:!!storedSession,storedLen:storedSession?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H3'})}).catch(()=>{});
+    // #endregion
     if (storedSession) {
       try {
         const parsed = JSON.parse(storedSession);
         if (!cancelled) setSession(parsed);
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:parsed',message:'Session from localStorage',data:{hasResults:Array.isArray(parsed?.results),resultsLen:parsed?.results?.length,hasGraph:!!parsed?.graph},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+        // #endregion
       } catch (err: any) {
         if (!cancelled) {
           setError('Invalid session data');
           toast.error('Failed to load session', { description: 'Session data is corrupted', duration: 5000 });
         }
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:parseError',message:'Parse error localStorage',data:{err:err?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+        // #endregion
       }
       if (!cancelled) setIsLoading(false);
       return;
@@ -85,13 +97,22 @@ function SearchWorkspaceContent() {
     const loadFromApi = async () => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (user?.id) headers['x-clerk-user-id'] = user.id;
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:fetchStart',message:'Fetch session from API',data:{sessionId,hasClerkHeader:!!user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H2'})}).catch(()=>{});
+      // #endregion
       const res = await fetch(`/api/search/session/${sessionId}`, { headers });
       if (cancelled) return;
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:fetchDone',message:'API response',data:{ok:res.ok,status:res.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H2'})}).catch(()=>{});
+      // #endregion
       if (res.ok) {
         const data = await res.json();
         if (data.session) {
           setSession(data.session);
           localStorage.setItem(`search-session-${sessionId}`, JSON.stringify(data.session));
+          // #region agent log
+          fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:setSessionApi',message:'Session set from API',data:{hasResults:Array.isArray(data.session?.results),resultsLen:data.session?.results?.length,hasGraph:!!data.session?.graph},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3,H5'})}).catch(()=>{});
+          // #endregion
         } else {
           setError('Session not found');
           setTimeout(() => navigate('/search'), 2000);
@@ -189,6 +210,9 @@ function SearchWorkspaceContent() {
   }, [session, handleFollowup]);
 
   if (isLoading) {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:render',message:'Render branch: loading',data:{isLoading,error:error||null,hasSession:!!session},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+    // #endregion
     return (
       <AppShell>
         <SEO title="Loading Search... | Nucigen Labs" />
@@ -203,6 +227,9 @@ function SearchWorkspaceContent() {
   }
 
   if (error || !session) {
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:render',message:'Render branch: error',data:{isLoading,error:error||null,hasSession:!!session},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H2,H4'})}).catch(()=>{});
+    // #endregion
     return (
       <AppShell>
         <SEO title="Search Error | Nucigen Labs" />
@@ -223,22 +250,23 @@ function SearchWorkspaceContent() {
   }
 
   const selectedResult = session.results.find(r => r.id === selectedResultId) || null;
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:render',message:'Render branch: success',data:{resultsLen:session?.results?.length,hasGraph:!!session?.graph},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3,H5'})}).catch(()=>{});
+  // #endregion
 
   return (
     <AppShell>
       <SEO title={`${session.query} | Search | Nucigen Labs`} description="Search workspace with AI-powered intelligence" />
-      
-      <div className="flex gap-6">
-        {/* Left: search history (ChatGPT-style) — hidden on small screens */}
-        <aside className="hidden lg:block w-52 shrink-0 pt-2">
-          <SearchHistorySidebar currentSessionId={sessionId ?? null} compact />
-        </aside>
-        {/* Content area: restore grid so col-span-* layout works (header, panels, results) */}
+      {/* Span full width of MainContent's 12-col grid so layout is visible (fixes black screen when single child) */}
+      <div className="col-span-1 sm:col-span-12 flex flex-col min-w-0 w-full overflow-x-hidden min-h-[60vh] bg-background-base">
+        {/* Content area: grid so col-span-* layout works (header, panels, results) - no min-h-0 to avoid collapse */}
         <div className="flex-1 min-w-0 grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4">
       
-      {/* Header with back button, query summary, and Answer tab */}
+      {/* Header: history menu (hamburger) + back button + query summary + Answer tab */}
       <div className="col-span-1 sm:col-span-12 mb-2 sm:mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex items-start gap-2">
+          <SearchHistoryMenu currentSessionId={sessionId ?? null} compact variant="inline" />
+          <div className="min-w-0">
           <button
             onClick={() => navigate('/search')}
             className="flex items-center gap-2 text-text-secondary hover:text-text-primary mb-4 transition-colors"
@@ -262,6 +290,7 @@ function SearchWorkspaceContent() {
           >
             {session.results.length} résultat{session.results.length !== 1 ? 's' : ''}
           </div>
+          </div>
         </div>
         <Link
           to={`/search/session/${sessionId}/reponse`}
@@ -273,7 +302,7 @@ function SearchWorkspaceContent() {
       </div>
 
       {/* Main Content: Insight Panel (Left) + Graph (Right) */}
-      <div className="col-span-1 sm:col-span-5">
+      <div className="col-span-1 sm:col-span-5 min-w-0">
         <InsightPanel
           results={session.results}
           graph={session.graph}
@@ -311,8 +340,8 @@ function SearchWorkspaceContent() {
       </div>
 
       {/* Knowledge Graph - Central */}
-      <div className="col-span-1 sm:col-span-7">
-        <div className="sticky top-24">
+      <div className="col-span-1 sm:col-span-7 min-w-0">
+        <div className="sticky top-24 w-full min-w-0">
           <KnowledgeGraph
             graph={session.graph}
             query={session.query}

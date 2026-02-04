@@ -537,45 +537,6 @@ export default function Papers() {
             </div>
           </div>
 
-          {/* Research Access Policy */}
-          <div className="mb-32 max-w-4xl mx-auto">
-            <p className="text-xs text-slate-600 mb-12 text-center tracking-[0.3em] font-normal uppercase">Research Access Policy</p>
-
-            <div className="backdrop-blur-xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] border border-white/[0.08] rounded-lg p-10">
-              <ul className="space-y-4 mb-10">
-                {['No anonymous research access', 'No free institutional usage', 'Manual validation only'].map((policy, idx) => (
-                  <li key={idx} className="flex items-start gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-600/60 mt-2 flex-shrink-0"></div>
-                    <p className="text-base text-slate-400 font-light">{policy}</p>
-                  </li>
-                ))}
-              </ul>
-
-              {/* Access Request Bar */}
-              <div className="flex items-center justify-between gap-4 p-4 bg-white/[0.02] border border-white/[0.08] rounded-lg mb-6">
-                <div className="text-sm text-slate-500 font-light">NUCIGEN</div>
-                <div className="flex items-center gap-2">
-                  <button className="px-4 py-2 bg-white/[0.05] border border-white/[0.10] text-white text-xs font-light rounded-md">
-                    Researcher
-                  </button>
-                  <button className="px-4 py-2 bg-white/[0.02] border border-white/[0.08] text-slate-400 text-xs font-light rounded-md hover:bg-white/[0.05] transition-all">
-                    Analyst
-                  </button>
-                </div>
-                <Link
-                  to="/request-access"
-                  className="inline-block px-6 py-2.5 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white text-xs font-light rounded-md transition-all tracking-wide"
-                >
-                  Request Access
-                </Link>
-              </div>
-
-              <p className="text-lg text-white font-light text-center">
-                Intelligence is earned, not consumed.
-              </p>
-            </div>
-          </div>
-
           {/* Closing Statement */}
           <div className="text-center py-16 border-y border-white/[0.10]">
             <p className="text-2xl md:text-4xl font-light leading-relaxed text-slate-300">

@@ -124,10 +124,12 @@ function App() {
     '/profile', '/settings', '/onboarding'
   ];
   
-  // Special handling for /intelligence vs /intelligence-page
-  const isAppIntelligence = (location.pathname === '/intelligence' || location.pathname.startsWith('/intelligence/')) && 
-                            !location.pathname.startsWith('/intelligence-page');
-  const shouldHideMarketing = hideMarketingPaths.some(path => location.pathname.startsWith(path)) || isAppIntelligence;
+  // Special handling: /intelligence-page is a marketing page (hero) → show nav; /intelligence (app) → hide nav
+  const isIntelligencePageMarketing = location.pathname === '/intelligence-page' || location.pathname.startsWith('/intelligence-page/');
+  const isAppIntelligence = (location.pathname === '/intelligence' || location.pathname.startsWith('/intelligence/')) && !isIntelligencePageMarketing;
+  const shouldHideMarketing = !isIntelligencePageMarketing && (
+    hideMarketingPaths.some(path => location.pathname.startsWith(path)) || isAppIntelligence
+  );
 
   return (
     <div className="relative min-h-screen">

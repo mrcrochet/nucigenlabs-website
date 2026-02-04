@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useUser } from '@clerk/clerk-react';
 import { toast } from 'sonner';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import AppShell from '../components/layout/AppShell';
@@ -29,6 +30,7 @@ interface SearchSession {
 function SearchResponsePageContent() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const { user } = useUser();
   const [session, setSession] = useState<SearchSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,31 +41,48 @@ function SearchResponsePageContent() {
       return;
     }
 
+    let cancelled = false;
     setIsLoading(true);
     setError(null);
 
     const storedSession = localStorage.getItem(`search-session-${sessionId}`);
-
     if (storedSession) {
       try {
         const parsed = JSON.parse(storedSession);
-        setSession(parsed);
+        if (!cancelled) setSession(parsed);
       } catch (err: any) {
-        console.error('[SearchResponsePage] Error parsing stored session:', err);
-        setError('Invalid session data');
-        toast.error('Failed to load session', {
-          description: 'Session data is corrupted',
-          duration: 5000,
-        });
-      } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setError('Invalid session data');
+          toast.error('Failed to load session', { description: 'Session data is corrupted', duration: 5000 });
+        }
       }
-    } else {
-      setError('Session not found');
-      setIsLoading(false);
-      setTimeout(() => navigate('/search'), 2000);
+      if (!cancelled) setIsLoading(false);
+      return;
     }
-  }, [sessionId, navigate]);
+
+    const loadFromApi = async () => {
+      const headers: Record<string, string> = {};
+      if (user?.id) headers['x-clerk-user-id'] = user.id;
+      const res = await fetch(`/api/search/session/${sessionId}`, { headers });
+      if (cancelled) return;
+      if (res.ok) {
+        const data = await res.json();
+        if (data.session) {
+          setSession(data.session);
+          localStorage.setItem(`search-session-${sessionId}`, JSON.stringify(data.session));
+        } else {
+          setError('Session not found');
+          setTimeout(() => navigate('/search'), 2000);
+        }
+      } else {
+        setError('Session not found');
+        setTimeout(() => navigate('/search'), 2000);
+      }
+      setIsLoading(false);
+    };
+    loadFromApi();
+    return () => { cancelled = true; };
+  }, [sessionId, navigate, user?.id]);
 
   if (isLoading) {
     return (
@@ -116,12 +135,12 @@ function SearchResponsePageContent() {
     <AppShell>
       <SEO title={`Chat : ${session.query} | Nucigen Labs`} description="Chat avec les résultats web pour cette recherche" />
 
-      <div className="col-span-1 sm:col-span-12 mb-6">
+      <div className="col-span-1 sm:col-span-12 mb-6 min-w-0">
         <Link
           to={`/search/session/${sessionId}`}
           className="inline-flex items-center gap-2 text-text-secondary hover:text-text-primary mb-4 transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-4 h-4 shrink-0" />
           <span>Retour aux résultats</span>
         </Link>
         <h1 className="text-lg font-semibold text-text-primary truncate" title={session.query}>
@@ -132,12 +151,12 @@ function SearchResponsePageContent() {
         </p>
       </div>
 
-      <div className="col-span-1 sm:col-span-12 max-w-3xl min-h-[60vh] flex flex-col">
+      <div className="col-span-1 sm:col-span-12 max-w-3xl min-h-[60vh] flex flex-col min-w-0 w-full">
         <SearchAnswerPanel
           query={session.query}
           resultsSummary={resultsSummary}
           autoExplain={false}
-          className="min-h-[60vh]"
+          className="min-h-[60vh] flex-1 min-w-0"
         />
       </div>
     </AppShell>
