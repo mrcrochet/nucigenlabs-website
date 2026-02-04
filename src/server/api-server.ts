@@ -4317,6 +4317,44 @@ app.get('/api/search/history', async (req, res) => {
   }
 });
 
+// DELETE /api/search/history/:sessionId - Remove one search session from user's history
+app.delete('/api/search/history/:sessionId', async (req, res) => {
+  try {
+    const sessionId = req.params.sessionId?.trim();
+    const clerkUserId = req.headers['x-clerk-user-id'] as string || null;
+    if (!sessionId || !clerkUserId || !supabase) {
+      return res.status(400).json({ success: false, error: 'Missing session or user' });
+    }
+    const userId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'User not found' });
+    }
+    let error = (await supabase.rpc('delete_search_history', {
+      p_user_id: userId,
+      p_session_id: sessionId,
+    })).error;
+    if (error && (error.message?.includes('does not exist') || error.code === '42883')) {
+      const direct = await supabase
+        .from('search_history')
+        .delete()
+        .eq('user_id', userId)
+        .eq('session_id', sessionId);
+      error = direct.error;
+    }
+    if (error) {
+      console.error('[API] Search history delete error:', error);
+      return res.status(500).json({ success: false, error: error.message || 'Delete failed' });
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('[API] Search history delete error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
 // POST /api/search/session/:id/followup - Add followup search to session
 app.post('/api/search/session/:id/followup', async (req, res) => {
   try {
