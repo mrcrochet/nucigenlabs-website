@@ -197,11 +197,11 @@ function SearchHomeContent() {
                 onPaste={handlePaste}
                 placeholder="Search anything, or paste a link"
                 disabled={isProcessing}
-                className="w-full pl-12 pr-28 py-3 text-base bg-background-glass-subtle/90 backdrop-blur-sm border border-borders-subtle rounded-xl text-text-primary placeholder-text-secondary focus:outline-none focus:border-[#E1463E]/50 focus:bg-background-glass-medium transition-all disabled:opacity-50"
+                className="w-full pl-12 pr-28 py-3 min-h-[48px] sm:min-h-0 text-base bg-background-glass-subtle/90 backdrop-blur-sm border border-borders-subtle rounded-xl text-text-primary placeholder-text-secondary focus:outline-none focus:border-[#E1463E]/50 focus:bg-background-glass-medium transition-all disabled:opacity-50 touch-manipulation"
               />
               
               {/* Right side indicators */}
-              <div className="absolute right-4 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
+              <div className="absolute right-2 sm:right-4 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
                 {isUrl && !isProcessing && (
                   <div className="flex items-center gap-1.5 text-[#E1463E]">
                     <LinkIcon className="w-4 h-4" />
@@ -215,7 +215,7 @@ function SearchHomeContent() {
                   <button
                     type="submit"
                     disabled={!query.trim()}
-                    className="px-4 py-1.5 bg-[#E1463E] hover:bg-[#E1463E]/90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors"
+                    className="min-h-[44px] px-4 py-2 bg-[#E1463E] hover:bg-[#E1463E]/90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-medium transition-colors touch-manipulation"
                   >
                     Search
                   </button>

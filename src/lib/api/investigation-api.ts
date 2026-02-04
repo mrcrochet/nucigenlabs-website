@@ -201,6 +201,22 @@ export async function getDetectiveGraph(
   }
 }
 
+/** Créer ou récupérer le playground (investigation) pour une session de recherche. Retourne threadId ; le graphe s’obtient via getDetectiveGraph (polling). */
+export async function getOrCreatePlaygroundForSearchSession(
+  sessionId: string,
+  apiOptions?: InvestigationApiOptions
+): Promise<{ success: boolean; threadId?: string; error?: string }> {
+  try {
+    const data = await fetchJson<{ success: boolean; threadId: string; graph?: unknown }>(
+      `${API_BASE}/search/session/${sessionId}/playground`,
+      { method: 'POST', headers: buildHeaders(apiOptions) }
+    );
+    return { success: true, threadId: data.threadId };
+  } catch (e: any) {
+    return { success: false, error: e?.message };
+  }
+}
+
 /** Télécharger le brief (texte) d'une piste */
 export async function getBrief(
   threadId: string,

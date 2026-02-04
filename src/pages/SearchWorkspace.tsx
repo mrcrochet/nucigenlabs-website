@@ -264,14 +264,14 @@ function SearchWorkspaceContent() {
       
       {/* Header: history menu (hamburger) + back button + query summary + Answer tab */}
       <div className="col-span-1 sm:col-span-12 mb-2 sm:mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-        <div className="flex-1 min-w-0 flex items-start gap-2">
+        <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-start gap-2">
           <SearchHistoryMenu currentSessionId={sessionId ?? null} compact variant="inline" />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
           <button
             onClick={() => navigate('/search')}
-            className="flex items-center gap-2 text-text-secondary hover:text-text-primary mb-4 transition-colors"
+            className="flex items-center gap-2 text-text-secondary hover:text-text-primary mb-2 sm:mb-4 min-h-[44px] touch-manipulation"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 shrink-0" />
             <span>Back to Search</span>
           </button>
           <SearchSessionHeader
@@ -294,9 +294,9 @@ function SearchWorkspaceContent() {
         </div>
         <Link
           to={`/search/session/${sessionId}/reponse`}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-borders-subtle bg-borders-subtle/50 text-text-secondary hover:text-text-primary hover:bg-[#E1463E]/10 hover:border-[#E1463E]/30 text-sm font-medium transition-colors shrink-0"
+          className="flex items-center justify-center gap-2 px-4 py-3 min-h-[44px] rounded-lg border border-borders-subtle bg-borders-subtle/50 text-text-secondary hover:text-text-primary hover:bg-[#E1463E]/10 hover:border-[#E1463E]/30 text-sm font-medium transition-colors shrink-0 touch-manipulation w-full sm:w-auto"
         >
-          <span>Réponse</span>
+          <span>Playground</span>
           <span className="text-xs opacity-80">→</span>
         </Link>
       </div>
@@ -339,9 +339,9 @@ function SearchWorkspaceContent() {
         />
       </div>
 
-      {/* Knowledge Graph - Central */}
-      <div className="col-span-1 sm:col-span-7 min-w-0">
-        <div className="sticky top-24 w-full min-w-0">
+      {/* Knowledge Graph - Central: full width on mobile, sticky only on sm+ */}
+      <div className="col-span-1 sm:col-span-7 min-w-0 overflow-hidden">
+        <div className="sm:sticky sm:top-24 w-full min-w-0">
           <KnowledgeGraph
             graph={session.graph}
             query={session.query}
@@ -406,7 +406,7 @@ function SearchWorkspaceContent() {
             <button
               type="button"
               onClick={() => setImpactBriefOpen(false)}
-              className="mt-4 px-4 py-2 bg-borders-subtle hover:bg-borders-medium rounded-lg text-sm text-text-primary"
+              className="mt-4 min-h-[44px] px-4 py-3 bg-borders-subtle hover:bg-borders-medium rounded-lg text-sm text-text-primary touch-manipulation"
             >
               Close
             </button>

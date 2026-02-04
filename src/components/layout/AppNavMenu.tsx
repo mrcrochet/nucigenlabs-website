@@ -113,19 +113,19 @@ export default function AppNavMenu({ isOpen, onClose }: AppNavMenuProps) {
         `}
       >
         {/* Header */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-borders-subtle">
+        <div className="h-14 sm:h-16 flex items-center justify-between px-4 border-b border-borders-subtle">
           <h2 className="text-lg font-semibold text-text-primary">Menu</h2>
           <button
             onClick={onClose}
-            className="p-2 text-text-secondary hover:text-text-primary hover:bg-background-glass-subtle rounded-lg transition-colors"
+            className="min-w-[44px] min-h-[44px] flex items-center justify-center -m-1 rounded-lg text-text-secondary hover:text-text-primary hover:bg-background-glass-subtle transition-colors touch-manipulation"
             aria-label="Close menu"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Navigation Items */}
-        <nav className="flex-1 py-4 overflow-y-auto">
+        {/* Navigation Items - Touch-friendly min height */}
+        <nav className="flex-1 py-3 overflow-y-auto overflow-x-hidden overscroll-contain">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = normalizedPath === item.path || normalizedPath.startsWith(item.path + '/');
@@ -135,10 +135,10 @@ export default function AppNavMenu({ isOpen, onClose }: AppNavMenuProps) {
                 key={item.path}
                 to={item.path}
                 onClick={handleLinkClick}
-                className={`flex items-center gap-3 px-4 py-2 mx-2 mb-1 rounded-lg transition-colors ${
+                className={`flex items-center gap-3 px-4 py-3 min-h-[48px] mx-2 mb-1 rounded-lg transition-colors touch-manipulation ${
                   isActive
                     ? 'bg-background-glass-medium text-text-primary border border-borders-medium'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-background-glass-subtle'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-background-glass-subtle active:bg-background-glass-medium'
                 }`}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />

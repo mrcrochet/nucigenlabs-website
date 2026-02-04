@@ -1204,6 +1204,10 @@ app.get('/api/investigations/:threadId/signals', async (req, res) => {
 
 // GET /api/investigations/:threadId/detective-graph — graphe depuis tables detective_* (nodes, edges, paths)
 app.get('/api/investigations/:threadId/detective-graph', async (req, res) => {
+  const threadIdParam = req.params.threadId;
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:detective-graph-entry',message:'GET detective-graph entry',data:{threadId:threadIdParam},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+  // #endregion
   try {
     const { threadId } = req.params;
     const clerkUserId = getInvestigationUserId(req);
@@ -1225,6 +1229,9 @@ app.get('/api/investigations/:threadId/detective-graph', async (req, res) => {
     }
     const { loadGraphForInvestigation } = await import('./services/detective-graph-persistence.js');
     const graph = await loadGraphForInvestigation(supabase, threadId);
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:detective-graph-result',message:'GET detective-graph result',data:{threadId,hasGraph:!!graph,nodeCount:graph?.nodes?.length??0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
     if (!graph) {
       return res.status(200).json({ success: true, graph: null });
     }
@@ -4272,6 +4279,110 @@ app.get('/api/search/session/:id', async (req, res) => {
       success: false,
       error: error.message || 'Internal server error',
     });
+  }
+});
+
+// POST /api/search/session/:sessionId/playground — Create or get investigation playground for this search session
+app.post('/api/search/session/:sessionId/playground', async (req, res) => {
+  // #region agent log
+  const sessionIdParam = req.params.sessionId?.trim();
+  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:playground-entry',message:'Playground POST entry',data:{sessionId:sessionIdParam,hasClerk:!!req.headers['x-clerk-user-id'],hasSupabase:!!supabase},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H3'})}).catch(()=>{});
+  // #endregion
+  try {
+    const sessionId = sessionIdParam;
+    const clerkUserId = req.headers['x-clerk-user-id'] as string || null;
+    if (!sessionId || !clerkUserId || !supabase) {
+      return res.status(400).json({ success: false, error: 'Session ID and user required' });
+    }
+    const userId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!userId) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    const { data: row, error } = await supabase
+      .from('search_history')
+      .select('session_snapshot')
+      .eq('user_id', userId)
+      .eq('session_id', sessionId)
+      .maybeSingle();
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:playground-session-fetch',message:'Playground session fetch',data:{sessionId,found:!!(row?.session_snapshot),dbError:error?.message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H3'})}).catch(()=>{});
+    // #endregion
+    if (error || !row?.session_snapshot) {
+      return res.status(404).json({ success: false, error: 'Session not found' });
+    }
+    const session = row.session_snapshot as { query?: string; results?: Array<{ title?: string; summary?: string; url?: string }>; investigationThreadId?: string };
+    const existingThreadId = session.investigationThreadId;
+    if (existingThreadId) {
+      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:playground-return-existing',message:'Playground return existing threadId',data:{sessionId,threadId:existingThreadId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      return res.json({ success: true, threadId: existingThreadId, graph: null });
+    }
+    const query = (session.query || '').trim();
+    if (!query) {
+      return res.status(400).json({ success: false, error: 'Session has no query' });
+    }
+    const titleVal = query.length > 80 ? query.slice(0, 77) + '...' : query;
+    const { data: thread, error: insertError } = await supabase
+      .from('investigation_threads')
+      .insert({
+        user_id: userId,
+        title: titleVal,
+        initial_hypothesis: query,
+        scope: 'geopolitics',
+        status: 'active',
+        confidence_score: null,
+        investigative_axes: [],
+        blind_spots: [],
+      })
+      .select()
+      .single();
+    if (insertError || !thread) {
+      console.error('[API] Playground thread create error:', insertError);
+      return res.status(500).json({ success: false, error: insertError?.message || 'Failed to create investigation' });
+    }
+    const threadId = thread.id;
+    const rawTextChunks = (session.results || []).map((r: { title?: string; summary?: string; url?: string }) => ({
+      text: ((r.title || '') + '\n' + (r.summary || '')).trim() || (r.title || ''),
+      sourceUrl: r.url,
+      sourceName: r.title || undefined,
+    })).filter((c: { text: string }) => c.text.length > 0);
+    setImmediate(async () => {
+      try {
+        const { getOrCreateDetectiveInvestigation } = await import('./services/detective-graph-persistence.js');
+        const { runDetectiveIngestion } = await import('./services/detective-ingestion-pipeline.js');
+        await getOrCreateDetectiveInvestigation(supabase, threadId, { title: titleVal, hypothesis: query });
+        await runDetectiveIngestion({
+          investigationId: threadId,
+          hypothesis: query,
+          skipTavily: false,
+          maxTavilyResults: 15,
+          maxScrapeUrls: 8,
+          runGraphRebuild: true,
+          supabase,
+          rawTextChunks,
+        });
+        console.log('[API] Playground ingestion done for session', sessionId, 'thread', threadId);
+      } catch (e: any) {
+        console.error('[API] Playground ingestion:', e?.message);
+      }
+    });
+    const updatedSnapshot = { ...session, investigationThreadId: threadId };
+    const { error: updateError } = await supabase
+      .from('search_history')
+      .update({ session_snapshot: updatedSnapshot })
+      .eq('user_id', userId)
+      .eq('session_id', sessionId);
+    if (updateError) {
+      console.error('[API] Playground snapshot update error:', updateError);
+      // Still return threadId so client can poll
+    }
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:playground-return-new',message:'Playground return new threadId',data:{sessionId,threadId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+    res.json({ success: true, threadId, graph: null });
+  } catch (err: any) {
+    console.error('[API] Playground create:', err);
+    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:playground-catch',message:'Playground error',data:{error:err?.message,sessionId:req.params.sessionId?.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H3'})}).catch(()=>{});
+    res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
   }
 });
 
