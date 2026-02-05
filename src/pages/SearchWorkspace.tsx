@@ -6,7 +6,7 @@
  * Each question = new search that enriches the workspace
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useUser } from '@clerk/clerk-react';
 import { toast } from 'sonner';
@@ -20,8 +20,36 @@ import InsightPanel from '../components/search/InsightPanel';
 import SuggestedQuestions from '../components/search/SuggestedQuestions';
 import SearchSessionHeader from '../components/search/SearchSessionHeader';
 import ResultDetailsDrawer from '../components/search/ResultDetailsDrawer';
+import EntityDetailsDrawer from '../components/search/EntityDetailsDrawer';
 import SearchHistoryMenu from '../components/search/SearchHistoryMenu';
-import type { SearchResult, KnowledgeGraph as KnowledgeGraphType } from '../types/search';
+import type { SearchResult, KnowledgeGraph as KnowledgeGraphType, GraphNode, GraphLink } from '../types/search';
+
+/** Build ego graph around a node (1 or 2 hops). */
+function getEgoGraph(graph: KnowledgeGraphType, centerId: string, depth: number = 2): KnowledgeGraphType {
+  const nodeIds = new Set<string>([centerId]);
+  let frontier = new Set<string>([centerId]);
+  for (let d = 0; d < depth; d++) {
+    const next = new Set<string>();
+    for (const link of graph.links) {
+      const src = typeof link.source === 'object' ? (link.source as { id: string }).id : link.source;
+      const tgt = typeof link.target === 'object' ? (link.target as { id: string }).id : link.target;
+      if (frontier.has(src) || frontier.has(tgt)) {
+        nodeIds.add(src);
+        nodeIds.add(tgt);
+        next.add(src);
+        next.add(tgt);
+      }
+    }
+    frontier = next;
+  }
+  const nodes = graph.nodes.filter((n) => nodeIds.has(n.id));
+  const links = graph.links.filter((l) => {
+    const src = typeof l.source === 'object' ? (l.source as { id: string }).id : l.source;
+    const tgt = typeof l.target === 'object' ? (l.target as { id: string }).id : l.target;
+    return nodeIds.has(src) && nodeIds.has(tgt);
+  });
+  return { nodes, links };
+}
 
 interface SearchSession {
   id: string;
@@ -51,9 +79,14 @@ function SearchWorkspaceContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingFollowup, setIsLoadingFollowup] = useState(false);
   const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
+  const [selectedEntityNode, setSelectedEntityNode] = useState<GraphNode | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [impactBriefOpen, setImpactBriefOpen] = useState(false);
   const [impactBriefText, setImpactBriefText] = useState('');
+  const [subgraphFocusNodeId, setSubgraphFocusNodeId] = useState<string | null>(null);
+  const [visibleNodeTypes, setVisibleNodeTypes] = useState<string[] | null>(null);
+  const [visibleLinkTypes, setVisibleLinkTypes] = useState<string[] | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Load session from localStorage or from API (search history)
   useEffect(() => {
@@ -200,7 +233,7 @@ function SearchWorkspaceContent() {
     }
   }, [sessionId, session]);
 
-  // Handle node explore
+  // Handle node explore (Ctrl/Cmd+click or double-click)
   const handleNodeExplore = useCallback((_nodeId: string, nodeLabel: string) => {
     if (!session) return;
     
@@ -208,6 +241,32 @@ function SearchWorkspaceContent() {
     const contextualQuery = `${session.query} ${nodeLabel}`;
     handleFollowup(contextualQuery);
   }, [session, handleFollowup]);
+
+  const graphToShow = useMemo(() => {
+    if (!session) return { nodes: [] as GraphNode[], links: [] as GraphLink[] };
+    if (subgraphFocusNodeId) return getEgoGraph(session.graph, subgraphFocusNodeId, 2);
+    return session.graph;
+  }, [session, subgraphFocusNodeId]);
+
+  const handleFocusSubgraph = useCallback((nodeId: string) => {
+    setSubgraphFocusNodeId(nodeId);
+    setSelectedEntityNode(null);
+  }, []);
+
+  // Handle node click: open ResultDetailsDrawer for event nodes that match a result, else EntityDetailsDrawer for entities
+  const handleNodeClick = useCallback((nodeId: string) => {
+    if (!session) return;
+    const node = session.graph.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    const matchingResult = session.results.find((r) => r.id === nodeId);
+    if (node.type === 'event' && matchingResult) {
+      setSelectedResultId(nodeId);
+      setSelectedEntityNode(null);
+    } else {
+      setSelectedEntityNode(node);
+      setSelectedResultId(null);
+    }
+  }, [session]);
 
   if (isLoading) {
     // #region agent log
@@ -341,15 +400,114 @@ function SearchWorkspaceContent() {
 
       {/* Knowledge Graph - Central: full width on mobile, sticky only on sm+ */}
       <div className="col-span-1 sm:col-span-7 min-w-0 overflow-hidden">
-        <div className="sm:sticky sm:top-24 w-full min-w-0">
-          <KnowledgeGraph
-            graph={session.graph}
-            query={session.query}
-            onNodeClick={setSelectedResultId}
-            onNodeExplore={handleNodeExplore}
-            height={600}
-            focusNodeId={focusNodeId}
-          />
+        <div className="sm:sticky sm:top-24 w-full min-w-0 space-y-2">
+          {subgraphFocusNodeId && (
+            <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-background-glass-subtle border border-borders-subtle text-sm">
+              <span className="text-text-secondary truncate">
+                Sous-graphe autour de {session.graph.nodes.find((n) => n.id === subgraphFocusNodeId)?.label ?? subgraphFocusNodeId}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSubgraphFocusNodeId(null)}
+                className="shrink-0 px-3 py-1.5 rounded-md bg-borders-subtle hover:bg-borders-medium text-text-primary text-xs font-medium"
+              >
+                Revenir au graphe complet
+              </button>
+            </div>
+          )}
+          <div className="relative">
+            {filtersOpen && (
+              <div className="absolute top-0 left-0 right-0 z-20 p-3 rounded-lg bg-background-base border border-borders-subtle shadow-lg space-y-3 mb-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-text-primary">Filtres par type</span>
+                  <button type="button" onClick={() => setFiltersOpen(false)} className="text-text-tertiary hover:text-text-primary text-xs">Fermer</button>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <div className="font-medium text-text-secondary mb-1">Nœuds</div>
+                    {['event', 'country', 'company', 'commodity', 'organization', 'person'].map((t) => {
+                      const selected = visibleNodeTypes === null || visibleNodeTypes.includes(t);
+                      return (
+                        <label key={t} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => {
+                              const all = ['event', 'country', 'company', 'commodity', 'organization', 'person'];
+                              if (visibleNodeTypes === null) {
+                                setVisibleNodeTypes(all.filter((x) => x !== t));
+                              } else if (selected) {
+                                const next = visibleNodeTypes.filter((x) => x !== t);
+                                setVisibleNodeTypes(next.length ? next : null);
+                              } else {
+                                const next = [...visibleNodeTypes, t];
+                                setVisibleNodeTypes(next.length === all.length ? null : next);
+                              }
+                            }}
+                          />
+                          <span className="text-text-primary capitalize">{t}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <div>
+                    <div className="font-medium text-text-secondary mb-1">Liens</div>
+                    {['causes', 'precedes', 'related_to', 'operates_in', 'exposes_to', 'impacts'].map((t) => {
+                      const selected = visibleLinkTypes === null || visibleLinkTypes.includes(t);
+                      return (
+                        <label key={t} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => {
+                              const all = ['causes', 'precedes', 'related_to', 'operates_in', 'exposes_to', 'impacts'];
+                              if (visibleLinkTypes === null) {
+                                setVisibleLinkTypes(all.filter((x) => x !== t));
+                              } else if (selected) {
+                                const next = visibleLinkTypes.filter((x) => x !== t);
+                                setVisibleLinkTypes(next.length ? next : null);
+                              } else {
+                                const next = [...visibleLinkTypes, t];
+                                setVisibleLinkTypes(next.length === all.length ? null : next);
+                              }
+                            }}
+                          />
+                          <span className="text-text-primary">{t.replace('_', ' ')}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end mb-1">
+              <button
+                type="button"
+                onClick={() => setFiltersOpen((o) => !o)}
+                className="text-xs text-text-secondary hover:text-text-primary px-2 py-1 rounded border border-borders-subtle"
+              >
+                {filtersOpen ? 'Masquer filtres' : 'Filtres'}
+              </button>
+            </div>
+            <KnowledgeGraph
+              graph={graphToShow}
+              query={session.query}
+              onNodeClick={handleNodeClick}
+              onNodeExplore={handleNodeExplore}
+              height={600}
+              focusNodeId={subgraphFocusNodeId ?? focusNodeId}
+              visibleNodeTypes={visibleNodeTypes}
+              visibleLinkTypes={visibleLinkTypes}
+              filterControls={{
+                visibleNodeTypes,
+                visibleLinkTypes,
+                setVisibleNodeTypes,
+                setVisibleLinkTypes,
+                filtersOpen,
+                setFiltersOpen,
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -393,6 +551,18 @@ function SearchWorkspaceContent() {
           onExploreDeeper={() => {
             handleFollowup(`Tell me more about: ${selectedResult.title}`);
           }}
+        />
+      )}
+
+      {/* Entity Details Drawer (graph entity nodes: company, person, country, etc.) */}
+      {selectedEntityNode && (
+        <EntityDetailsDrawer
+          entityNode={selectedEntityNode}
+          results={session.results}
+          graph={session.graph}
+          isOpen={!!selectedEntityNode}
+          onClose={() => setSelectedEntityNode(null)}
+          onFocusSubgraph={handleFocusSubgraph}
         />
       )}
 
