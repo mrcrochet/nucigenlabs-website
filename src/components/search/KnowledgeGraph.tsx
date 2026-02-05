@@ -565,7 +565,7 @@ export default function KnowledgeGraph({ graph, query, onNodeClick, onNodeExplor
           aria-label="Knowledge Graph - Fullscreen"
           className="fixed inset-0 bg-background-base z-[9999] flex flex-col"
         >
-          <div className="h-16 min-h-16 bg-background-overlay/90 backdrop-blur-sm border-b border-borders-subtle flex items-center justify-between px-4 sm:px-6 flex-shrink-0 flex-wrap gap-2">
+          <div className="min-h-16 py-3 bg-background-overlay/90 backdrop-blur-sm border-b border-borders-subtle flex items-center justify-between px-4 sm:px-6 flex-shrink-0 flex-wrap gap-2">
             <div className="flex flex-col min-w-0">
               <h2 className="text-lg font-semibold text-text-primary">Knowledge Graph - Fullscreen</h2>
               {query && (
@@ -640,7 +640,7 @@ export default function KnowledgeGraph({ graph, query, onNodeClick, onNodeExplor
             </div>
           </div>
           {filterControls && filterControls.filtersOpen && (
-            <div className="flex-shrink-0 border-b border-borders-subtle bg-background-elevated/80 px-4 py-3 text-sm">
+            <div className="flex-shrink-0 border-b border-borders-subtle bg-background-elevated/80 px-4 pt-4 pb-3 text-sm">
               <div className="flex items-center justify-between mb-3">
                 <span className="font-medium text-text-primary">Filtres par type</span>
                 <button

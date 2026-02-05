@@ -415,9 +415,18 @@ function SearchWorkspaceContent() {
               </button>
             </div>
           )}
-          <div className="relative">
+          <div className="space-y-2">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setFiltersOpen((o) => !o)}
+                className="text-xs text-text-secondary hover:text-text-primary px-2 py-1 rounded border border-borders-subtle"
+              >
+                {filtersOpen ? 'Masquer filtres' : 'Filtres'}
+              </button>
+            </div>
             {filtersOpen && (
-              <div className="absolute top-0 left-0 right-0 z-20 p-3 rounded-lg bg-background-base border border-borders-subtle shadow-lg space-y-3 mb-2">
+              <div className="p-3 rounded-lg bg-background-base border border-borders-subtle shadow-lg space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-text-primary">Filtres par type</span>
                   <button type="button" onClick={() => setFiltersOpen(false)} className="text-text-tertiary hover:text-text-primary text-xs">Fermer</button>
@@ -480,15 +489,6 @@ function SearchWorkspaceContent() {
                 </div>
               </div>
             )}
-            <div className="flex justify-end mb-1">
-              <button
-                type="button"
-                onClick={() => setFiltersOpen((o) => !o)}
-                className="text-xs text-text-secondary hover:text-text-primary px-2 py-1 rounded border border-borders-subtle"
-              >
-                {filtersOpen ? 'Masquer filtres' : 'Filtres'}
-              </button>
-            </div>
             <KnowledgeGraph
               graph={graphToShow}
               query={session.query}
