@@ -3,9 +3,12 @@
  * When the server returns HTML (e.g. SPA index.html when API is down or proxy misconfigured),
  * avoids "Unexpected token '<'" and throws a clear error instead.
  * In production, relative URLs (/api/...) are prefixed with VITE_API_URL when set.
+ * Includes a timeout so requests don't hang indefinitely and block the UI.
  */
 
 import { apiUrl, getApiBaseUrl } from './api-base';
+
+const DEFAULT_FETCH_TIMEOUT_MS = 20_000;
 
 function getApiUnavailableMessage(): string {
   if (import.meta.env.PROD && !getApiBaseUrl()) {
@@ -16,13 +19,39 @@ function getApiUnavailableMessage(): string {
 
 export async function safeFetchJson<T = unknown>(
   input: RequestInfo | URL,
-  init?: RequestInit
+  init?: RequestInit,
+  options?: { timeoutMs?: number }
 ): Promise<T> {
+  const timeoutMs = options?.timeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS;
   const url =
     typeof input === 'string' && input.startsWith('/')
       ? apiUrl(input)
       : input;
-  const res = await fetch(url, init);
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  if (init?.signal) {
+    init.signal.addEventListener('abort', () => controller.abort());
+  }
+  const fetchInit: RequestInit = {
+    ...init,
+    signal: controller.signal,
+  };
+
+  let res: Response;
+  try {
+    res = await fetch(url, fetchInit);
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(
+        `Requête expirée après ${timeoutMs / 1000}s. ${getApiUnavailableMessage()}`
+      );
+    }
+    throw err;
+  }
+  clearTimeout(timeoutId);
+
   const contentType = res.headers.get("content-type") ?? "";
   const text = await res.text();
 
