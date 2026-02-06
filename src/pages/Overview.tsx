@@ -1,21 +1,14 @@
 /**
  * Overview Page - Command Center
- * 
- * NEW ARCHITECTURE: "My World Changed"
- * 
- * This page must shock positively. Required content:
- * - Alertes déclenchées (top)
- * - Impacts sur MA watchlist
- * - 3 Decision Points clairs
- * - Exposition qui change
- * 
- * If a user arrives here and doesn't know what to do, it's failed.
+ *
+ * Global Situation map is the first block (V1); then Command Center and rest.
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import AppShell from '../components/layout/AppShell';
 import HeaderBar from '../components/overview/HeaderBar';
+import GlobalSituationMap from '../components/overview/GlobalSituationMap';
+import OverviewMapSidePanel from '../components/overview/OverviewMapSidePanel';
 import KPIGrid from '../components/overview/KPIGrid';
 import TriggeredAlertsFeed from '../components/overview/TriggeredAlertsFeed';
 import ActionItemsCard from '../components/overview/ActionItemsCard';
@@ -29,16 +22,19 @@ import OpportunitiesCard from '../components/overview/OpportunitiesCard';
 import RecentEventsFeed from '../components/overview/RecentEventsFeed';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
-import { Bell, AlertCircle } from 'lucide-react';
-import Badge from '../components/ui/Badge';
+import { Bell } from 'lucide-react';
+import { getOverviewMapData } from '../lib/api/overview-api';
+import type { OverviewMapData } from '../types/overview';
 
 function OverviewContent() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [mapData, setMapData] = useState<OverviewMapData | null>(null);
 
   useEffect(() => {
-    // Load overview data
-    setLoading(false);
+    getOverviewMapData().then((data) => {
+      setMapData(data);
+      setLoading(false);
+    });
   }, []);
 
   if (loading) {
@@ -51,9 +47,13 @@ function OverviewContent() {
     );
   }
 
+  const signals = mapData?.signals ?? [];
+  const top_events = mapData?.top_events ?? [];
+  const top_impacts = mapData?.top_impacts ?? [];
+
   return (
     <AppShell>
-      <SEO 
+      <SEO
         title="Overview — Nucigen"
         description="Command Center: What changed and what to do"
       />
@@ -63,7 +63,22 @@ function OverviewContent() {
         <HeaderBar />
       </div>
 
-      {/* NEW: Command Center Section - Top Priority */}
+      {/* Global Situation Map (V1) – map + side panel */}
+      <div className="col-span-1 sm:col-span-12 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div className="lg:col-span-9 min-h-[400px]">
+            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              Global Situation
+            </h2>
+            <GlobalSituationMap signals={signals} />
+          </div>
+          <div className="lg:col-span-3 min-h-[400px]">
+            <OverviewMapSidePanel top_events={top_events} top_impacts={top_impacts} />
+          </div>
+        </div>
+      </div>
+
+      {/* Command Center Section */}
       <div className="col-span-1 sm:col-span-12 mb-6">
         <div className="backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/10 to-[#E1463E]/5 border border-[#E1463E]/20 rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-4">

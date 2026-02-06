@@ -1875,6 +1875,38 @@ app.get('/api/overview/narrative', async (req, res) => {
   }
 });
 
+// GET /api/overview/map - Global Situation map data (signals + top events + top corporate impacts)
+app.get('/api/overview/map', async (req, res) => {
+  try {
+    // V1: static fixture. Later: derive from events/signals with geo resolution.
+    const now = new Date().toISOString();
+    const data = {
+      signals: [
+        { id: '1', lat: -2.5, lon: 28.8, type: 'security', impact: 'regional', importance: 85, confidence: 82, occurred_at: now, label_short: 'DRC – North Kivu', subtitle_short: 'ADF activity escalation', impact_one_line: 'Gold supply risk', investigate_id: '/investigations' },
+        { id: '2', lat: 25.2, lon: 55.3, type: 'supply-chains', impact: 'global', importance: 78, confidence: 76, occurred_at: now, label_short: 'UAE – Dubai', subtitle_short: 'Gold trade hub disruption', impact_one_line: 'Precious metals flow', investigate_id: '/investigations' },
+        { id: '3', lat: 51.5, lon: -0.1, type: 'geopolitics', impact: 'global', importance: 90, confidence: 94, occurred_at: now, label_short: 'UK – London', subtitle_short: 'Sanctions policy update', impact_one_line: 'Financial compliance', investigate_id: '/investigations' },
+        { id: '4', lat: 55.7, lon: 37.6, type: 'energy', impact: 'regional', importance: 72, confidence: 88, occurred_at: now, label_short: 'Russia – Moscow', subtitle_short: 'Energy export reconfiguration', impact_one_line: 'Gas supply routes', investigate_id: '/investigations' },
+        { id: '5', lat: 39.9, lon: 116.4, type: 'supply-chains', impact: 'global', importance: 80, confidence: 79, occurred_at: now, label_short: 'China – Beijing', subtitle_short: 'Strategic minerals stockpiling', impact_one_line: 'Rare earth dominance', investigate_id: '/investigations' },
+        { id: '6', lat: 40.7, lon: -74.0, type: 'markets', impact: 'global', importance: 88, confidence: 91, occurred_at: now, label_short: 'USA – New York', subtitle_short: 'Financial markets volatility', impact_one_line: 'Commodity futures', investigate_id: '/investigations' },
+      ],
+      top_events: [
+        { id: '1', label_short: 'DRC – North Kivu', impact_one_line: 'Gold supply risk', investigate_id: '/investigations' },
+        { id: '2', label_short: 'UAE – Dubai', impact_one_line: 'Precious metals flow', investigate_id: '/investigations' },
+        { id: '3', label_short: 'UK – London', impact_one_line: 'Financial compliance', investigate_id: '/investigations' },
+      ],
+      top_impacts: [
+        { name: 'Barrick Gold', impact_one_line: 'Production disruption', investigate_id: '/investigations' },
+        { name: 'Gazprom', impact_one_line: 'Route reconfiguration', investigate_id: '/investigations' },
+        { name: 'HSBC', impact_one_line: 'Compliance costs', investigate_id: '/investigations' },
+      ],
+    };
+    res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('[API] Overview map error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+  }
+});
+
 // GET /api/alerts/triggered - Triggered alerts
 app.get('/api/alerts/triggered', async (req, res) => {
   try {
@@ -6544,6 +6576,7 @@ const server = app.listen(PORT, () => {
   console.log(`   Time Series: GET http://localhost:${PORT}/api/market-data/:symbol/timeseries`);
   console.log(`\n   Optional Endpoints (for performance):`);
   console.log(`   Overview KPIs: GET http://localhost:${PORT}/api/overview/kpis`);
+  console.log(`   Overview Map: GET http://localhost:${PORT}/api/overview/map`);
   console.log(`   Overview Narrative: GET http://localhost:${PORT}/api/overview/narrative`);
   console.log(`   Triggered Alerts: GET http://localhost:${PORT}/api/alerts/triggered`);
   console.log(`   Events List: GET http://localhost:${PORT}/api/events`);

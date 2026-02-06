@@ -381,4 +381,16 @@
     will-change: transform, opacity;
     transform: translateZ(0);
   }
+
+  /* Global Situation map – dark tooltip */
+  .global-situation-popup .mapboxgl-popup-content {
+    background: #171717;
+    border: 1px solid #404040;
+    border-radius: 6px;
+    padding: 10px 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+  .global-situation-popup .mapboxgl-popup-tip {
+    border-top-color: #171717;
+  }
 }
