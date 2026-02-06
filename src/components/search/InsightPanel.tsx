@@ -6,7 +6,7 @@
  */
 
 import { useMemo } from 'react';
-import { Sparkles, TrendingUp, Users, AlertTriangle, FileText, Eye } from 'lucide-react';
+import { TrendingUp, Users, AlertTriangle, FileText } from 'lucide-react';
 import type { SearchResult, KnowledgeGraph } from '../../types/search';
 import TopClaimsPanel from './TopClaimsPanel';
 
@@ -109,40 +109,29 @@ export default function InsightPanel({
     return extracted;
   }, [results, graph]);
 
-  // Empty state
+  // Empty state – Detective style
   if (!insights || (results.length === 0 && graph.nodes.length === 0)) {
     return (
       <div className="h-full flex flex-col">
-        <div className="bg-background-glass-subtle border border-borders-subtle rounded-lg p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <Sparkles className="w-5 h-5 text-[#E1463E]" />
-            <h2 className="text-lg font-semibold text-text-primary">What we see so far</h2>
+        <div className="border border-gray-800 bg-gray-900/30 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <TrendingUp className="w-4 h-4 text-red-500" />
+            <h3 className="text-sm font-semibold text-gray-300">What we see so far</h3>
           </div>
-          
-          <div className="space-y-4">
-            <p className="text-sm text-text-secondary">
-              Start exploring by searching for events, actors, or pasting a URL to analyze.
-            </p>
-            
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Try searching for:</p>
-              <div className="space-y-1">
-                {['DRC cobalt sanctions', 'China supply chain risks', 'EU trade policy changes'].map((example, idx) => (
-                  <button
-                    key={idx}
-                    className="block w-full text-left px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-background-glass-medium rounded-md transition-colors"
-                    onClick={() => {
-                      // This will be handled by parent
-                      if (onViewResults) {
-                        // Could trigger search, but for now just show placeholder
-                      }
-                    }}
-                  >
-                    {example}
-                  </button>
-                ))}
-              </div>
-            </div>
+          <p className="text-xs text-gray-400 leading-relaxed mb-4">
+            Start by running a search or pasting a URL. Synthesis and key actors will appear here.
+          </p>
+          <div className="space-y-1">
+            <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-2">Try</p>
+            {['DRC cobalt sanctions', 'China supply chain risks', 'EU trade policy'].map((example, idx) => (
+              <button
+                key={idx}
+                type="button"
+                className="block w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:text-gray-300 hover:bg-gray-800/50 transition-colors"
+              >
+                {example}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -151,98 +140,95 @@ export default function InsightPanel({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="bg-background-glass-subtle border border-borders-subtle rounded-lg p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <Sparkles className="w-5 h-5 text-[#E1463E]" />
-          <h2 className="text-lg font-semibold text-text-primary">What we see so far</h2>
+      <div className="border border-gray-800 bg-gray-900/30 p-5 space-y-4">
+        <div className="flex items-center gap-2 mb-4">
+          <TrendingUp className="w-4 h-4 text-red-500" />
+          <h3 className="text-sm font-semibold text-gray-300">What we see so far</h3>
         </div>
 
-        {/* Main Event */}
-        {insights.mainEvent && (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="w-4 h-4 text-text-secondary" />
-              <h3 className="text-sm font-medium text-text-primary">Main Event</h3>
+        <div className="space-y-4 text-xs">
+          {insights.mainEvent && (
+            <div>
+              <div className="flex items-center gap-2 text-gray-500 mb-2">
+                <FileText className="w-3 h-3" />
+                <span className="uppercase tracking-wider font-medium">Main Event</span>
+              </div>
+              <p className="text-gray-400 leading-relaxed">{insights.mainEvent}</p>
             </div>
-            <p className="text-sm text-text-secondary leading-relaxed">{insights.mainEvent}</p>
-          </div>
-        )}
-
-        {/* Key Actors */}
-        {insights.keyActors.length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Users className="w-4 h-4 text-text-secondary" />
-              <h3 className="text-sm font-medium text-text-primary">Key Actors</h3>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {insights.keyActors.map((actor, idx) => (
-                <span
-                  key={idx}
-                  className="px-2 py-1 bg-background-glass-medium border border-borders-subtle rounded text-xs text-text-secondary"
-                >
-                  {actor.name}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Exposure/Risk */}
-        {insights.exposure && (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-text-secondary" />
-              <h3 className="text-sm font-medium text-text-primary">Potential Exposure</h3>
-            </div>
-            <p className="text-sm text-text-secondary">{insights.exposure}</p>
-          </div>
-        )}
-
-        {/* Sectors */}
-        {insights.sectors.length > 0 && (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <FileText className="w-4 h-4 text-text-secondary" />
-              <h3 className="text-sm font-medium text-text-primary">Related Sectors</h3>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {insights.sectors.map((sector, idx) => (
-                <span
-                  key={idx}
-                  className="px-2 py-1 bg-background-glass-medium border border-borders-subtle rounded text-xs text-text-secondary"
-                >
-                  {sector}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Top Claims / Risks / Uncertainties - PRIORITÉ PRODUIT #2 */}
-        <TopClaimsPanel results={results} />
-
-        {/* Actions */}
-        <div className="pt-4 border-t border-borders-subtle space-y-2">
-          {results.length > 0 && onViewResults && (
-            <button
-              onClick={onViewResults}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-background-glass-medium hover:bg-background-glass-strong border border-borders-subtle rounded-md text-sm font-medium text-text-primary transition-colors"
-            >
-              <Eye className="w-4 h-4" />
-              View Full Results ({results.length})
-            </button>
           )}
-          {onGenerateImpactBrief && (
-            <button
-              onClick={onGenerateImpactBrief}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#E1463E]/20 hover:bg-[#E1463E]/30 border border-[#E1463E]/50 rounded-md text-sm font-medium text-[#E1463E] transition-colors"
-            >
-              <FileText className="w-4 h-4" />
-              Generate Impact Brief
-            </button>
+
+          {insights.keyActors.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 text-gray-500 mb-2">
+                <Users className="w-3 h-3" />
+                <span className="uppercase tracking-wider font-medium">Key Actors</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {insights.keyActors.map((actor, idx) => (
+                  <span
+                    key={idx}
+                    className="px-2 py-0.5 bg-gray-800/50 border border-gray-700 text-gray-400"
+                  >
+                    {actor.name}
+                  </span>
+                ))}
+              </div>
+            </div>
           )}
+
+          {insights.exposure && (
+            <div>
+              <div className="flex items-center gap-2 text-gray-500 mb-2">
+                <AlertTriangle className="w-3 h-3" />
+                <span className="uppercase tracking-wider font-medium">Potential Exposure</span>
+              </div>
+              <p className="text-gray-400">{insights.exposure}</p>
+            </div>
+          )}
+
+          {insights.sectors.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 text-gray-500 mb-2">
+                <FileText className="w-3 h-3" />
+                <span className="uppercase tracking-wider font-medium">Related Sectors</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {insights.sectors.map((sector, idx) => (
+                  <span
+                    key={idx}
+                    className="px-2 py-0.5 bg-gray-800/50 border border-gray-700 text-gray-400"
+                  >
+                    {sector}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <TopClaimsPanel results={results} />
+
+          <div className="pt-4 border-t border-gray-800 space-y-2">
+            {results.length > 0 && onViewResults && (
+              <button
+                type="button"
+                onClick={onViewResults}
+                className="w-full px-4 py-2 border border-gray-800 hover:bg-gray-800 text-xs text-gray-400 transition-colors flex items-center justify-center gap-2"
+              >
+                <FileText className="w-3 h-3" />
+                View Full Results ({results.length})
+              </button>
+            )}
+            {onGenerateImpactBrief && (
+              <button
+                type="button"
+                onClick={onGenerateImpactBrief}
+                className="w-full px-4 py-2 bg-red-900/20 border border-red-900/50 hover:bg-red-900/30 text-xs text-red-400 transition-colors flex items-center justify-center gap-2"
+              >
+                <FileText className="w-3 h-3" />
+                Generate Impact Brief
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

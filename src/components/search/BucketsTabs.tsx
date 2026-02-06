@@ -24,15 +24,16 @@ export default function BucketsTabs({ activeBucket, onBucketChange, counts }: Bu
   ];
 
   return (
-    <div className="flex items-center gap-2 border-b border-slate-800">
+    <div className="flex items-center gap-1 mb-6 border-b border-gray-900">
       {tabs.map((tab) => (
         <button
           key={tab.id}
+          type="button"
           onClick={() => onBucketChange(tab.id)}
-          className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+          className={`px-4 py-2 text-xs font-medium transition-colors border-b-2 -mb-px ${
             activeBucket === tab.id
-              ? 'text-[#E1463E] border-[#E1463E]'
-              : 'text-text-secondary border-transparent hover:text-text-primary'
+              ? 'text-red-400 border-red-500'
+              : 'text-gray-500 hover:text-gray-400 border-transparent'
           }`}
         >
           {tab.label} ({tab.count})

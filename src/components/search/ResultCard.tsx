@@ -1,13 +1,12 @@
 /**
- * Result Card - Perplexity Style
- * 
- * Displays a single search result with source icon, URL, and snippet
+ * Result Card (Evidence card) – analyst-grade, Detective-aligned
+ * Source-first, relevance/credibility scoring, minimal serious tone.
  */
 
-import { ExternalLink, Search, Globe } from 'lucide-react';
+import { ExternalLink, Search, AlertCircle } from 'lucide-react';
 import CollectionsMenu from './CollectionsMenu';
 import SourceCredibility, { CredibilityBadge } from './SourceCredibility';
-import SentimentAnalysis, { SentimentBadge } from './SentimentAnalysis';
+import SentimentAnalysis from './SentimentAnalysis';
 import type { SearchResult } from '../../types/search';
 
 interface ResultCardProps {
@@ -26,11 +25,6 @@ function getDomain(url: string): string {
   }
 }
 
-// Get favicon URL
-function getFaviconUrl(domain: string): string {
-  return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-}
-
 // Get source name from domain
 function getSourceName(domain: string, fallback: string): string {
   // Extract readable name from domain
@@ -42,116 +36,121 @@ function getSourceName(domain: string, fallback: string): string {
   return fallback || domain;
 }
 
+// Credibility score 0–100 from result
+function getCredibilityScore(result: SearchResult): number {
+  const domain = getDomain(result.url);
+  const known: Record<string, number> = {
+    'reuters.com': 95,
+    'ap.org': 95,
+    'bbc.com': 90,
+    'ft.com': 92,
+    'wsj.com': 90,
+    'economist.com': 88,
+  };
+  if (known[domain]) return known[domain];
+  return Math.min(100, Math.round((result.sourceScore || 0.5) * 100));
+}
+
 export default function ResultCard({ result, onClick, onExploreDeeper }: ResultCardProps) {
   const domain = getDomain(result.url);
   const sourceName = getSourceName(domain, result.source);
-  const faviconUrl = getFaviconUrl(domain);
+  const initials = sourceName.substring(0, 2).toUpperCase();
+  const relevancePct = Math.round((result.relevanceScore || 0) * 100);
+  const credibilityPct = getCredibilityScore(result);
+  const hasLowCredibility = credibilityPct < 50;
 
   return (
     <div
-      className="bg-background-glass-subtle border border-borders-subtle rounded-lg p-4 hover:border-borders-medium transition-colors cursor-pointer group min-w-0"
+      className="border border-gray-800 bg-gray-900/30 hover:border-gray-700 transition-all cursor-pointer p-5 min-w-0"
       onClick={onClick}
     >
       <div className="space-y-3 min-w-0">
-        {/* Source Header - Perplexity Style */}
-        <div className="flex items-center gap-2">
-          {/* Favicon */}
-          <div className="flex-shrink-0 w-5 h-5 rounded overflow-hidden bg-background-glass-medium flex items-center justify-center">
-            <img
-              src={faviconUrl}
-              alt={sourceName}
-              className="w-full h-full object-contain"
-              onError={(e) => {
-                // Fallback to globe icon if favicon fails to load
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                const parent = target.parentElement;
-                if (parent && !parent.querySelector('.fallback-icon')) {
-                  const icon = document.createElement('div');
-                  icon.className = 'fallback-icon';
-                  icon.innerHTML = '<svg class="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"></path></svg>';
-                  parent.appendChild(icon);
-                }
-              }}
-            />
-          </div>
-          
-          {/* Source Name and URL */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-text-secondary">{sourceName}</span>
-              <span className="text-xs text-text-tertiary truncate">{domain}</span>
+        {/* Source Header – Detective style */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 flex-shrink-0 bg-gray-800 border border-gray-700 flex items-center justify-center text-xs font-bold text-gray-400">
+              {initials}
             </div>
-            <a
-              href={result.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="text-xs text-text-tertiary hover:text-primary truncate block max-w-full"
-              title={result.url}
-            >
-              {result.url.length > 60 ? result.url.substring(0, 60) + '...' : result.url}
-            </a>
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-gray-300">{sourceName}</div>
+              <div className="text-xs text-gray-600 truncate">{domain}</div>
+            </div>
           </div>
-        </div>
-
-        {/* Title - Bold and prominent */}
-        <div className="flex items-start gap-2 min-w-0">
-          <h3 className="text-base font-semibold text-text-primary line-clamp-2 leading-snug group-hover:text-primary transition-colors flex-1 min-w-0 break-words">
-            {result.title}
-          </h3>
-          <CredibilityBadge result={result} />
-        </div>
-
-        {/* Snippet - Perplexity style */}
-        <p className="text-sm text-text-secondary leading-relaxed line-clamp-3 break-words">
-          {result.summary}
-        </p>
-
-        {/* Sentiment Analysis */}
-        <SentimentAnalysis result={result} />
-
-        {/* Meta Info */}
-        <div className="flex items-center justify-between pt-2 border-t border-borders-subtle">
-          <div className="flex items-center gap-4 text-xs text-text-tertiary flex-wrap">
-            <span>{new Date(result.publishedAt).toLocaleDateString('fr-FR', { 
-              year: 'numeric', 
-              month: 'short', 
-              day: 'numeric' 
-            })}</span>
-            {result.relevanceScore > 0 && (
-              <span className="flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary"></span>
-                {(result.relevanceScore * 100).toFixed(0)}% relevant
-              </span>
-            )}
-            <SourceCredibility result={result} />
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <CollectionsMenu result={result} />
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 window.open(result.url, '_blank');
               }}
-              className="flex items-center gap-1 px-3 py-1.5 bg-background-glass-medium hover:bg-background-glass-strong rounded text-xs text-text-secondary hover:text-text-primary transition-colors"
-              title="Open in new tab"
+              className="p-1.5 hover:bg-gray-800 border border-gray-800 transition-colors text-gray-500 hover:text-gray-400"
+              title="Open source"
+              aria-label="Open source"
             >
-              <ExternalLink className="w-3 h-3" />
+              <ExternalLink className="w-3.5 h-3.5" />
             </button>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onExploreDeeper();
               }}
-              className="flex items-center gap-1 px-3 py-1.5 bg-[#E1463E]/20 hover:bg-[#E1463E]/30 border border-[#E1463E]/50 rounded text-xs text-[#E1463E] hover:text-[#E1463E] transition-colors"
+              className="p-1.5 hover:bg-gray-800 border border-gray-800 transition-colors text-gray-500 hover:text-red-400"
               title="Explore deeper"
+              aria-label="Explore deeper"
             >
-              <Search className="w-3 h-3" />
+              <Search className="w-3.5 h-3.5" />
             </button>
           </div>
+        </div>
+
+        {/* Title */}
+        <h3 className="text-base font-semibold text-gray-200 mb-3 leading-snug break-words line-clamp-2">
+          {result.title}
+        </h3>
+
+        {/* Summary */}
+        <p className="text-sm text-gray-400 leading-relaxed mb-4 break-words line-clamp-3">
+          {result.summary}
+        </p>
+
+        {/* Tags */}
+        {result.tags && result.tags.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {result.tags.slice(0, 4).map((tag) => (
+              <span
+                key={tag}
+                className="px-2 py-0.5 bg-gray-800/50 border border-gray-700 text-xs text-gray-400"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <SentimentAnalysis result={result} />
+
+        {/* Metadata – Detective style */}
+        <div className="flex items-center gap-4 text-xs pt-4 border-t border-gray-800 flex-wrap">
+          <span className="text-gray-500">
+            {new Date(result.publishedAt).toLocaleDateString('fr-FR', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </span>
+          {relevancePct > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-green-500 rounded-full shrink-0" aria-hidden />
+              <span className="text-gray-400">{relevancePct}% relevant</span>
+            </span>
+          )}
+          <span className="flex items-center gap-1.5">
+            <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" aria-hidden />
+            <span className="text-amber-400">{credibilityPct}% credible</span>
+          </span>
+          {hasLowCredibility && <CredibilityBadge result={result} />}
         </div>
       </div>
     </div>

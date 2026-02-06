@@ -30,6 +30,27 @@
   --color-border-medium: rgba(255, 255, 255, 0.15);
   --color-border-strong: rgba(255, 255, 255, 0.2);
 
+  /* Analyst / Detective spectrum – Search, Investigation, analyst-grade views */
+  --analyst-bg: #000000;
+  --analyst-bg-panel: rgba(17, 24, 39, 0.3);
+  --analyst-bg-surface: rgb(31, 41, 55);
+  --analyst-bg-hover: rgb(17, 24, 39);
+  --analyst-border: rgb(31, 41, 55);
+  --analyst-border-light: rgb(55, 65, 81);
+  --analyst-border-section: rgb(17, 24, 39);
+  --analyst-text-primary: rgb(229, 231, 235);
+  --analyst-text-secondary: rgb(209, 213, 219);
+  --analyst-text-muted: rgb(156, 163, 175);
+  --analyst-text-tertiary: rgb(107, 114, 128);
+  --analyst-text-quiet: rgb(75, 85, 99);
+  --analyst-accent: rgb(248, 113, 113);
+  --analyst-accent-strong: rgb(239, 68, 68);
+  --analyst-accent-soft: rgba(127, 29, 29, 0.2);
+  --analyst-accent-soft-border: rgba(127, 29, 29, 0.5);
+  --analyst-relevance: rgb(34, 197, 94);
+  --analyst-credibility: rgb(251, 191, 36);
+  --analyst-credibility-icon: rgb(245, 158, 11);
+
   /* Spacing - Consistent scale */
   --spacing-xs: 0.25rem;   /* 4px */
   --spacing-sm: 0.5rem;    /* 8px */
@@ -105,3 +126,15 @@
 .shadow-glow-red-sm {
   box-shadow: var(--shadow-glow-red-sm);
 }
+
+/* Analyst spectrum utilities (CSS) – use when not using Tailwind analyst.* */
+.bg-analyst { background-color: var(--analyst-bg); }
+.bg-analyst-panel { background-color: var(--analyst-bg-panel); }
+.bg-analyst-surface { background-color: var(--analyst-bg-surface); }
+.border-analyst { border-color: var(--analyst-border); }
+.border-analyst-section { border-color: var(--analyst-border-section); }
+.text-analyst-primary { color: var(--analyst-text-primary); }
+.text-analyst-secondary { color: var(--analyst-text-secondary); }
+.text-analyst-muted { color: var(--analyst-text-muted); }
+.text-analyst-tertiary { color: var(--analyst-text-tertiary); }
+.text-analyst-accent { color: var(--analyst-accent); }
