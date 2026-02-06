@@ -15,7 +15,11 @@ import Badge from '../ui/Badge';
 import { getNormalizedEvents, getOrCreateSupabaseUserId } from '../../lib/supabase';
 import type { Event } from '../../types/intelligence';
 
-export default function RecentEventsFeed() {
+interface RecentEventsFeedProps {
+  limit?: number;
+}
+
+export default function RecentEventsFeed({ limit = 8 }: RecentEventsFeedProps) {
   const { user } = useUser();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +32,7 @@ export default function RecentEventsFeed() {
           {
             dateFrom: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
             dateTo: new Date().toISOString(),
-            limit: 8,
+            limit,
           },
           userId
         );
@@ -42,7 +46,7 @@ export default function RecentEventsFeed() {
     };
 
     loadEvents();
-  }, [user]);
+  }, [user, limit]);
 
   if (loading) {
     return (
@@ -68,7 +72,7 @@ export default function RecentEventsFeed() {
       <SectionHeader title="Recent Events" />
       
       <div className="mt-4 space-y-3">
-        {events.map((event) => (
+        {events.slice(0, limit).map((event) => (
           <Link
             key={event.id}
             to={`/events/${event.id}`}

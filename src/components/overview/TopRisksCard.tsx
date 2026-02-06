@@ -149,7 +149,7 @@ export default function TopRisksCard() {
             
             <div className="flex items-center gap-4 text-xs text-text-tertiary">
               <span>Horizon: {risk.time_horizon}</span>
-              <span>Impact: {risk.impact_score}/100</span>
+              <span>Severity: {risk.impact_score}/100</span>
             </div>
           </div>
         ))}

@@ -100,19 +100,19 @@ export default function KPIGrid() {
 
         setKpis([
           {
-            label: 'Events (24h)',
-            value: events24h.length.toString(),
-            delta: deltaEvents,
-            trendData: trendDataEvents,
-          },
-          {
             label: 'Signals (24h)',
             value: signals24h.length.toString(),
             delta: deltaSignals,
             trendData: trendDataSignals,
           },
           {
-            label: 'High-Impact Impacts (7d)',
+            label: 'Events (24h)',
+            value: events24h.length.toString(),
+            delta: deltaEvents,
+            trendData: trendDataEvents,
+          },
+          {
+            label: 'High-severity (7d)',
             value: impacts7d.length.toString(),
             delta: 0,
             trendData: Array.from({ length: 7 }, () => Math.floor(Math.random() * 5)),
@@ -131,19 +131,19 @@ export default function KPIGrid() {
         // Fallback to placeholder data
         setKpis([
           {
-            label: 'Events (24h)',
-            value: '0',
-            delta: 0,
-            trendData: [10, 15, 12, 18, 20, 16, 14],
-          },
-          {
             label: 'Signals (24h)',
             value: '0',
             delta: 0,
             trendData: [5, 8, 6, 10, 12, 9, 7],
           },
           {
-            label: 'High-Impact Impacts (7d)',
+            label: 'Events (24h)',
+            value: '0',
+            delta: 0,
+            trendData: [10, 15, 12, 18, 20, 16, 14],
+          },
+          {
+            label: 'High-severity (7d)',
             value: '0',
             delta: 0,
             trendData: [2, 3, 2, 4, 5, 3, 2],

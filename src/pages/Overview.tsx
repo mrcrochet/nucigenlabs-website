@@ -1,7 +1,7 @@
 /**
- * Overview Page - Command Center
+ * Overview Page
  *
- * Global Situation map is the first block (V1); then Command Center and rest.
+ * Global Situation map is the first block (V1); then KPIs and rest.
  */
 
 import { useState, useEffect } from 'react';
@@ -9,20 +9,14 @@ import AppShell from '../components/layout/AppShell';
 import HeaderBar from '../components/overview/HeaderBar';
 import GlobalSituationMap from '../components/overview/GlobalSituationMap';
 import OverviewMapSidePanel from '../components/overview/OverviewMapSidePanel';
+import { Link } from 'react-router-dom';
 import KPIGrid from '../components/overview/KPIGrid';
-import TriggeredAlertsFeed from '../components/overview/TriggeredAlertsFeed';
-import ActionItemsCard from '../components/overview/ActionItemsCard';
-import WatchlistChangesCard from '../components/overview/WatchlistChangesCard';
 import NarrativeCard from '../components/overview/NarrativeCard';
-import TimelineCard from '../components/overview/TimelineCard';
-import MarketMoversCard from '../components/overview/MarketMoversCard';
 import TopSignalsTable from '../components/overview/TopSignalsTable';
-import TopRisksCard from '../components/overview/TopRisksCard';
-import OpportunitiesCard from '../components/overview/OpportunitiesCard';
 import RecentEventsFeed from '../components/overview/RecentEventsFeed';
+import { ChevronRight } from 'lucide-react';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
-import { Bell } from 'lucide-react';
 import { getOverviewMapData } from '../lib/api/overview-api';
 import type { OverviewMapData } from '../types/overview';
 
@@ -55,7 +49,7 @@ function OverviewContent() {
     <AppShell>
       <SEO
         title="Overview — Nucigen"
-        description="Command Center: What changed and what to do"
+        description="Global Situation and strategic overview"
       />
 
       {/* Row 1: HeaderBar */}
@@ -78,64 +72,36 @@ function OverviewContent() {
         </div>
       </div>
 
-      {/* Command Center Section */}
+      {/* KPIGrid (4 cards) */}
       <div className="col-span-1 sm:col-span-12 mb-6">
-        <div className="backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/10 to-[#E1463E]/5 border border-[#E1463E]/20 rounded-2xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Bell className="w-5 h-5 text-[#E1463E]" />
-            <h2 className="text-xl font-semibold text-text-primary">My World Changed</h2>
-          </div>
-          <p className="text-sm text-text-secondary mb-6">
-            Here's what changed for you, now, and what you need to do.
-          </p>
-          
-          {/* Command Center Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Alertes déclenchées */}
-            <div className="lg:col-span-1">
-              <TriggeredAlertsFeed />
-            </div>
-            
-            {/* Decision Points */}
-            <div className="lg:col-span-1">
-              <ActionItemsCard />
-            </div>
-            
-            {/* Watchlist Changes */}
-            <div className="lg:col-span-1">
-              <WatchlistChangesCard />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Row 2: KPIGrid (4 cards) */}
-      <div className="col-span-1 sm:col-span-12">
         <KPIGrid />
       </div>
 
-      {/* Row 3: Left (8) + Right (4) */}
-      <div className="col-span-1 sm:col-span-8 space-y-6">
+      {/* Narrative only */}
+      <div className="col-span-1 sm:col-span-12 mb-6">
         <NarrativeCard />
-        <TimelineCard />
-      </div>
-      <div className="col-span-1 sm:col-span-4 space-y-6">
-        <MarketMoversCard />
-        <TopRisksCard />
-        <OpportunitiesCard />
       </div>
 
-      {/* Row 4: TopSignalsTable (Top 5) */}
-      <div className="col-span-1 sm:col-span-12">
-        <TopSignalsTable limit={5} />
-      </div>
-
-      {/* Row 5: Left (6) + Right (6) */}
-      <div className="col-span-1 sm:col-span-6">
-        <RecentEventsFeed />
-      </div>
-      <div className="col-span-1 sm:col-span-6">
-        {/* Additional context can go here */}
+      {/* Compact: Top signals (3) + Recent events (3) with View all */}
+      <div className="col-span-1 sm:col-span-12 grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+          <TopSignalsTable limit={3} />
+          <Link
+            to="/signals"
+            className="mt-2 inline-flex items-center gap-1 text-sm text-text-secondary hover:text-primary-red transition-colors"
+          >
+            View all <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+        <div>
+          <RecentEventsFeed limit={3} />
+          <Link
+            to="/events"
+            className="mt-2 inline-flex items-center gap-1 text-sm text-text-secondary hover:text-primary-red transition-colors"
+          >
+            View all <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
       </div>
     </AppShell>
   );

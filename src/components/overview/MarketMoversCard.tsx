@@ -27,6 +27,7 @@ const FALLBACK_MOVERS: Mover[] = [
 export default function MarketMoversCard() {
   const [movers, setMovers] = useState<Mover[]>([]);
   const [loading, setLoading] = useState(true);
+  const [usedFallback, setUsedFallback] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,7 +36,7 @@ export default function MarketMoversCard() {
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
         if (cancelled) return;
-        if (json?.success && Array.isArray(json.data?.movers)) {
+        if (json?.success && Array.isArray(json.data?.movers) && json.data.movers.length > 0) {
           setMovers(
             json.data.movers.map((m: { symbol: string; name?: string; change_percent?: number; volume?: number; sparkline_data?: number[] }) => ({
               symbol: m.symbol,
@@ -47,12 +48,17 @@ export default function MarketMoversCard() {
                 : Array.from({ length: 10 }, () => Math.random() * 100),
             }))
           );
+          setUsedFallback(false);
         } else {
           setMovers(FALLBACK_MOVERS);
+          setUsedFallback(true);
         }
       })
       .catch(() => {
-        if (!cancelled) setMovers(FALLBACK_MOVERS);
+        if (!cancelled) {
+          setMovers(FALLBACK_MOVERS);
+          setUsedFallback(true);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -72,8 +78,13 @@ export default function MarketMoversCard() {
 
   return (
     <Card>
-      <SectionHeader title="Market Movers (24h)" />
-      
+      <div className="flex items-center justify-between">
+        <SectionHeader title="Market Movers (24h)" />
+        {usedFallback && (
+          <span className="text-xs text-text-tertiary">Sample data</span>
+        )}
+      </div>
+
       <div className="mt-4 space-y-2">
         {movers.map((mover) => (
           <div

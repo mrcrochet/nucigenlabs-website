@@ -64,13 +64,10 @@ export default function TimelineCard() {
 
   return (
     <Card>
-      <SectionHeader
-        title="Event Timeline"
-        subtitle="Indices et mouvements de marché bientôt disponibles"
-      />
+      <SectionHeader title="Event Timeline" />
       {events.length === 0 ? (
         <div className="mt-4 text-sm text-text-secondary">
-          Aucun événement sur la période
+          No events in range.
         </div>
       ) : (
         <div className="mt-4 space-y-3">

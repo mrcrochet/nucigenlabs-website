@@ -75,8 +75,8 @@ export default function NarrativeCard() {
     return (
       <Card>
         <SectionHeader title="Today's Narrative" />
-        <div className="text-text-secondary text-sm mt-4">
-          {error || 'No narrative available'}
+        <div className="text-text-secondary text-sm mt-4 py-2">
+          No summary for this period.
         </div>
       </Card>
     );

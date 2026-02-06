@@ -69,7 +69,7 @@ export default function TopSignalsTable({ limit = 10 }: TopSignalsTableProps) {
           <thead>
             <tr className="border-b border-borders-subtle">
               <th className="text-left py-3 px-4 text-sm font-medium text-text-secondary">Signal</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-text-secondary">Strength</th>
+              <th className="text-left py-3 px-4 text-sm font-medium text-text-secondary">Importance</th>
               <th className="text-left py-3 px-4 text-sm font-medium text-text-secondary">Confidence</th>
               <th className="text-left py-3 px-4 text-sm font-medium text-text-secondary"># Events</th>
               <th className="text-left py-3 px-4 text-sm font-medium text-text-secondary">Linked Assets</th>
