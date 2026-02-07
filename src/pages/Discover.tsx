@@ -139,8 +139,6 @@ function DiscoverContent() {
   const [contextPanelOpen, setContextPanelOpen] = useState(false);
   const [pageContext, setPageContext] = useState<string | null>(null);
   const [contextLoading, setContextLoading] = useState(false);
-  /** Sources pour le globe: events (DB) | discover (Discover+Perplexity) | events,discover (les deux) */
-  const [globeSources, setGlobeSources] = useState<'events' | 'discover' | 'events,discover'>('events,discover');
 
   // Persist view mode preference
   useEffect(() => {
@@ -217,9 +215,8 @@ function DiscoverContent() {
           if (supabaseUserId) params.set('userId', supabaseUserId);
         }
 
-        params.set('sources', globeSources);
-
-        const res = await fetch(apiUrl(`/api/globe/events?${params.toString()}`), { signal: controller.signal });
+        const apiBase = import.meta.env.DEV ? 'http://localhost:3001' : '';
+        const res = await fetch(`${apiBase}/api/events?${params.toString()}`, { signal: controller.signal });
         if (!res.ok) throw new Error('Failed to load events');
         const json = await res.json();
         if (!json.success || !json.data?.events) throw new Error('Invalid response');
@@ -239,7 +236,7 @@ function DiscoverContent() {
       isActiveRef.current = false;
       controller.abort();
     };
-  }, [sourceMode, eventFilters, user?.id, globeSources]);
+  }, [sourceMode, eventFilters, user?.id]);
 
   const fetchPageContext = useCallback(async () => {
     setContextLoading(true);
@@ -746,28 +743,6 @@ function DiscoverContent() {
       {/* Mode Actualité: globe uniquement */}
       {sourceMode === 'actualite' && (
         <div className="col-span-1 sm:col-span-12 relative min-h-[70vh] sm:min-h-[calc(100vh-14rem)]">
-          {/* Sélecteur de sources pour le globe (Events API, Discover, Perplexity) */}
-          <div className="absolute top-0 left-0 right-0 z-10 flex flex-wrap items-center justify-center gap-2 px-4 py-2 bg-gradient-to-b from-black/60 to-transparent">
-            <span className="text-[10px] uppercase tracking-wider text-slate-500 mr-1">Sources carte</span>
-            {[
-              { value: 'events' as const, label: 'Événements' },
-              { value: 'discover' as const, label: 'Discover' },
-              { value: 'events,discover' as const, label: 'Tout' },
-            ].map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setGlobeSources(value)}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                  globeSources === value
-                    ? 'bg-[#E1463E]/20 text-[#E1463E]'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
           <DiscoverGlobeView
             events={events}
             loading={eventsLoading}

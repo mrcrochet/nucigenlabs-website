@@ -93,7 +93,6 @@ const COUNTRY_COORDS: Record<string, [number, number]> = {
 };
 
 const REGION_COORDS: Record<string, [number, number]> = {
-  'Global': [20.0, 0.0],
   'Europe': [50.0, 10.0],
   'European Union': [50.0, 10.0],
   'EU': [50.0, 10.0],

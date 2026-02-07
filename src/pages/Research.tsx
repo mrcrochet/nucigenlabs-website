@@ -25,8 +25,9 @@ import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SectionHeader from '../components/ui/SectionHeader';
 import Tooltip from '../components/ui/Tooltip';
-import { BookOpen, Clock, ArrowRight, TrendingUp, Search, Sparkles, Loader2, ExternalLink } from 'lucide-react';
+import { BookOpen, Clock, ArrowRight, TrendingUp, Search, Sparkles, Loader2, ExternalLink, FileText } from 'lucide-react';
 import ResearchTemplates from '../components/research/ResearchTemplates';
+import { apiUrl } from '../lib/api-base';
 
 function ResearchContent() {
   const { user, isLoaded: userLoaded } = useUser();
@@ -46,6 +47,29 @@ function ResearchContent() {
   const [deepResearchResult, setDeepResearchResult] = useState<Analysis | null>(null);
   const [deepResearchError, setDeepResearchError] = useState('');
   const [deepResearchProgress, setDeepResearchProgress] = useState<string>('');
+
+  // Meeting brief state
+  const [meetingCompany, setMeetingCompany] = useState('');
+  const [meetingTicker, setMeetingTicker] = useState('');
+  const [meetingType, setMeetingType] = useState('');
+  const [meetingDate, setMeetingDate] = useState('');
+  const [meetingBrief, setMeetingBrief] = useState<{ brief: string; sources: { title: string; url: string }[]; generatedAt: string } | null>(null);
+  const [meetingLoading, setMeetingLoading] = useState(false);
+  const [meetingError, setMeetingError] = useState('');
+
+  // ESG extract from document
+  const [esgDocText, setEsgDocText] = useState('');
+  const [esgPdfFile, setEsgPdfFile] = useState<File | null>(null);
+  const [esgResult, setEsgResult] = useState<{
+    companyName?: string;
+    environmental: string[];
+    social: string[];
+    governance: string[];
+    summary?: string;
+    generatedAt: string;
+  } | null>(null);
+  const [esgLoading, setEsgLoading] = useState(false);
+  const [esgError, setEsgError] = useState('');
 
   // Load preferences
   useEffect(() => {
@@ -173,6 +197,75 @@ function ResearchContent() {
         setIsDeepResearching(false);
         setDeepResearchProgress('');
       }, 500);
+    }
+  };
+
+  const handleMeetingBrief = async () => {
+    if (!meetingCompany.trim() || meetingLoading) return;
+    setMeetingLoading(true);
+    setMeetingError('');
+    setMeetingBrief(null);
+    try {
+      const res = await fetch(apiUrl('/api/meeting-brief'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          company: meetingCompany.trim(),
+          ticker: meetingTicker.trim() || undefined,
+          meetingType: meetingType.trim() || undefined,
+          date: meetingDate.trim() || undefined,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || res.statusText);
+      if (json.success && json.brief != null) {
+        setMeetingBrief({ brief: json.brief, sources: json.sources || [], generatedAt: json.generatedAt || new Date().toISOString() });
+      } else {
+        throw new Error(json.error || 'Failed to generate brief');
+      }
+    } catch (err: any) {
+      setMeetingError(err.message || 'Failed to generate meeting brief');
+    } finally {
+      setMeetingLoading(false);
+    }
+  };
+
+  const handleESGExtract = async () => {
+    if ((!esgDocText.trim() && !esgPdfFile) || esgLoading) return;
+    setEsgLoading(true);
+    setEsgError('');
+    setEsgResult(null);
+    try {
+      let text = esgDocText.trim();
+      let pdfBase64: string | undefined;
+      if (esgPdfFile) {
+        const buf = await esgPdfFile.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        pdfBase64 = typeof btoa !== 'undefined' ? btoa(binary) : Buffer.from(buf).toString('base64');
+      }
+      const res = await fetch(apiUrl('/api/esg/extract-from-document'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pdfBase64 ? { pdfBase64 } : { text }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || res.statusText);
+      if (json.success) {
+        setEsgResult({
+          companyName: json.companyName,
+          environmental: json.environmental || [],
+          social: json.social || [],
+          governance: json.governance || [],
+          summary: json.summary,
+          generatedAt: json.generatedAt || new Date().toISOString(),
+        });
+      } else throw new Error(json.error || 'Extraction failed');
+    } catch (err: any) {
+      setEsgError(err.message || 'Failed to extract ESG');
+    } finally {
+      setEsgLoading(false);
     }
   };
 
@@ -317,6 +410,179 @@ function ResearchContent() {
                   </div>
                 )}
               </div>
+            </Card>
+          </div>
+
+          {/* Meeting brief */}
+          <div className="mb-8">
+            <Card className="p-6 bg-gradient-to-br from-amber-500/10 to-orange-500/10 border-amber-500/20">
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="w-5 h-5 text-amber-400" />
+                  <h3 className="text-lg font-light text-white">Meeting brief</h3>
+                </div>
+                <p className="text-sm text-slate-400 font-light">
+                  One-page briefing for a company or meeting. Powered by Tavily and OpenAI.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                <input
+                  type="text"
+                  placeholder="Company name *"
+                  value={meetingCompany}
+                  onChange={(e) => setMeetingCompany(e.target.value)}
+                  disabled={meetingLoading}
+                  className="px-4 py-2.5 bg-white/[0.02] border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50 text-sm"
+                />
+                <input
+                  type="text"
+                  placeholder="Ticker (e.g. AAPL)"
+                  value={meetingTicker}
+                  onChange={(e) => setMeetingTicker(e.target.value)}
+                  disabled={meetingLoading}
+                  className="px-4 py-2.5 bg-white/[0.02] border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50 text-sm"
+                />
+                <input
+                  type="text"
+                  placeholder="Meeting type (e.g. earnings call)"
+                  value={meetingType}
+                  onChange={(e) => setMeetingType(e.target.value)}
+                  disabled={meetingLoading}
+                  className="px-4 py-2.5 bg-white/[0.02] border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50 text-sm"
+                />
+                <input
+                  type="text"
+                  placeholder="Date (optional)"
+                  value={meetingDate}
+                  onChange={(e) => setMeetingDate(e.target.value)}
+                  disabled={meetingLoading}
+                  className="px-4 py-2.5 bg-white/[0.02] border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50 text-sm"
+                />
+              </div>
+              <button
+                onClick={handleMeetingBrief}
+                disabled={!meetingCompany.trim() || meetingLoading}
+                className="px-4 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 disabled:opacity-50 border border-amber-500/30 rounded-lg text-amber-200 text-sm font-light flex items-center gap-2"
+              >
+                {meetingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                Generate brief
+              </button>
+              {meetingError && (
+                <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  <p className="text-red-400 text-sm">{meetingError}</p>
+                </div>
+              )}
+              {meetingBrief && (
+                <div className="mt-6 pt-6 border-t border-white/[0.06]">
+                  <p className="text-xs text-slate-500 mb-2">
+                    Generated {new Date(meetingBrief.generatedAt).toLocaleString()}
+                  </p>
+                  <div className="p-4 rounded-lg bg-black/20 border border-white/[0.06] max-h-[480px] overflow-y-auto">
+                    <pre className="text-sm text-slate-300 font-light whitespace-pre-wrap font-sans">
+                      {meetingBrief.brief}
+                    </pre>
+                  </div>
+                  {meetingBrief.sources.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs text-slate-500 mb-2">Sources</p>
+                      <div className="flex flex-wrap gap-2">
+                        {meetingBrief.sources.map((s, i) => (
+                          <a
+                            key={i}
+                            href={s.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-white/[0.06] text-slate-400 hover:text-amber-400 text-xs"
+                          >
+                            {s.title}
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* ESG extract from document */}
+          <div className="mb-8">
+            <Card className="p-6 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border-emerald-500/20">
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <BookOpen className="w-5 h-5 text-emerald-400" />
+                  <h3 className="text-lg font-light text-white">Analyse ESG d&apos;un document</h3>
+                </div>
+                <p className="text-sm text-slate-400 font-light">
+                  Collez le texte d&apos;un rapport RSE ou uploadez un PDF pour extraire les indicateurs E, S, G.
+                </p>
+              </div>
+              <div className="space-y-3 mb-4">
+                <textarea
+                  placeholder="Collez ici le texte du rapport (ou uploadez un PDF ci-dessous)"
+                  value={esgDocText}
+                  onChange={(e) => setEsgDocText(e.target.value)}
+                  disabled={esgLoading}
+                  rows={4}
+                  className="w-full px-4 py-2.5 bg-white/[0.02] border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 text-sm resize-y"
+                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={(e) => setEsgPdfFile(e.target.files?.[0] || null)}
+                    disabled={esgLoading}
+                    className="text-sm text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-emerald-500/20 file:text-emerald-200"
+                  />
+                  {esgPdfFile && (
+                    <span className="text-xs text-slate-500">{esgPdfFile.name}</span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={handleESGExtract}
+                disabled={(!esgDocText.trim() && !esgPdfFile) || esgLoading}
+                className="px-4 py-2.5 bg-emerald-500/20 hover:bg-emerald-500/30 disabled:opacity-50 border border-emerald-500/30 rounded-lg text-emerald-200 text-sm font-light flex items-center gap-2"
+              >
+                {esgLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <BookOpen className="w-4 h-4" />}
+                Extraire les indicateurs ESG
+              </button>
+              {esgError && (
+                <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  <p className="text-red-400 text-sm">{esgError}</p>
+                </div>
+              )}
+              {esgResult && (
+                <div className="mt-6 pt-6 border-t border-white/[0.06] space-y-4">
+                  {esgResult.companyName && (
+                    <p className="text-sm text-slate-400">Company: <span className="text-white">{esgResult.companyName}</span></p>
+                  )}
+                  {esgResult.summary && (
+                    <p className="text-sm text-slate-300">{esgResult.summary}</p>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                      <p className="text-xs text-emerald-400 font-medium mb-2">Environmental</p>
+                      <ul className="text-xs text-slate-300 space-y-1">
+                        {esgResult.environmental.length ? esgResult.environmental.map((s, i) => <li key={i}>• {s}</li>) : <li>—</li>}
+                      </ul>
+                    </div>
+                    <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                      <p className="text-xs text-blue-400 font-medium mb-2">Social</p>
+                      <ul className="text-xs text-slate-300 space-y-1">
+                        {esgResult.social.length ? esgResult.social.map((s, i) => <li key={i}>• {s}</li>) : <li>—</li>}
+                      </ul>
+                    </div>
+                    <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                      <p className="text-xs text-amber-400 font-medium mb-2">Governance</p>
+                      <ul className="text-xs text-slate-300 space-y-1">
+                        {esgResult.governance.length ? esgResult.governance.map((s, i) => <li key={i}>• {s}</li>) : <li>—</li>}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
             </Card>
           </div>
 

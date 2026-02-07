@@ -1876,6 +1876,58 @@ app.get('/api/overview/narrative', async (req, res) => {
   }
 });
 
+// GET /api/market-digest - Short daily market summary (Perplexity)
+app.get('/api/market-digest', async (req, res) => {
+  try {
+    const useCache = (req.query.cache as string) !== 'false';
+    const { getMarketDigest } = await import('./services/market-digest-service.js');
+    const digest = await getMarketDigest(useCache);
+    if (!digest) {
+      return res.json({ success: true, data: null, message: 'Market digest temporarily unavailable' });
+    }
+    res.json({ success: true, data: digest });
+  } catch (error: any) {
+    console.error('[API] Market digest error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch market digest' });
+  }
+});
+
+// GET /api/news/realtime — Phase 3: optional Newsfilter recent articles (set NEWSFILTER_API_KEY)
+app.get('/api/news/realtime', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt((req.query.limit as string) || '15', 10) || 15, 50);
+    const { fetchNewsfilterRecent } = await import('./services/newsfilter-service.js');
+    const articles = await fetchNewsfilterRecent(limit);
+    res.json({ success: true, data: articles, source: 'newsfilter' });
+  } catch (error: any) {
+    console.error('[API] News realtime error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch realtime news' });
+  }
+});
+
+// GET /api/openbb/fundamentals/:symbol — Phase 3: optional OpenBB Platform adapter (set OPENBB_API_URL)
+app.get('/api/openbb/fundamentals/:symbol', async (req, res) => {
+  try {
+    const symbol = (req.params.symbol || '').trim();
+    if (!symbol) {
+      return res.status(400).json({ success: false, error: 'Symbol is required' });
+    }
+    if (!process.env.OPENBB_API_URL) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'OpenBB adapter not configured. Set OPENBB_API_URL to your OpenBB Platform API base URL.',
+      });
+    }
+    const { fetchOpenBBFundamentals } = await import('./services/openbb-adapter-service.js');
+    const data = await fetchOpenBBFundamentals(symbol);
+    res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('[API] OpenBB fundamentals error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch OpenBB data' });
+  }
+});
+
 // GET /api/overview/map - Global Situation map data (signals + top events + top corporate impacts)
 app.get('/api/overview/map', async (req, res) => {
   try {
@@ -3538,115 +3590,6 @@ app.get('/api/eventregistry/health', async (req, res) => {
   }
 });
 
-// GET /api/globe/events - Aggregated events for globe (Events API + Discover + Perplexity)
-app.get('/api/globe/events', async (req, res) => {
-  try {
-    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
-    const sourcesParam = (req.query.sources as string) || 'events,discover'; // events | discover | perplexity | events,discover
-    const sources = new Set(sourcesParam.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean));
-    const includeEvents = sources.has('events');
-    const includeDiscover = sources.has('discover') || sources.has('perplexity');
-
-    const {
-      dateFrom,
-      dateTo,
-      limit = 50,
-      offset = 0,
-      region,
-      sector,
-      eventType,
-    } = req.query;
-
-    let events: any[] = [];
-
-    if (includeEvents && supabase) {
-      const { getNormalizedEvents } = await import('../lib/supabase.js');
-      const supabaseUserId = userId ? await getSupabaseUserId(userId, supabase) : null;
-      const options: any = {
-        limit: Math.min(parseInt(limit as string, 10) || 50, 100),
-        offset: parseInt(offset as string, 10) || 0,
-      };
-      if (dateFrom) options.dateFrom = dateFrom as string;
-      if (dateTo) options.dateTo = dateTo as string;
-      if (region) options.region = region as string;
-      if (sector) options.sector = sector as string;
-      if (eventType) options.eventType = eventType as string;
-      const dbEvents = await getNormalizedEvents(options, supabaseUserId || undefined);
-      events = dbEvents;
-    }
-
-    if (includeDiscover) {
-      const { fetchDiscoverItems } = await import('./services/discover-service.js');
-      const { fetchDiscoverNewsFromPerplexity } = await import('./services/discover-perplexity-feed.js');
-      const category = 'all';
-      const limitDiscover = 20;
-      let discoverItems: any[] = [];
-      try {
-        const supabaseUserIdForDiscover = userId && supabase ? await getSupabaseUserId(userId, supabase) : null;
-        discoverItems = await fetchDiscoverItems(
-          category,
-          { offset: 0, limit: limitDiscover },
-          supabaseUserIdForDiscover ?? undefined,
-          undefined,
-          '7d',
-          'relevance'
-        );
-      } catch (_) {}
-      let perplexityItems: any[] = [];
-      if (process.env.PERPLEXITY_API_KEY) {
-        try {
-          perplexityItems = await fetchDiscoverNewsFromPerplexity(category, 10);
-        } catch (_) {}
-      }
-      const mergedDiscover = [...perplexityItems, ...discoverItems];
-      const categoryToRegion: Record<string, string> = {
-        all: 'Global',
-        tech: 'North America',
-        finance: 'Global',
-        geopolitics: 'Middle East',
-        energy: 'Middle East',
-        'supply-chain': 'Asia',
-      };
-      const discoverAsEvents = mergedDiscover.slice(0, 25).map((item: any) => ({
-        id: item.id,
-        event_id: item.id,
-        type: 'event',
-        scope: null,
-        impact: null,
-        horizon: null,
-        source_count: item.sources?.length || 1,
-        last_updated: item.metadata?.updated_at || new Date().toISOString(),
-        headline: item.title || '',
-        description: item.summary || item.title || '',
-        date: item.metadata?.published_at || new Date().toISOString(),
-        location: null,
-        actors: [],
-        sectors: [],
-        sources: (item.sources || []).map((s: any) => ({ name: s.name || 'Source', url: s.url || '' })),
-        region: categoryToRegion[item.category] || 'Global',
-        country: null,
-        source_type: item.id.startsWith('perplexity-') ? 'perplexity' : 'discover',
-      }));
-      events = [...events, ...discoverAsEvents];
-    }
-
-    res.json({
-      success: true,
-      data: {
-        events,
-        total: events.length,
-        sources: Array.from(sources),
-      },
-    });
-  } catch (error: any) {
-    console.error('[API] Globe events error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to load globe events',
-    });
-  }
-});
-
 // POST /api/discover/page-context - Generate AI page context for Discover/Globe (OpenAI)
 app.post('/api/discover/page-context', async (req, res) => {
   try {
@@ -3698,6 +3641,82 @@ app.post('/api/discover/page-context', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to generate page context',
+    });
+  }
+});
+
+// POST /api/stock-digest — Stock Portfolio Researcher (Tavily + OpenAI), inspired by tavily-ai/market-researcher
+app.post('/api/stock-digest', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const tickers = Array.isArray(body.tickers) ? body.tickers : [];
+    if (tickers.length === 0) {
+      return res.status(400).json({ success: false, error: 'tickers must be a non-empty array (e.g. ["AAPL", "GOOGL"])' });
+    }
+    const { generateStockDigest } = await import('./services/stock-digest-service.js');
+    const result = await generateStockDigest(tickers);
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('[API] Stock digest error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate stock digest',
+    });
+  }
+});
+
+// POST /api/meeting-brief — Meeting/company brief (Tavily + OpenAI), inspiration: meeting-prep-agent
+app.post('/api/meeting-brief', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const company = (body.company as string) || '';
+    if (!company.trim()) {
+      return res.status(400).json({ success: false, error: 'body.company is required' });
+    }
+    const { generateMeetingBrief } = await import('./services/meeting-brief-service.js');
+    const result = await generateMeetingBrief({
+      company: company.trim(),
+      ticker: body.ticker ? String(body.ticker).trim() : undefined,
+      meetingType: body.meetingType ? String(body.meetingType).trim() : undefined,
+      date: body.date ? String(body.date).trim() : undefined,
+    });
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('[API] Meeting brief error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate meeting brief',
+    });
+  }
+});
+
+// POST /api/esg/extract-from-document — Extract ESG indicators from text or PDF (base64)
+app.post('/api/esg/extract-from-document', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const text = typeof body.text === 'string' ? body.text.trim() : '';
+    let pdfBuffer: Buffer | undefined;
+    if (typeof body.pdfBase64 === 'string' && body.pdfBase64.length > 0) {
+      try {
+        pdfBuffer = Buffer.from(body.pdfBase64, 'base64');
+      } catch {
+        return res.status(400).json({ success: false, error: 'Invalid pdfBase64' });
+      }
+    }
+    if (!text && !pdfBuffer?.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'Provide either body.text (document text) or body.pdfBase64 (PDF file as base64)',
+      });
+    }
+    const { extractESGFromDocument } = await import('./services/esg-extract-service.js');
+    const result = await extractESGFromDocument({ text: text || undefined, pdfBuffer });
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('[API] ESG extract error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to extract ESG from document',
     });
   }
 });
@@ -5380,6 +5399,29 @@ app.get('/api/account/export',
     context: (req) => ({ endpoint: '/api/account/export' }),
   })
 );
+
+// ============================================
+// ESG (Open Sustainability Index)
+// ============================================
+
+// GET /api/esg/scores - ESG scores by company name (Open Sustainability Index)
+app.get('/api/esg/scores', async (req, res) => {
+  try {
+    const company = (req.query.company as string) || (req.query.name as string) || '';
+    if (!company.trim()) {
+      return res.status(400).json({ success: false, error: 'Query parameter "company" or "name" is required' });
+    }
+    const { fetchESGScores } = await import('./services/open-sustainability-service.js');
+    const scores = await fetchESGScores(company);
+    if (!scores) {
+      return res.json({ success: true, data: null, message: 'No ESG data available for this company' });
+    }
+    res.json({ success: true, data: scores });
+  } catch (error: any) {
+    console.error('[API] ESG scores error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch ESG scores' });
+  }
+});
 
 // ============================================
 // Corporate Impact Endpoints

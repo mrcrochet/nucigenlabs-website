@@ -27,6 +27,7 @@ import ConfidenceBreakdown from './ConfidenceBreakdown';
 import ComparableEventsModal from './ComparableEventsModal';
 import ExposureBreakdownModal from './ExposureBreakdownModal';
 import EventImpactAnalysisSection from './EventImpactAnalysisSection';
+import ESGScoresBlock from './ESGScoresBlock';
 
 // Helper component for expandable evidence source sections
 function EvidenceSourceSection({ 
@@ -348,6 +349,9 @@ export default function SignalCard({ signal }: SignalCardProps) {
                     ))}
                   </ul>
                 </div>
+
+                {/* ESG scores (Open Sustainability Index) — optional, only when data available */}
+                <ESGScoresBlock companyName={signal.company.name} enabled={expanded} />
 
                 {/* Event-level causal analysis */}
                 {signal.catalyst_event.event_id && (

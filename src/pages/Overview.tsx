@@ -9,6 +9,7 @@
 import { useState, useEffect } from 'react';
 import AppShell from '../components/layout/AppShell';
 import HeaderBar from '../components/overview/HeaderBar';
+import MarketSummaryBlock from '../components/overview/MarketSummaryBlock';
 import GlobalSituationMap from '../components/overview/GlobalSituationMap';
 import OverviewMapSidePanel from '../components/overview/OverviewMapSidePanel';
 import MyWorldChangedSection from '../components/overview/MyWorldChangedSection';
@@ -55,6 +56,11 @@ function OverviewContent() {
         <HeaderBar />
       </div>
 
+      {/* Market summary (daily digest) */}
+      <div className="col-span-1 sm:col-span-12 mb-4">
+        <MarketSummaryBlock />
+      </div>
+
       {/* Bloc 1: Global Situation — carte + side panel */}
       <div className="col-span-1 sm:col-span-12 mb-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
@@ -75,6 +81,21 @@ function OverviewContent() {
 
       {/* Bloc 3: What to Watch Next — Emerging Signals */}
       <WhatToWatchNextSection />
+
+      {/* Phase 3.3: Portfolio / Watchlist placeholder (finance dashboard inspiration) */}
+      <section className="col-span-1 sm:col-span-12 mt-6" aria-labelledby="portfolio-watchlist-heading">
+        <h2 id="portfolio-watchlist-heading" className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+          Portfolio & Watchlist
+        </h2>
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-6 sm:p-8 text-center">
+          <p className="text-slate-400 text-sm mb-2">
+            Track your watchlist and key metrics in one place.
+          </p>
+          <p className="text-slate-500 text-xs">
+            Coming soon — meanwhile use Corporate Impact and Stock Portfolio Researcher for company-level insights.
+          </p>
+        </div>
+      </section>
     </AppShell>
   );
 }

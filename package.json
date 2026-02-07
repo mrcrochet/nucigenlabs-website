@@ -85,6 +85,7 @@
     "lucide-react": "^0.344.0",
     "mapbox-gl": "^3.18.1",
     "openai": "^4.104.0",
+    "pdf-parse": "^1.1.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-hotkeys-hook": "^5.2.3",
