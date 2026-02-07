@@ -68,6 +68,7 @@ const PATHS: InvestigationGraph['paths'] = [
     status: 'active',
     confidence: 78,
     hypothesis_label: 'Sanctions-driven supply shock',
+    lastUpdate: 'il y a 2 h',
   },
   {
     id: 'path-demo-b',
@@ -75,6 +76,7 @@ const PATHS: InvestigationGraph['paths'] = [
     status: 'weak',
     confidence: 52,
     hypothesis_label: 'Weather and storage stress',
+    lastUpdate: 'il y a 5 h',
   },
   {
     id: 'path-demo-c',
@@ -82,6 +84,8 @@ const PATHS: InvestigationGraph['paths'] = [
     status: 'dead',
     confidence: 28,
     hypothesis_label: 'Speculation-only',
+    lastUpdate: 'il y a 1 j',
+    contradictions: ['Données de positionnement des fonds non corrélées à la hausse', 'Crédibilité source D'],
   },
 ];
 

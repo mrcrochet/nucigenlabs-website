@@ -1,5 +1,5 @@
 /**
- * TriggeredAlertsFeed - 8 alerts
+ * TriggeredAlertsFeed - Alertes déclenchées (Overview: max 5).
  * Data: GET /api/alerts/triggered?range=7d&limit=8&userId=
  */
 
@@ -27,7 +27,11 @@ function normalizeSeverity(s: string | undefined): 'moderate' | 'high' | 'critic
   return 'moderate';
 }
 
-export default function TriggeredAlertsFeed() {
+interface TriggeredAlertsFeedProps {
+  limit?: number;
+}
+
+export default function TriggeredAlertsFeed({ limit = 8 }: TriggeredAlertsFeedProps) {
   const { user } = useUser();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +47,7 @@ export default function TriggeredAlertsFeed() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    const url = apiUrl(`/api/alerts/triggered?range=7d&limit=8&userId=${encodeURIComponent(user.id)}`);
+    const url = apiUrl(`/api/alerts/triggered?range=7d&limit=${Math.max(limit, 8)}&userId=${encodeURIComponent(user.id)}`);
     fetch(url)
       .then((res) => {
         if (cancelled) return null;
@@ -82,7 +86,7 @@ export default function TriggeredAlertsFeed() {
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user?.id, limit]);
 
   if (loading) {
     return (
@@ -120,7 +124,7 @@ export default function TriggeredAlertsFeed() {
       <SectionHeader title="Triggered Alerts" />
       
       <div className="mt-4 space-y-3">
-        {alerts.map((alert) => (
+        {alerts.slice(0, limit).map((alert) => (
           <Link
             key={alert.id}
             to={`/alerts/${alert.id}`}

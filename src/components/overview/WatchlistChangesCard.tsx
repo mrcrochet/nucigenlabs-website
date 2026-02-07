@@ -24,7 +24,11 @@ interface WatchlistChange {
   relatedEventId?: string;
 }
 
-export default function WatchlistChangesCard() {
+interface WatchlistChangesCardProps {
+  limit?: number;
+}
+
+export default function WatchlistChangesCard({ limit = 5 }: WatchlistChangesCardProps) {
   const { user } = useUser();
   const [changes, setChanges] = useState<WatchlistChange[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,8 +41,7 @@ export default function WatchlistChangesCard() {
       }
 
       try {
-        // Fetch watchlist changes analysis from API
-        const response = await fetch('/api/watchlists/changes?limit=5&hours_back=24', {
+        const response = await fetch(`/api/watchlists/changes?limit=${Math.max(limit, 10)}&hours_back=24`, {
           headers: {
             'x-clerk-user-id': user.id,
           },
@@ -75,7 +78,7 @@ export default function WatchlistChangesCard() {
     };
 
     loadWatchlistChanges();
-  }, [user?.id]);
+  }, [user?.id, limit]);
 
   const getChangeIcon = (changeType: WatchlistChange['changeType']) => {
     switch (changeType) {
@@ -119,7 +122,7 @@ export default function WatchlistChangesCard() {
             <p>No changes to your watchlist</p>
           </div>
         ) : (
-          changes.map((change) => (
+          changes.slice(0, limit).map((change) => (
             <div
               key={change.id}
               className="p-4 bg-background-glass-subtle rounded-lg border border-borders-subtle hover:border-borders-medium transition-colors"

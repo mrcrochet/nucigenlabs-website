@@ -1,15 +1,29 @@
 /**
- * Pipeline d'ingestion Detective : Tavily → Firecrawl → OpenAI → detective_claims.
+ * Pipeline d'ingestion Detective.
  *
- * À ce stade : pas de graphe, pas de paths, seulement des claims stockés.
- * Voir docs/PIPELINE_INGESTION_DETECTIVE.md.
+ * Deux modes :
+ * - useSearchGraph (défaut) : même tech que Search — Tavily → extractEntities → extractRelationshipsFromText → buildGraph → convertSearchGraphToInvestigation → persist. Graphe type Knowledge Graph (entités, relations).
+ * - useSearchGraph=false : Tavily → claims → buildGraphFromClaims → paths → persist (legacy).
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { searchTavily } from './tavily-unified-service.js';
 import { scrapeOfficialDocument, isFirecrawlAvailable } from '../phase4/firecrawl-official-service.js';
 import { extractDetectiveClaims, type DetectiveClaimPayload } from './detective-claim-extractor.js';
-import { rebuildAndPersistGraph } from './detective-graph-persistence.js';
+import { rebuildAndPersistGraph, persistInvestigationGraph } from './detective-graph-persistence.js';
+import { extractEntities } from './entity-extractor.js';
+import { extractRelationshipsFromText } from './relationship-extractor.js';
+import { buildGraph } from './graph-builder.js';
+import type { SearchResult } from './search-orchestrator.js';
+import { convertSearchGraphToInvestigation } from './search-graph-to-investigation.js';
+
+function extractDomain(url: string): string {
+  try {
+    return new URL(url).hostname.replace('www.', '');
+  } catch {
+    return 'unknown';
+  }
+}
 
 export interface RunDetectiveIngestionParams {
   investigationId: string;
@@ -31,6 +45,8 @@ export interface RunDetectiveIngestionParams {
   rawTextChunks?: Array<string | { text: string; sourceUrl?: string; sourceName?: string }>;
   /** Si true, après ingestion des claims, reconstruit et persiste le graphe (nodes, edges, paths). */
   runGraphRebuild?: boolean;
+  /** Si true (défaut), construire le graphe avec la même tech que Search (entity-extractor + relationship-extractor + graph-builder). Sinon : claims → buildGraphFromClaims. */
+  useSearchGraph?: boolean;
 }
 
 export interface RunDetectiveIngestionResult {
@@ -69,6 +85,7 @@ export async function runDetectiveIngestion(
     skipFirecrawl = false,
     rawTextChunks = [],
     runGraphRebuild = false,
+    useSearchGraph = true,
   } = params;
 
   const supabase = supabaseParam ?? getSupabase();
@@ -129,7 +146,58 @@ export async function runDetectiveIngestion(
     }
   }
 
-  // 2. EXTRACTION + 3. PERSISTANCE
+  // 1b. Mode Knowledge Graph (même tech que Search) : requête utilisateur → Tavily/sources → entities + relationships + buildGraph → convert → persist
+  if (useSearchGraph && runGraphRebuild && toProcess.length > 0) {
+    try {
+      const results: SearchResult[] = toProcess.map((item, index) => ({
+        id: `inv-${investigationId}-${Date.now()}-${index}`,
+        type: 'article' as const,
+        title: item.sourceName ?? '',
+        summary: (item.rawText || '').substring(0, 200),
+        url: item.sourceUrl ?? '',
+        source: item.sourceUrl ? extractDomain(item.sourceUrl) : 'unknown',
+        publishedAt: new Date().toISOString(),
+        relevanceScore: 0.5,
+        sourceScore: 0.5,
+        entities: [],
+        tags: [],
+        content: item.rawText,
+      }));
+
+      const allText = results.map((r) => `${r.title} ${r.summary} ${r.content || ''}`).join('\n\n');
+      const entities = await extractEntities(allText);
+
+      const resultsWithEntities = results.map((result) => {
+        const resultText = `${result.title} ${result.summary} ${result.content || ''}`.toLowerCase();
+        const resultEntities = entities.filter((e) => resultText.includes(e.name.toLowerCase()));
+        return {
+          ...result,
+          entities: resultEntities,
+          tags: resultEntities.map((e) => e.name),
+        };
+      });
+
+      const relationships = await extractRelationshipsFromText(allText, resultsWithEntities);
+      const kg = await buildGraph(resultsWithEntities, relationships);
+      const graph = convertSearchGraphToInvestigation(kg);
+      const graphResult = await persistInvestigationGraph(supabase, investigationId, graph);
+      return {
+        claimsCreated: 0,
+        articlesProcessed,
+        errors,
+        graph: {
+          nodesCount: graphResult.nodesCount,
+          edgesCount: graphResult.edgesCount,
+          pathsCount: graphResult.pathsCount,
+        },
+      };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      errors.push(`Search graph: ${msg}`);
+    }
+  }
+
+  // 2. EXTRACTION + 3. PERSISTANCE (mode claims)
   for (const { rawText, sourceUrl, sourceName } of toProcess) {
     let payloads: DetectiveClaimPayload[];
     try {

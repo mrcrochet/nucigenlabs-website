@@ -38,6 +38,7 @@ import EventsList from '../components/events/EventsList';
 import ContextInspector from '../components/events/ContextInspector';
 import { Loader2, Filter, Sparkles, Newspaper } from 'lucide-react';
 import { getOrCreateSupabaseUserId, updateUserPreferences } from '../lib/supabase';
+import { apiUrl } from '../lib/api-base';
 import type { Event } from '../types/intelligence';
 import { trackPageView, trackItemView, trackItemSave, trackItemShare, trackFilterChange, trackViewModeChange, trackAdvancedFilterApply, trackSectorFilter, trackRegionFilter, trackEntityFilter, trackPredictionView, trackVirtualScrollEnabled } from '../lib/analytics';
 
@@ -446,15 +447,15 @@ function DiscoverContent() {
   // Save mutation with optimistic updates
   const saveMutation = useMutation({
     mutationFn: async (itemId: string) => {
-      const userId = user ? await getOrCreateSupabaseUserId(user.id) : undefined;
-      if (!userId) {
-        throw new Error('User ID required');
+      if (!user?.id) {
+        throw new Error('Connectez-vous pour sauvegarder');
       }
 
-      const response = await fetch(`/api/discover/${itemId}/save?userId=${userId}`, {
+      const response = await fetch(apiUrl(`/api/discover/${itemId}/save`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-clerk-user-id': user.id,
         },
       });
 

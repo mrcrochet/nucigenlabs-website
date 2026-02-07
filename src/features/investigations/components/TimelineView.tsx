@@ -1,11 +1,10 @@
 /**
- * Timeline View — vertical timeline; events as cards with date, sources, confidence.
- * Same graph as Flow and Map. See CONCEPTION_INVESTIGATION_ENGINE.md §8.2.
+ * Timeline View — chronological list; type, label, confidence.
  */
 
-import type { InvestigationGraph } from '../../types/investigation-graph';
+import type { InvestigationGraph } from '../../../types/investigation-graph';
 
-interface InvestigationTimelineViewProps {
+interface TimelineViewProps {
   graph: InvestigationGraph;
   selectedNodeId: string | null;
   selectedPathId?: string | null;
@@ -28,7 +27,7 @@ function groupNodesByDate(nodes: InvestigationGraph['nodes']): Map<string, Inves
   return byDate;
 }
 
-export default function InvestigationTimelineView({
+export default function TimelineView({
   graph,
   selectedNodeId,
   selectedPathId = null,
@@ -36,7 +35,7 @@ export default function InvestigationTimelineView({
   onNodeClick,
   onPathClick,
   className = '',
-}: InvestigationTimelineViewProps) {
+}: TimelineViewProps) {
   const { nodes, paths } = graph;
   const visiblePaths = showDeadPaths ? paths : paths.filter((p) => p.status !== 'dead');
   const selectedPath = selectedPathId ? paths.find((p) => p.id === selectedPathId) : null;
@@ -44,10 +43,8 @@ export default function InvestigationTimelineView({
 
   if (nodes.length === 0) {
     return (
-      <div
-        className={`rounded-xl border border-borders-subtle bg-background-base p-6 text-center text-text-muted text-sm ${className}`}
-      >
-        No events yet. Add signals to build the timeline.
+      <div className={`rounded-xl border border-borders-subtle bg-background-base p-6 text-center text-text-muted text-sm ${className}`}>
+        Aucun événement. Lancez la collecte pour construire la chronologie.
       </div>
     );
   }
@@ -62,8 +59,8 @@ export default function InvestigationTimelineView({
   return (
     <div className={`rounded-xl border border-borders-subtle bg-background-base overflow-hidden ${className}`}>
       <div className="p-3 border-b border-borders-subtle">
-        <h2 className="text-sm font-semibold text-text-primary">Timeline View</h2>
-        <p className="text-xs text-text-muted mt-0.5">Events by date.</p>
+        <h2 className="text-sm font-semibold text-text-primary">Chronologie</h2>
+        <p className="text-xs text-text-muted mt-0.5">Événements par date.</p>
         {visiblePaths.length > 0 && onPathClick && (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {visiblePaths.map((p) => (
@@ -72,9 +69,7 @@ export default function InvestigationTimelineView({
                 type="button"
                 onClick={() => onPathClick(p.id)}
                 className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                  selectedPathId === p.id
-                    ? 'bg-[#E1463E] text-white'
-                    : 'bg-borders-subtle text-text-secondary hover:bg-[#E1463E]/20 hover:text-text-primary'
+                  selectedPathId === p.id ? 'bg-[#E1463E] text-white' : 'bg-borders-subtle text-text-secondary hover:bg-[#E1463E]/20 hover:text-text-primary'
                 } ${p.status === 'dead' ? 'opacity-70' : ''}`}
               >
                 {p.hypothesis_label || p.id} ({p.status} {p.confidence}%)
@@ -88,7 +83,7 @@ export default function InvestigationTimelineView({
           {sortedDates.map((dateKey) => (
             <div key={dateKey}>
               <div className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2">
-                {dateKey === 'no-date' ? 'No date' : dateKey}
+                {dateKey === 'no-date' ? 'Sans date' : dateKey}
               </div>
               <div className="space-y-2">
                 {(byDate.get(dateKey) ?? []).map((node) => (

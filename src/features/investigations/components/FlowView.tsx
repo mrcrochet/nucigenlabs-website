@@ -1,9 +1,8 @@
 /**
- * Flow View — Left to right = time; edges as arrows; width/color = strength/confidence.
- * Same graph as Timeline and Map. See CONCEPTION_INVESTIGATION_ENGINE.md section 8.1.
+ * Flow View — Left to right = time; edges as arrows; edge labels visible.
  */
 
-import type { InvestigationGraph, InvestigationGraphNode, InvestigationEdgeRelation } from '../../types/investigation-graph';
+import type { InvestigationGraph, InvestigationGraphNode, InvestigationEdgeRelation } from '../../../types/investigation-graph';
 
 function edgeColorClass(relation: InvestigationEdgeRelation): string {
   if (relation === 'supports') return 'text-emerald-600';
@@ -11,7 +10,7 @@ function edgeColorClass(relation: InvestigationEdgeRelation): string {
   return 'text-[#E1463E]';
 }
 
-export interface InvestigationFlowViewProps {
+export interface FlowViewProps {
   graph: InvestigationGraph;
   selectedNodeId: string | null;
   selectedEdgeKey?: string | null;
@@ -23,7 +22,6 @@ export interface InvestigationFlowViewProps {
   className?: string;
 }
 
-/** Order nodes by date for flow (left → right). */
 function orderNodesForFlow(nodes: InvestigationGraphNode[]): InvestigationGraphNode[] {
   return [...nodes].sort((a, b) => {
     if (!a.date) return 1;
@@ -32,7 +30,7 @@ function orderNodesForFlow(nodes: InvestigationGraphNode[]): InvestigationGraphN
   });
 }
 
-export default function InvestigationFlowView({
+export default function FlowView({
   graph,
   selectedNodeId,
   selectedEdgeKey = null,
@@ -42,7 +40,7 @@ export default function InvestigationFlowView({
   onEdgeClick,
   onPathClick,
   className = '',
-}: InvestigationFlowViewProps) {
+}: FlowViewProps) {
   const { nodes, edges, paths } = graph;
   const visiblePaths = showDeadPaths ? paths : paths.filter((p) => p.status !== 'dead');
   const selectedPath = selectedPathId ? paths.find((p) => p.id === selectedPathId) : null;
@@ -50,10 +48,8 @@ export default function InvestigationFlowView({
 
   if (nodes.length === 0) {
     return (
-      <div
-        className={`rounded-xl border border-borders-subtle bg-background-base p-6 text-center text-text-muted text-sm ${className}`}
-      >
-        No nodes yet. Add signals to build the graph.
+      <div className={`rounded-xl border border-borders-subtle bg-background-base p-6 text-center text-text-muted text-sm ${className}`}>
+        Aucun nœud. Lancez la collecte pour construire le graphe.
       </div>
     );
   }
@@ -65,8 +61,8 @@ export default function InvestigationFlowView({
   return (
     <div className={`rounded-xl border border-borders-subtle bg-background-base overflow-hidden ${className}`}>
       <div className="p-3 border-b border-borders-subtle">
-        <h2 className="text-sm font-semibold text-text-primary">Flow View</h2>
-        <p className="text-xs text-text-muted mt-0.5">Left → right = time. Arrow thickness = strength. Green = supports, amber = weakens.</p>
+        <h2 className="text-sm font-semibold text-text-primary">Graphe</h2>
+        <p className="text-xs text-text-muted mt-0.5">Gauche → droite = temps. Épaisseur = force. Vert = soutient, ambre = affaiblit.</p>
         {visiblePaths.length > 0 && onPathClick && (
           <div className="flex flex-wrap gap-1.5 mt-2">
             {visiblePaths.map((p) => (
@@ -75,9 +71,7 @@ export default function InvestigationFlowView({
                 type="button"
                 onClick={() => onPathClick(p.id)}
                 className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                  selectedPathId === p.id
-                    ? 'bg-[#E1463E] text-white'
-                    : 'bg-borders-subtle text-text-secondary hover:bg-[#E1463E]/20 hover:text-text-primary'
+                  selectedPathId === p.id ? 'bg-[#E1463E] text-white' : 'bg-borders-subtle text-text-secondary hover:bg-[#E1463E]/20 hover:text-text-primary'
                 } ${p.status === 'dead' ? 'opacity-70' : ''}`}
               >
                 {p.hypothesis_label || p.id} ({p.status} {p.confidence}%)
@@ -102,60 +96,57 @@ export default function InvestigationFlowView({
                 }`}
               >
                 <span className="font-medium truncate block">{node.label}</span>
-                {node.date && (
-                  <span className="block text-xs text-text-muted mt-0.5 truncate">{node.date}</span>
-                )}
+                {node.date && <span className="block text-xs text-text-muted mt-0.5 truncate">{node.date}</span>}
                 <span className="block text-xs text-text-muted mt-0.5">{node.confidence} %</span>
               </button>
-              {i < ordered.length - 1 && (() => {
-                const nextId = ordered[i + 1].id;
-                const edgeKey = `${node.id}|${nextId}`;
-                const edge = edgeByKey.get(edgeKey);
-                if (!edge) {
-                  return (
-                    <div className="shrink-0 px-1 flex items-center" key={edgeKey}>
-                      <span className="text-text-muted text-lg">→</span>
+              {i < ordered.length - 1 &&
+                (() => {
+                  const nextId = ordered[i + 1].id;
+                  const edgeKey = `${node.id}|${nextId}`;
+                  const edge = edgeByKey.get(edgeKey);
+                  if (!edge) {
+                    return (
+                      <div className="shrink-0 px-1 flex items-center" key={edgeKey}>
+                        <span className="text-text-muted text-lg">→</span>
+                      </div>
+                    );
+                  }
+                  const strokeW = Math.max(1, Math.round(edge.strength * 3));
+                  const opacity = 0.4 + edge.strength * 0.5;
+                  const isSelected = selectedEdgeKey === edgeKey;
+                  const colorClass = edgeColorClass(edge.relation);
+                  const relationLabel = edge.relation;
+                  const content = (
+                    <div className="flex flex-col items-center gap-0.5">
+                      <svg width="32" height="24" viewBox="0 0 32 24" className={colorClass} aria-hidden>
+                        <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth={strokeW} strokeOpacity={opacity} />
+                        <path d="M 22 8 L 30 12 L 22 16 Z" fill="currentColor" opacity={opacity} />
+                      </svg>
+                      <span className="text-[10px] text-text-muted uppercase tracking-wide max-w-[4rem] truncate" title={relationLabel}>{relationLabel}</span>
                     </div>
                   );
-                }
-                const strokeW = Math.max(1, Math.round(edge.strength * 3));
-                const opacity = 0.4 + edge.strength * 0.5;
-                const isSelected = selectedEdgeKey === edgeKey;
-                const colorClass = edgeColorClass(edge.relation);
-                const relationLabel = edge.relation;
-                const content = (
-                  <div className="flex flex-col items-center gap-0.5">
-                    <svg width="32" height="24" viewBox="0 0 32 24" className={colorClass} aria-hidden>
-                      <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth={strokeW} strokeOpacity={opacity} />
-                      <path d="M 22 8 L 30 12 L 22 16 Z" fill="currentColor" opacity={opacity} />
-                    </svg>
-                    <span className="text-[10px] text-text-muted uppercase tracking-wide max-w-[4rem] truncate" title={relationLabel}>{relationLabel}</span>
-                  </div>
-                );
-                return (
-                  <div className="shrink-0 px-1 flex items-center" key={edgeKey}>
-                    {onEdgeClick ? (
-                      <button
-                        type="button"
-                        onClick={() => onEdgeClick(node.id, nextId)}
-                        className={`rounded p-0.5 transition-colors ${isSelected ? 'ring-2 ring-[#E1463E] ring-offset-1 ring-offset-background-base' : 'hover:bg-borders-subtle'}`}
-                        title={`${relationLabel}: view details`}
-                        aria-label={`Relation ${relationLabel}`}
-                      >
-                        {content}
-                      </button>
-                    ) : (
-                      content
-                    )}
-                  </div>
-                );
-              })()}
+                  return (
+                    <div className="shrink-0 px-1 flex items-center" key={edgeKey}>
+                      {onEdgeClick ? (
+                        <button
+                          type="button"
+                          onClick={() => onEdgeClick(node.id, nextId)}
+                          className={`rounded p-0.5 transition-colors ${isSelected ? 'ring-2 ring-[#E1463E] ring-offset-1 ring-offset-background-base' : 'hover:bg-borders-subtle'}`}
+                          title={`${relationLabel}: détails`}
+                          aria-label={`Relation ${relationLabel}`}
+                        >
+                          {content}
+                        </button>
+                      ) : (
+                        content
+                      )}
+                    </div>
+                  );
+                })()}
             </div>
           ))}
         </div>
-        {edges.length > 0 && (
-          <p className="text-xs text-text-muted mt-3">{edges.length} link(s) between events.</p>
-        )}
+        {edges.length > 0 && <p className="text-xs text-text-muted mt-3">{edges.length} lien(s).</p>}
       </div>
     </div>
   );

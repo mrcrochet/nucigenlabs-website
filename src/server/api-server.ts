@@ -957,6 +957,7 @@ app.post('/api/investigations', async (req, res) => {
           investigationId: threadId,
           hypothesis: invHypothesis,
           runGraphRebuild: true,
+          useSearchGraph: true, // même Knowledge Graph que Search (Tavily → buildGraph), réponse = requête utilisateur
           supabase,
         });
         console.log('[API] Investigation graph generated for', threadId);
@@ -1148,6 +1149,7 @@ app.post('/api/investigations/:threadId/messages', async (req, res) => {
           skipTavily: true,
           rawTextChunks,
           runGraphRebuild: true,
+          useSearchGraph: true, // même Knowledge Graph que Search ; entrée = preuves de la réponse à la requête utilisateur
           supabase,
         });
       } catch (detectiveErr: any) {
@@ -1277,6 +1279,7 @@ app.post('/api/investigations/:threadId/generate-graph', async (req, res) => {
           investigationId: threadId,
           hypothesis,
           runGraphRebuild: true,
+          useSearchGraph: true, // même Knowledge Graph que Search ; graphe issu de la requête utilisateur
           supabase,
         });
         console.log('[API] Investigation graph generated for', threadId);
@@ -3540,12 +3543,16 @@ app.get('/api/eventregistry/health', async (req, res) => {
 // GET /api/discover/saved - List saved (library) items for user
 app.get('/api/discover/saved', async (req, res) => {
   try {
-    const userId = req.query.userId as string;
-    if (!userId) {
-      return res.status(401).json({ success: false, error: 'User ID required' });
+    const clerkUserId = (req.headers['x-clerk-user-id'] as string) || (req.query.userId as string);
+    if (!clerkUserId) {
+      return res.status(401).json({ success: false, error: 'User ID required (x-clerk-user-id header or userId query)' });
     }
     if (!supabase) {
       return res.status(503).json({ success: false, error: 'Database not configured' });
+    }
+    const userId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'User not found' });
     }
     const { data: rows, error } = await supabase
       .from('user_engagement')
@@ -3571,12 +3578,12 @@ app.get('/api/discover/saved', async (req, res) => {
 app.post('/api/discover/:id/save', async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = (req.query.userId as string) || (req.body?.userId as string);
+    const clerkUserId = (req.headers['x-clerk-user-id'] as string) || (req.query.userId as string) || (req.body?.userId as string);
 
-    if (!userId) {
+    if (!clerkUserId) {
       return res.status(401).json({
         success: false,
-        error: 'User ID required',
+        error: 'User ID required (x-clerk-user-id header or userId)',
       });
     }
 
@@ -3585,6 +3592,11 @@ app.post('/api/discover/:id/save', async (req, res) => {
         success: false,
         error: 'Database not configured',
       });
+    }
+
+    const userId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'User not found' });
     }
 
     // Track engagement (only UUID event ids are stored; Perplexity ids may fail silently)
@@ -3613,12 +3625,16 @@ app.post('/api/discover/:id/save', async (req, res) => {
 app.delete('/api/discover/:id/save', async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = (req.query.userId as string) || (req.body?.userId as string);
-    if (!userId) {
-      return res.status(401).json({ success: false, error: 'User ID required' });
+    const clerkUserId = (req.headers['x-clerk-user-id'] as string) || (req.query.userId as string) || (req.body?.userId as string);
+    if (!clerkUserId) {
+      return res.status(401).json({ success: false, error: 'User ID required (x-clerk-user-id header or userId)' });
     }
     if (!supabase) {
       return res.status(503).json({ success: false, error: 'Database not configured' });
+    }
+    const userId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'User not found' });
     }
     const { error } = await supabase
       .from('user_engagement')
@@ -4389,6 +4405,7 @@ app.post('/api/search/session/:sessionId/playground', async (req, res) => {
           maxTavilyResults: 15,
           maxScrapeUrls: 8,
           runGraphRebuild: true,
+          useSearchGraph: true, // même Knowledge Graph que Search ; requête utilisateur → Tavily → buildGraph
           supabase,
           rawTextChunks,
         });

@@ -9,16 +9,12 @@ import Map, { Marker, Popup } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { OverviewSignal, OverviewSignalType } from '../../types/overview';
 import { Layers } from 'lucide-react';
+import { OVERVIEW_LAYER_SEMANTICS, OVERVIEW_MAP_MAX_SIGNALS } from '../../constants/overview-signals';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN as string | undefined;
 
-const LAYER_OPTIONS: { id: OverviewSignalType; label: string; color: string }[] = [
-  { id: 'geopolitics', label: 'Geopolitics', color: '#ca8a04' },
-  { id: 'supply-chains', label: 'Supply Chains', color: '#ea580c' },
-  { id: 'markets', label: 'Markets', color: '#2563eb' },
-  { id: 'energy', label: 'Energy', color: '#d97706' },
-  { id: 'security', label: 'Security', color: '#dc2626' },
-];
+const LAYER_OPTIONS = (Object.entries(OVERVIEW_LAYER_SEMANTICS) as [OverviewSignalType, typeof OVERVIEW_LAYER_SEMANTICS[OverviewSignalType]][])
+  .map(([id, { label, color }]) => ({ id, label, color }));
 
 function typeToColor(type: OverviewSignalType): string {
   return LAYER_OPTIONS.find((l) => l.id === type)?.color ?? '#71717a';
@@ -43,11 +39,14 @@ export interface GlobalSituationMapProps {
   signals: OverviewSignal[];
   /** Default: geopolitics, supply-chains */
   defaultLayers?: OverviewSignalType[];
+  /** When set, called on point click instead of navigating to investigate_id */
+  onSignalClick?: (signal: OverviewSignal) => void;
 }
 
 export default function GlobalSituationMap({
   signals,
   defaultLayers = ['geopolitics', 'supply-chains'],
+  onSignalClick,
 }: GlobalSituationMapProps) {
   const navigate = useNavigate();
   const [selectedLayers, setSelectedLayers] = useState<OverviewSignalType[]>(defaultLayers);
@@ -62,14 +61,18 @@ export default function GlobalSituationMap({
   // V1 product rule: max 8–12 signals visible so the map answers "where to look" at a glance
   const filteredSignals = signals
     .filter((s) => selectedLayers.includes(s.type))
-    .slice(0, 12);
+    .slice(0, OVERVIEW_MAP_MAX_SIGNALS);
 
   const handleSignalClick = useCallback(
     (signal: OverviewSignal) => {
-      const path = signal.investigate_id || '/investigations';
+      if (onSignalClick) {
+        onSignalClick(signal);
+        return;
+      }
+      const path = signal.investigate_id || '/search';
       navigate(path);
     },
-    [navigate]
+    [navigate, onSignalClick]
   );
 
   if (!MAPBOX_TOKEN) {

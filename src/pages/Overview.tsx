@@ -1,7 +1,9 @@
 /**
  * Overview Page
  *
- * Global Situation map is the first block (V1); then KPIs and rest.
+ * Radar stratégique : lecture macro du monde en 10–15 secondes.
+ * 3 blocs uniquement : Global Situation | My World Changed | What to Watch Next.
+ * Pas de KPI dashboard, pas de long texte, pas d’analyse causale — Overview montre, Enquêtes expliquent.
  */
 
 import { useState, useEffect } from 'react';
@@ -9,12 +11,8 @@ import AppShell from '../components/layout/AppShell';
 import HeaderBar from '../components/overview/HeaderBar';
 import GlobalSituationMap from '../components/overview/GlobalSituationMap';
 import OverviewMapSidePanel from '../components/overview/OverviewMapSidePanel';
-import { Link } from 'react-router-dom';
-import KPIGrid from '../components/overview/KPIGrid';
-import NarrativeCard from '../components/overview/NarrativeCard';
-import TopSignalsTable from '../components/overview/TopSignalsTable';
-import RecentEventsFeed from '../components/overview/RecentEventsFeed';
-import { ChevronRight } from 'lucide-react';
+import MyWorldChangedSection from '../components/overview/MyWorldChangedSection';
+import WhatToWatchNextSection from '../components/overview/WhatToWatchNextSection';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import { getOverviewMapData } from '../lib/api/overview-api';
@@ -35,7 +33,7 @@ function OverviewContent() {
     return (
       <AppShell>
         <div className="col-span-1 sm:col-span-12 flex items-center justify-center h-64">
-          <div className="text-text-secondary">Loading overview...</div>
+          <div className="text-text-secondary">Chargement…</div>
         </div>
       </AppShell>
     );
@@ -49,7 +47,7 @@ function OverviewContent() {
     <AppShell>
       <SEO
         title="Overview — Nucigen"
-        description="Global Situation and strategic overview"
+        description="Lecture macro du monde : où ça bouge, quoi est important, où creuser."
       />
 
       {/* Row 1: HeaderBar */}
@@ -57,7 +55,7 @@ function OverviewContent() {
         <HeaderBar />
       </div>
 
-      {/* Global Situation Map (V1) – map + side panel */}
+      {/* Bloc 1: Global Situation — carte + side panel */}
       <div className="col-span-1 sm:col-span-12 mb-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <div className="lg:col-span-9 min-h-[400px]">
@@ -72,37 +70,11 @@ function OverviewContent() {
         </div>
       </div>
 
-      {/* KPIGrid (4 cards) */}
-      <div className="col-span-1 sm:col-span-12 mb-6">
-        <KPIGrid />
-      </div>
+      {/* Bloc 2: My World Changed — Triggered Alerts | Decision Points | Watchlist */}
+      <MyWorldChangedSection />
 
-      {/* Narrative only */}
-      <div className="col-span-1 sm:col-span-12 mb-6">
-        <NarrativeCard />
-      </div>
-
-      {/* Compact: Top signals (3) + Recent events (3) with View all */}
-      <div className="col-span-1 sm:col-span-12 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div>
-          <TopSignalsTable limit={3} />
-          <Link
-            to="/signals"
-            className="mt-2 inline-flex items-center gap-1 text-sm text-text-secondary hover:text-primary-red transition-colors"
-          >
-            View all <ChevronRight className="w-4 h-4" />
-          </Link>
-        </div>
-        <div>
-          <RecentEventsFeed limit={3} />
-          <Link
-            to="/events"
-            className="mt-2 inline-flex items-center gap-1 text-sm text-text-secondary hover:text-primary-red transition-colors"
-          >
-            View all <ChevronRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </div>
+      {/* Bloc 3: What to Watch Next — Emerging Signals */}
+      <WhatToWatchNextSection />
     </AppShell>
   );
 }

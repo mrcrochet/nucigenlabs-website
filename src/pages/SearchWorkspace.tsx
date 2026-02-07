@@ -351,13 +351,6 @@ function SearchWorkspaceContent() {
           </div>
           </div>
         </div>
-        <Link
-          to={`/search/session/${sessionId}/reponse`}
-          className="flex items-center justify-center gap-2 px-4 py-3 min-h-[44px] border border-gray-800 hover:bg-gray-900 text-gray-400 hover:text-gray-300 text-sm transition-colors shrink-0 w-full sm:w-auto"
-        >
-          <span>Playground</span>
-          <span className="text-xs">→</span>
-        </Link>
       </div>
 
       {/* Main Content: Insight Panel (Left) + Graph (Right) */}

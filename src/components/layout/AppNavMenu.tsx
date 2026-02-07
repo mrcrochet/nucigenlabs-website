@@ -21,7 +21,6 @@ import {
   Target, 
   Bell,
   Search,
-  FileSearch,
   Sparkles,
   Newspaper,
   Activity,
@@ -33,7 +32,6 @@ import {
 const navItems = [
   { path: '/overview', label: 'Overview', icon: LayoutDashboard },
   { path: '/search', label: 'Search', icon: Search },
-  { path: '/investigations', label: 'Enquêtes', icon: FileSearch },
   { path: '/signals', label: 'Corporate Impact', icon: TrendingUp },
   { path: '/discover', label: 'Discover', icon: Sparkles },
   { path: '/library', label: 'Ma bibliothèque', icon: Bookmark },
@@ -55,11 +53,6 @@ export default function AppNavMenu({ isOpen, onClose }: AppNavMenuProps) {
   const normalizedPath = (() => {
     const path = location.pathname;
 
-    // Enquêtes workspace → /investigations
-    if (path.startsWith('/investigations')) {
-      return '/investigations';
-    }
-    
     // Legacy dashboard/app → overview
     if (path === '/dashboard' || path === '/app') {
       return '/overview';

@@ -7,6 +7,9 @@
  * Sémantique produit (wording / UI):
  * - importance = gravité du signal (drives point size)
  * - impact = étendue géographique (local / regional / global, drives halo)
+ *
+ * Définition officielle d'un signal : voir constants/overview-signals.ts
+ * Un signal = déséquilibre observable à impact global/régional. Pas une news, alerte ou hypothèse.
  */
 
 export type OverviewSignalType =
