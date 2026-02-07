@@ -33,10 +33,11 @@ import ViewModeToggle, { type ViewMode } from '../components/discover/ViewModeTo
 import AdvancedFilters, { type AdvancedFilters as AdvancedFiltersType } from '../components/discover/AdvancedFilters';
 import { DiscoverErrorBoundary } from '../components/discover/DiscoverErrorBoundary';
 import SkeletonCard from '../components/ui/SkeletonCard';
-import EventFiltersRail from '../components/events/EventFiltersRail';
-import EventsList from '../components/events/EventsList';
 import ContextInspector from '../components/events/ContextInspector';
-import { Loader2, Filter, Sparkles, Newspaper } from 'lucide-react';
+import DiscoverGlobeView from '../components/discover/DiscoverGlobeView';
+import PageContextPanel from '../components/discover/PageContextPanel';
+import { GLOBE_CATEGORIES, eventToGlobeCategory } from '../constants/globe-semantics';
+import { Loader2, Filter, Sparkles, Newspaper, X } from 'lucide-react';
 import { getOrCreateSupabaseUserId, updateUserPreferences } from '../lib/supabase';
 import { apiUrl } from '../lib/api-base';
 import type { Event } from '../types/intelligence';
@@ -135,6 +136,11 @@ function DiscoverContent() {
   const [events, setEvents] = useState<Event[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [contextPanelOpen, setContextPanelOpen] = useState(false);
+  const [pageContext, setPageContext] = useState<string | null>(null);
+  const [contextLoading, setContextLoading] = useState(false);
+  /** Sources pour le globe: events (DB) | discover (Discover+Perplexity) | events,discover (les deux) */
+  const [globeSources, setGlobeSources] = useState<'events' | 'discover' | 'events,discover'>('events,discover');
 
   // Persist view mode preference
   useEffect(() => {
@@ -211,8 +217,9 @@ function DiscoverContent() {
           if (supabaseUserId) params.set('userId', supabaseUserId);
         }
 
-        const apiBase = import.meta.env.DEV ? 'http://localhost:3001' : '';
-        const res = await fetch(`${apiBase}/api/events?${params.toString()}`, { signal: controller.signal });
+        params.set('sources', globeSources);
+
+        const res = await fetch(apiUrl(`/api/globe/events?${params.toString()}`), { signal: controller.signal });
         if (!res.ok) throw new Error('Failed to load events');
         const json = await res.json();
         if (!json.success || !json.data?.events) throw new Error('Invalid response');
@@ -232,7 +239,35 @@ function DiscoverContent() {
       isActiveRef.current = false;
       controller.abort();
     };
-  }, [sourceMode, eventFilters, user?.id]);
+  }, [sourceMode, eventFilters, user?.id, globeSources]);
+
+  const fetchPageContext = useCallback(async () => {
+    setContextLoading(true);
+    setPageContext(null);
+    try {
+      const timeRange = eventFilters.timeRange || '7d';
+      const eventSummaries = events.slice(0, 80).map((e) => ({
+        headline: e.headline ?? '',
+        category: GLOBE_CATEGORIES[eventToGlobeCategory(e)].shortLabel,
+        region: e.region || e.country || undefined,
+      }));
+      const res = await fetch(apiUrl('/api/discover/page-context'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timeRange, eventSummaries }),
+      });
+      const data = await res.json();
+      if (data.success && typeof data.context === 'string') {
+        setPageContext(data.context);
+      } else {
+        setPageContext('Impossible de générer le contexte. Vérifiez OPENAI_API_KEY.');
+      }
+    } catch (_) {
+      setPageContext('Erreur lors de la génération du contexte.');
+    } finally {
+      setContextLoading(false);
+    }
+  }, [events, eventFilters.timeRange]);
 
   // Keyboard shortcuts
   useHotkeys('esc', () => {
@@ -608,10 +643,33 @@ function DiscoverContent() {
     );
   }
 
-  const showRightInspector = sourceMode === 'actualite' && !!selectedEventId;
-  const rightInspectorContent = sourceMode === 'actualite' && selectedEventId
-    ? <ContextInspector eventId={selectedEventId} />
-    : null;
+  const showRightInspector = sourceMode === 'actualite' && (!!selectedEventId || contextPanelOpen);
+  const rightInspectorContent = sourceMode === 'actualite' ? (
+    selectedEventId ? (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-end gap-2 mb-3 pb-2 border-b border-[#2A2A2A]">
+          <button
+            type="button"
+            onClick={() => setSelectedEventId(null)}
+            className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Fermer le panneau"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <ContextInspector eventId={selectedEventId} />
+        </div>
+      </div>
+    ) : contextPanelOpen ? (
+      <PageContextPanel
+        context={pageContext}
+        loading={contextLoading}
+        onRegenerate={fetchPageContext}
+        onClose={() => setContextPanelOpen(false)}
+      />
+    ) : null
+  ) : null;
 
   return (
     <AppShell
@@ -653,67 +711,73 @@ function DiscoverContent() {
         </div>
       </div>
 
-      {/* Header */}
-      <div className="col-span-1 sm:col-span-12 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-light text-white mb-1">
-            {sourceMode === 'actualite' ? 'Actualité' : 'Discover'}
-          </h1>
-          <p className="text-slate-400 text-sm font-light">
-            {sourceMode === 'actualite'
-              ? 'Flux factuel : qui, quoi, où, quand — filtrez par type, région, secteur et période.'
-              : 'Actualités entreprises, marchés, géopolitique — filtrez par catégorie et par période.'}
-          </p>
+      {/* Header (hidden when actualité for full-screen globe) */}
+      {sourceMode !== 'actualite' && (
+        <div className="col-span-1 sm:col-span-12 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-light text-white mb-1">
+              {sourceMode === 'actualite' ? 'Actualité' : 'Discover'}
+            </h1>
+            <p className="text-slate-400 text-sm font-light">
+              {sourceMode === 'actualite'
+                ? 'Flux factuel : qui, quoi, où, quand — filtrez par type, région, secteur et période.'
+                : 'Actualités entreprises, marchés, géopolitique — filtrez par catégorie et par période.'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (sourceMode === 'actualite') {
+                setEventFilters((f) => ({ ...f })); // trigger events refetch
+              } else {
+                refetch();
+              }
+            }}
+            disabled={sourceMode === 'actualite' ? eventsLoading : isRefreshing}
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light shrink-0 self-start sm:self-center disabled:opacity-50"
+            aria-label="Actualiser le fil"
+          >
+            <Loader2 className={`w-4 h-4 ${(sourceMode === 'actualite' ? eventsLoading : isRefreshing) ? 'animate-spin' : ''}`} />
+            Actualiser
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            if (sourceMode === 'actualite') {
-              setEventFilters((f) => ({ ...f })); // trigger events refetch
-            } else {
-              refetch();
-            }
-          }}
-          disabled={sourceMode === 'actualite' ? eventsLoading : isRefreshing}
-          className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light shrink-0 self-start sm:self-center disabled:opacity-50"
-          aria-label="Actualiser le fil"
-        >
-          <Loader2 className={`w-4 h-4 ${(sourceMode === 'actualite' ? eventsLoading : isRefreshing) ? 'animate-spin' : ''}`} />
-          Actualiser
-        </button>
-      </div>
+      )}
 
-      {/* Mode Actualité: EventFiltersRail + EventsList */}
+      {/* Mode Actualité: globe uniquement */}
       {sourceMode === 'actualite' && (
-        <div className="col-span-1 sm:col-span-12">
-          {/* Mobile: time range only */}
-          <div className="lg:hidden mb-4 flex gap-2">
-            {(['24h', '7d', '30d'] as const).map((range) => (
+        <div className="col-span-1 sm:col-span-12 relative min-h-[70vh] sm:min-h-[calc(100vh-14rem)]">
+          {/* Sélecteur de sources pour le globe (Events API, Discover, Perplexity) */}
+          <div className="absolute top-0 left-0 right-0 z-10 flex flex-wrap items-center justify-center gap-2 px-4 py-2 bg-gradient-to-b from-black/60 to-transparent">
+            <span className="text-[10px] uppercase tracking-wider text-slate-500 mr-1">Sources carte</span>
+            {[
+              { value: 'events' as const, label: 'Événements' },
+              { value: 'discover' as const, label: 'Discover' },
+              { value: 'events,discover' as const, label: 'Tout' },
+            ].map(({ value, label }) => (
               <button
-                key={range}
-                onClick={() => setEventFilters((f) => ({ ...f, timeRange: range }))}
-                className={`flex-1 px-3 py-2 rounded-lg text-sm font-light transition-colors ${
-                  eventFilters.timeRange === range
-                    ? 'bg-[#E1463E]/20 text-[#E1463E] border border-[#E1463E]/40'
-                    : 'bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10'
+                key={value}
+                type="button"
+                onClick={() => setGlobeSources(value)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  globeSources === value
+                    ? 'bg-[#E1463E]/20 text-[#E1463E]'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
                 }`}
               >
-                {range}
+                {label}
               </button>
             ))}
           </div>
-          <div className="flex gap-6">
-            <div className="w-56 flex-shrink-0 hidden lg:block">
-              <EventFiltersRail filters={eventFilters} onFiltersChange={setEventFilters} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <EventsList
-                events={events}
-                loading={eventsLoading}
-                onEventClick={(eventId) => setSelectedEventId(eventId)}
-              />
-            </div>
-          </div>
+          <DiscoverGlobeView
+            events={events}
+            loading={eventsLoading}
+            timeRange={eventFilters.timeRange}
+            onTimeRangeChange={(timeRange) => setEventFilters((f) => ({ ...f, timeRange }))}
+            onRefresh={() => setEventFilters((f) => ({ ...f }))}
+            onEventClick={(eventId) => setSelectedEventId(eventId)}
+            onFetchPageContext={fetchPageContext}
+            onOpenContextPanel={() => setContextPanelOpen(true)}
+          />
         </div>
       )}
 

@@ -91,7 +91,6 @@ function SearchWorkspaceContent() {
   // Load session from localStorage or from API (search history)
   useEffect(() => {
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:effect',message:'Load session effect entry',data:{sessionId,hasUser:!!user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H4'})}).catch(()=>{});
     // #endregion
     if (!sessionId) {
       navigate('/search');
@@ -104,14 +103,12 @@ function SearchWorkspaceContent() {
 
     const storedSession = localStorage.getItem(`search-session-${sessionId}`);
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:storedSession',message:'Stored session check',data:{sessionId,hasStoredSession:!!storedSession,storedLen:storedSession?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H3'})}).catch(()=>{});
     // #endregion
     if (storedSession) {
       try {
         const parsed = JSON.parse(storedSession);
         if (!cancelled) setSession(parsed);
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:parsed',message:'Session from localStorage',data:{hasResults:Array.isArray(parsed?.results),resultsLen:parsed?.results?.length,hasGraph:!!parsed?.graph},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
         // #endregion
       } catch (err: any) {
         if (!cancelled) {
@@ -119,7 +116,6 @@ function SearchWorkspaceContent() {
           toast.error('Failed to load session', { description: 'Session data is corrupted', duration: 5000 });
         }
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:parseError',message:'Parse error localStorage',data:{err:err?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
         // #endregion
       }
       if (!cancelled) setIsLoading(false);
@@ -131,12 +127,10 @@ function SearchWorkspaceContent() {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (user?.id) headers['x-clerk-user-id'] = user.id;
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:fetchStart',message:'Fetch session from API',data:{sessionId,hasClerkHeader:!!user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H2'})}).catch(()=>{});
       // #endregion
       const res = await fetch(`/api/search/session/${sessionId}`, { headers });
       if (cancelled) return;
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:fetchDone',message:'API response',data:{ok:res.ok,status:res.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H2'})}).catch(()=>{});
       // #endregion
       if (res.ok) {
         const data = await res.json();
@@ -144,7 +138,6 @@ function SearchWorkspaceContent() {
           setSession(data.session);
           localStorage.setItem(`search-session-${sessionId}`, JSON.stringify(data.session));
           // #region agent log
-          fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:setSessionApi',message:'Session set from API',data:{hasResults:Array.isArray(data.session?.results),resultsLen:data.session?.results?.length,hasGraph:!!data.session?.graph},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3,H5'})}).catch(()=>{});
           // #endregion
         } else {
           setError('Session not found');
@@ -270,7 +263,6 @@ function SearchWorkspaceContent() {
 
   if (isLoading) {
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:render',message:'Render branch: loading',data:{isLoading,error:error||null,hasSession:!!session},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
     // #endregion
     return (
       <AppShell>
@@ -287,7 +279,6 @@ function SearchWorkspaceContent() {
 
   if (error || !session) {
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:render',message:'Render branch: error',data:{isLoading,error:error||null,hasSession:!!session},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H2,H4'})}).catch(()=>{});
     // #endregion
     return (
       <AppShell>
@@ -311,7 +302,6 @@ function SearchWorkspaceContent() {
 
   const selectedResult = session.results.find(r => r.id === selectedResultId) || null;
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchWorkspace.tsx:render',message:'Render branch: success',data:{resultsLen:session?.results?.length,hasGraph:!!session?.graph},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3,H5'})}).catch(()=>{});
   // #endregion
 
   return (

@@ -230,7 +230,6 @@ function SearchResponsePageContent() {
 
   useEffect(() => {
     if (!session || !sessionId) return;
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchResponsePage.tsx:render-state',message:'building/hasGraph state',data:{building,hasGraph,threadId:threadId||null,sessionId,showLoadingBlock},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
   }, [building, hasGraph, threadId, sessionId, session, showLoadingBlock]);
 
   return (

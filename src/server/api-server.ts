@@ -1208,7 +1208,6 @@ app.get('/api/investigations/:threadId/signals', async (req, res) => {
 app.get('/api/investigations/:threadId/detective-graph', async (req, res) => {
   const threadIdParam = req.params.threadId;
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:detective-graph-entry',message:'GET detective-graph entry',data:{threadId:threadIdParam},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
   // #endregion
   try {
     const { threadId } = req.params;
@@ -1232,7 +1231,6 @@ app.get('/api/investigations/:threadId/detective-graph', async (req, res) => {
     const { loadGraphForInvestigation } = await import('./services/detective-graph-persistence.js');
     const graph = await loadGraphForInvestigation(supabase, threadId);
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:detective-graph-result',message:'GET detective-graph result',data:{threadId,hasGraph:!!graph,nodeCount:graph?.nodes?.length??0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
     // #endregion
     if (!graph) {
       return res.status(200).json({ success: true, graph: null });
@@ -3540,6 +3538,170 @@ app.get('/api/eventregistry/health', async (req, res) => {
   }
 });
 
+// GET /api/globe/events - Aggregated events for globe (Events API + Discover + Perplexity)
+app.get('/api/globe/events', async (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+    const sourcesParam = (req.query.sources as string) || 'events,discover'; // events | discover | perplexity | events,discover
+    const sources = new Set(sourcesParam.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean));
+    const includeEvents = sources.has('events');
+    const includeDiscover = sources.has('discover') || sources.has('perplexity');
+
+    const {
+      dateFrom,
+      dateTo,
+      limit = 50,
+      offset = 0,
+      region,
+      sector,
+      eventType,
+    } = req.query;
+
+    let events: any[] = [];
+
+    if (includeEvents && supabase) {
+      const { getNormalizedEvents } = await import('../lib/supabase.js');
+      const supabaseUserId = userId ? await getSupabaseUserId(userId, supabase) : null;
+      const options: any = {
+        limit: Math.min(parseInt(limit as string, 10) || 50, 100),
+        offset: parseInt(offset as string, 10) || 0,
+      };
+      if (dateFrom) options.dateFrom = dateFrom as string;
+      if (dateTo) options.dateTo = dateTo as string;
+      if (region) options.region = region as string;
+      if (sector) options.sector = sector as string;
+      if (eventType) options.eventType = eventType as string;
+      const dbEvents = await getNormalizedEvents(options, supabaseUserId || undefined);
+      events = dbEvents;
+    }
+
+    if (includeDiscover) {
+      const { fetchDiscoverItems } = await import('./services/discover-service.js');
+      const { fetchDiscoverNewsFromPerplexity } = await import('./services/discover-perplexity-feed.js');
+      const category = 'all';
+      const limitDiscover = 20;
+      let discoverItems: any[] = [];
+      try {
+        const supabaseUserIdForDiscover = userId && supabase ? await getSupabaseUserId(userId, supabase) : null;
+        discoverItems = await fetchDiscoverItems(
+          category,
+          { offset: 0, limit: limitDiscover },
+          supabaseUserIdForDiscover ?? undefined,
+          undefined,
+          '7d',
+          'relevance'
+        );
+      } catch (_) {}
+      let perplexityItems: any[] = [];
+      if (process.env.PERPLEXITY_API_KEY) {
+        try {
+          perplexityItems = await fetchDiscoverNewsFromPerplexity(category, 10);
+        } catch (_) {}
+      }
+      const mergedDiscover = [...perplexityItems, ...discoverItems];
+      const categoryToRegion: Record<string, string> = {
+        all: 'Global',
+        tech: 'North America',
+        finance: 'Global',
+        geopolitics: 'Middle East',
+        energy: 'Middle East',
+        'supply-chain': 'Asia',
+      };
+      const discoverAsEvents = mergedDiscover.slice(0, 25).map((item: any) => ({
+        id: item.id,
+        event_id: item.id,
+        type: 'event',
+        scope: null,
+        impact: null,
+        horizon: null,
+        source_count: item.sources?.length || 1,
+        last_updated: item.metadata?.updated_at || new Date().toISOString(),
+        headline: item.title || '',
+        description: item.summary || item.title || '',
+        date: item.metadata?.published_at || new Date().toISOString(),
+        location: null,
+        actors: [],
+        sectors: [],
+        sources: (item.sources || []).map((s: any) => ({ name: s.name || 'Source', url: s.url || '' })),
+        region: categoryToRegion[item.category] || 'Global',
+        country: null,
+        source_type: item.id.startsWith('perplexity-') ? 'perplexity' : 'discover',
+      }));
+      events = [...events, ...discoverAsEvents];
+    }
+
+    res.json({
+      success: true,
+      data: {
+        events,
+        total: events.length,
+        sources: Array.from(sources),
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Globe events error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to load globe events',
+    });
+  }
+});
+
+// POST /api/discover/page-context - Generate AI page context for Discover/Globe (OpenAI)
+app.post('/api/discover/page-context', async (req, res) => {
+  try {
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) {
+      return res.status(503).json({
+        success: false,
+        error: 'OPENAI_API_KEY not configured. Configure it in .env to use page context.',
+      });
+    }
+    const body = req.body || {};
+    const timeRange = (body.timeRange as string) || '7d';
+    const eventSummaries = Array.isArray(body.eventSummaries) ? body.eventSummaries : [];
+    const summariesText =
+      eventSummaries.length > 0
+        ? eventSummaries
+            .slice(0, 80)
+            .map(
+              (s: { headline?: string; category?: string; region?: string }) =>
+                `- ${[s.headline || '', s.category || '', s.region || ''].filter(Boolean).join(' · ')}`
+            )
+            .join('\n')
+        : 'Aucun événement fourni pour cette période.';
+
+    const OpenAI = (await import('openai')).default;
+    const openai = new OpenAI({ apiKey: openaiApiKey });
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content:
+            'Tu es un analyste en veille stratégique. Tu synthétises en 2 à 4 phrases courtes le contexte géopolitique et économique de la période, sans inventer de faits. Réponds uniquement en français, ton professionnel et factuel.',
+        },
+        {
+          role: 'user',
+          content: `Période : ${timeRange}. Événements sur la carte :\n${summariesText}\n\nGénère un paragraphe de contexte stratégique pour cette vue (tendances, zones de tension, points d'attention).`,
+        },
+      ],
+      max_tokens: 400,
+      temperature: 0.4,
+    });
+    const context =
+      response.choices?.[0]?.message?.content?.trim() ||
+      'Impossible de générer le contexte pour le moment.';
+    res.json({ success: true, context });
+  } catch (error: any) {
+    console.error('[API] Discover page-context error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate page context',
+    });
+  }
+});
+
 // GET /api/discover/saved - List saved (library) items for user
 app.get('/api/discover/saved', async (req, res) => {
   try {
@@ -4037,7 +4199,6 @@ app.post('/api/search', async (req, res) => {
 // POST /api/search/session - Create new search session
 app.post('/api/search/session', async (req, res) => {
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3225',message:'Endpoint entry',data:{body:req.body,headers:Object.keys(req.headers),hasSupabase:!!supabase},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C'})}).catch(()=>{});
   // #endregion
 
   try {
@@ -4046,7 +4207,6 @@ app.post('/api/search/session', async (req, res) => {
     const clerkUserId = req.headers['x-clerk-user-id'] as string || null;
 
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3230',message:'Before userId extraction',data:{query,inputType,clerkUserId,hasSupabase:!!supabase},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C,D'})}).catch(()=>{});
     // #endregion
 
     let userId = null;
@@ -4054,11 +4214,9 @@ app.post('/api/search/session', async (req, res) => {
       try {
         userId = await getSupabaseUserId(clerkUserId, supabase);
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3236',message:'After userId extraction',data:{userId,clerkUserId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
         // #endregion
       } catch (userIdError: any) {
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3240',message:'UserId extraction error',data:{error:userIdError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
         // #endregion
         // Continue without userId if extraction fails
       }
@@ -4066,7 +4224,6 @@ app.post('/api/search/session', async (req, res) => {
 
     if (!query || typeof query !== 'string' || !query.trim()) {
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3248',message:'Query validation failed',data:{query,queryType:typeof query},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       // #endregion
       return res.status(400).json({
         success: false,
@@ -4077,7 +4234,6 @@ app.post('/api/search/session', async (req, res) => {
     console.log(`[API] Creating search session: "${query}" (type: ${inputType})`);
 
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3256',message:'Before search execution',data:{query,inputType,sessionId:`session-${Date.now()}-${Math.random().toString(36).substring(7)}`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
 
     // Generate session ID
@@ -4087,7 +4243,6 @@ app.post('/api/search/session', async (req, res) => {
     
     if (inputType === 'url') {
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3262',message:'URL processing branch',data:{query:query.trim(),queryLength:query.trim().length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       // #endregion
 
       // Validate and clean URL
@@ -4098,7 +4253,6 @@ app.post('/api/search/session', async (req, res) => {
         cleanUrl = testUrl.href; // Normalize URL
       } catch (urlError: any) {
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3268',message:'Invalid URL format',data:{query:cleanUrl,error:urlError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
         throw new Error(`Invalid URL format: ${urlError.message}`);
       }
@@ -4107,18 +4261,15 @@ app.post('/api/search/session', async (req, res) => {
         // Process URL: Tavily context + Firecrawl extraction
         const { processLink } = await import('./services/link-intelligence.js');
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3277',message:'Before processLink',data:{cleanUrl,urlLength:cleanUrl.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
         const linkResult = await processLink(cleanUrl, undefined, { permissive: true });
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3271',message:'After processLink',data:{hasResult:!!linkResult.result,hasGraph:!!linkResult.graph,fallbackUsed:linkResult.fallbackUsed},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
         
         // Also search Tavily for context around the URL
         const { searchTavily } = await import('./services/tavily-unified-service.js');
         const domain = new URL(cleanUrl).hostname;
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3276',message:'Before searchTavily',data:{domain},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
         const tavilyContext = await searchTavily(domain, 'news', {
           searchDepth: 'advanced',
@@ -4126,7 +4277,6 @@ app.post('/api/search/session', async (req, res) => {
           includeRawContent: true,
         });
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3283',message:'After searchTavily',data:{articlesCount:tavilyContext.articles?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
 
       // Combine results
@@ -4164,29 +4314,24 @@ app.post('/api/search/session', async (req, res) => {
       };
       } catch (urlError: any) {
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3288',message:'URL processing error',data:{errorName:urlError?.name,errorMessage:urlError?.message,errorStack:urlError?.stack?.substring(0,500),errorCode:urlError?.code,errorType:urlError?.errorType},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
         console.error('[API] URL processing error:', urlError);
         throw urlError;
       }
     } else {
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3294',message:'Text search branch',data:{query:query.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       // #endregion
 
       try {
         // Text search: use search orchestrator
         const { search } = await import('./services/search-orchestrator.js');
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3298',message:'Before search orchestrator',data:{query:query.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
         searchResult = await search(query.trim(), 'standard', {}, userId);
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3301',message:'After search orchestrator',data:{resultsCount:searchResult?.results?.length||0,hasGraph:!!searchResult?.graph},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
       } catch (textError: any) {
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3305',message:'Text search error',data:{error:textError?.message,stack:textError?.stack?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
         throw textError;
       }
@@ -4228,7 +4373,6 @@ app.post('/api/search/session', async (req, res) => {
     }
 
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3317',message:'Before response',data:{sessionId,resultsCount:session.results?.length||0,hasGraph:!!session.graph},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
 
     res.json({
@@ -4238,7 +4382,6 @@ app.post('/api/search/session', async (req, res) => {
     });
 
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3325',message:'Response sent',data:{success:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
   } catch (error: any) {
     // #region agent log
@@ -4251,7 +4394,6 @@ app.post('/api/search/session', async (req, res) => {
       errorString: String(error),
       errorKeys: error ? Object.keys(error) : [],
     };
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3330',message:'Error caught in endpoint',data:errorDetails,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
     console.error('[API] Create session error:', error);
     console.error('[API] Error details:', errorDetails);
@@ -4266,7 +4408,6 @@ app.post('/api/search/session', async (req, res) => {
 app.get('/api/search/session/:id', async (req, res) => {
   // #region agent log
   const entryPayload = { location: 'api-server.ts:GET session entry', message: 'GET search session', data: { id: req.params?.id, hasClerk: !!(req.headers['x-clerk-user-id']), hasSupabase: !!supabase }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1,H2' };
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entryPayload) }).catch(() => {});
   debugLog(entryPayload);
   // #endregion
   try {
@@ -4275,7 +4416,6 @@ app.get('/api/search/session/:id', async (req, res) => {
     if (!clerkUserId || !supabase) {
       // #region agent log
       const p404 = { location: 'api-server.ts:GET session 404 no clerk/supabase', message: 'Early 404', data: {}, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1' };
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p404) }).catch(() => {});
       debugLog(p404);
       // #endregion
       return res.status(404).json({
@@ -4287,7 +4427,6 @@ app.get('/api/search/session/:id', async (req, res) => {
     if (!userId) {
       // #region agent log
       const p404u = { location: 'api-server.ts:GET session 404 no userId', message: 'No supabase userId', data: {}, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1' };
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p404u) }).catch(() => {});
       debugLog(p404u);
       // #endregion
       return res.status(404).json({
@@ -4303,7 +4442,6 @@ app.get('/api/search/session/:id', async (req, res) => {
       .maybeSingle();
     // #region agent log
     const qPayload = { location: 'api-server.ts:GET session query', message: 'Supabase query result', data: { hasRow: !!row, hasSnapshot: !!row?.session_snapshot, dbError: error?.message }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H2,H3' };
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(qPayload) }).catch(() => {});
     debugLog(qPayload);
     // #endregion
     if (error || !row?.session_snapshot) {
@@ -4319,7 +4457,6 @@ app.get('/api/search/session/:id', async (req, res) => {
   } catch (error: any) {
     // #region agent log
     const catchPayload = { location: 'api-server.ts:GET session catch', message: 'Exception', data: { err: error?.message }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H2' };
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(catchPayload) }).catch(() => {});
     debugLog(catchPayload);
     // #endregion
     console.error('[API] Get session error:', error);
@@ -4334,7 +4471,6 @@ app.get('/api/search/session/:id', async (req, res) => {
 app.post('/api/search/session/:sessionId/playground', async (req, res) => {
   // #region agent log
   const sessionIdParam = req.params.sessionId?.trim();
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:playground-entry',message:'Playground POST entry',data:{sessionId:sessionIdParam,hasClerk:!!req.headers['x-clerk-user-id'],hasSupabase:!!supabase},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H3'})}).catch(()=>{});
   // #endregion
   try {
     const sessionId = sessionIdParam;
@@ -4353,7 +4489,6 @@ app.post('/api/search/session/:sessionId/playground', async (req, res) => {
       .eq('session_id', sessionId)
       .maybeSingle();
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:playground-session-fetch',message:'Playground session fetch',data:{sessionId,found:!!(row?.session_snapshot),dbError:error?.message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H3'})}).catch(()=>{});
     // #endregion
     if (error || !row?.session_snapshot) {
       return res.status(404).json({ success: false, error: 'Session not found' });
@@ -4361,7 +4496,6 @@ app.post('/api/search/session/:sessionId/playground', async (req, res) => {
     const session = row.session_snapshot as { query?: string; results?: Array<{ title?: string; summary?: string; url?: string }>; investigationThreadId?: string };
     const existingThreadId = session.investigationThreadId;
     if (existingThreadId) {
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:playground-return-existing',message:'Playground return existing threadId',data:{sessionId,threadId:existingThreadId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
       return res.json({ success: true, threadId: existingThreadId, graph: null });
     }
     const query = (session.query || '').trim();
@@ -4425,12 +4559,10 @@ app.post('/api/search/session/:sessionId/playground', async (req, res) => {
       // Still return threadId so client can poll
     }
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:playground-return-new',message:'Playground return new threadId',data:{sessionId,threadId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
     // #endregion
     res.json({ success: true, threadId, graph: null });
   } catch (err: any) {
     console.error('[API] Playground create:', err);
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:playground-catch',message:'Playground error',data:{error:err?.message,sessionId:req.params.sessionId?.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H3'})}).catch(()=>{});
     res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
   }
 });
