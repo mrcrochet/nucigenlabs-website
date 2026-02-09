@@ -56,14 +56,14 @@ export default function TimelineCard() {
 
   if (loading) {
     return (
-      <Card>
+      <Card className="p-5">
         <div className="h-64 animate-pulse bg-background-glass-subtle rounded-lg" />
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card className="p-5">
       <SectionHeader
         title="Event Timeline"
         subtitle="Indices et mouvements de marché bientôt disponibles"

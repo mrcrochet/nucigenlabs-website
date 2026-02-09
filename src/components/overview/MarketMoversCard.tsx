@@ -64,14 +64,14 @@ export default function MarketMoversCard() {
 
   if (loading) {
     return (
-      <Card>
+      <Card className="p-5">
         <div className="h-96 animate-pulse bg-background-glass-subtle rounded-lg" />
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card className="p-5">
       <SectionHeader title="Market Movers (24h)" />
       
       <div className="mt-4 space-y-2">

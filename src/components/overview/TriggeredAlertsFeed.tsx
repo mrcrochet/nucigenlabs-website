@@ -27,7 +27,11 @@ function normalizeSeverity(s: string | undefined): 'moderate' | 'high' | 'critic
   return 'moderate';
 }
 
-export default function TriggeredAlertsFeed() {
+interface TriggeredAlertsFeedProps {
+  onDataLoaded?: (count: number) => void;
+}
+
+export default function TriggeredAlertsFeed({ onDataLoaded }: TriggeredAlertsFeedProps) {
   const { user } = useUser();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,23 +61,25 @@ export default function TriggeredAlertsFeed() {
       .then((json) => {
         if (cancelled || !json) return;
         if (json.success && json.data?.alerts) {
-          setAlerts(
-            json.data.alerts.map((a: { id: string; title: string; severity?: string; triggered_at: string; related_event_id?: string }) => ({
-              id: a.id,
-              title: a.title || 'Alert',
-              severity: normalizeSeverity(a.severity),
-              triggeredAt: a.triggered_at,
-              relatedEventId: a.related_event_id,
-            }))
-          );
+          const mapped = json.data.alerts.map((a: { id: string; title: string; severity?: string; triggered_at: string; related_event_id?: string }) => ({
+            id: a.id,
+            title: a.title || 'Alert',
+            severity: normalizeSeverity(a.severity),
+            triggeredAt: a.triggered_at,
+            relatedEventId: a.related_event_id,
+          }));
+          setAlerts(mapped);
+          onDataLoaded?.(mapped.length);
         } else {
           setAlerts([]);
+          onDataLoaded?.(0);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setError('Indisponible');
           setAlerts([]);
+          onDataLoaded?.(0);
         }
       })
       .finally(() => {
@@ -86,7 +92,7 @@ export default function TriggeredAlertsFeed() {
 
   if (loading) {
     return (
-      <Card>
+      <Card className="p-5">
         <div className="h-64 animate-pulse bg-background-glass-subtle rounded-lg" />
       </Card>
     );
@@ -94,7 +100,7 @@ export default function TriggeredAlertsFeed() {
 
   if (alerts.length === 0) {
     return (
-      <Card>
+      <Card className="p-5">
         <SectionHeader title="Triggered Alerts" />
         <div className="mt-4 text-sm text-text-secondary flex items-center gap-2">
           <Bell className="w-4 h-4" />
@@ -116,7 +122,7 @@ export default function TriggeredAlertsFeed() {
   };
 
   return (
-    <Card>
+    <Card className="p-5">
       <SectionHeader title="Triggered Alerts" />
       
       <div className="mt-4 space-y-3">

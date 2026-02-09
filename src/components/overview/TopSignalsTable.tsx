@@ -54,14 +54,14 @@ export default function TopSignalsTable({ limit = 10 }: TopSignalsTableProps) {
 
   if (loading) {
     return (
-      <Card>
+      <Card className="p-5">
         <div className="h-64 animate-pulse bg-background-glass-subtle rounded-lg" />
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card className="p-5">
       <SectionHeader title="Top Signals" />
       
       <div className="mt-4 table-scroll">

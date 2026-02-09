@@ -83,7 +83,7 @@ export default function TopRisksCard() {
 
   if (loading) {
     return (
-      <Card>
+      <Card className="p-5">
         <SectionHeader title="Top Risks" />
         <div className="h-48 animate-pulse bg-background-glass-subtle rounded-lg mt-4" />
       </Card>
@@ -92,7 +92,7 @@ export default function TopRisksCard() {
 
   if (risks.length === 0) {
     return (
-      <Card>
+      <Card className="p-5">
         <SectionHeader title="Top Risks" />
         <div className="text-text-secondary text-sm mt-4">
           No significant risks detected in the last 7 days.
@@ -116,7 +116,7 @@ export default function TopRisksCard() {
   };
 
   return (
-    <Card>
+    <Card className="p-5">
       <SectionHeader title="Top Risks" />
       
       <div className="space-y-4 mt-4">

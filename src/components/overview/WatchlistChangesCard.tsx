@@ -24,7 +24,11 @@ interface WatchlistChange {
   relatedEventId?: string;
 }
 
-export default function WatchlistChangesCard() {
+interface WatchlistChangesCardProps {
+  onDataLoaded?: (count: number) => void;
+}
+
+export default function WatchlistChangesCard({ onDataLoaded }: WatchlistChangesCardProps) {
   const { user } = useUser();
   const [changes, setChanges] = useState<WatchlistChange[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,12 +67,15 @@ export default function WatchlistChangesCard() {
             relatedEventId: change.related_event_id,
           }));
           setChanges(mappedChanges);
+          onDataLoaded?.(mappedChanges.length);
         } else {
           setChanges([]);
+          onDataLoaded?.(0);
         }
       } catch (error) {
         console.error('Error loading watchlist changes:', error);
         setChanges([]);
+        onDataLoaded?.(0);
       } finally {
         setLoading(false);
       }
@@ -103,14 +110,14 @@ export default function WatchlistChangesCard() {
 
   if (loading) {
     return (
-      <Card>
+      <Card className="p-5">
         <div className="h-64 animate-pulse bg-background-glass-subtle rounded-lg" />
       </Card>
     );
   }
 
   return (
-    <Card>
+    <Card className="p-5">
       <SectionHeader title="Watchlist Changes" subtitle="What changed for you" />
       
       <div className="mt-4 space-y-3">

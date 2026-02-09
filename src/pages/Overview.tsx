@@ -1,19 +1,20 @@
 /**
  * Overview Page - Command Center
- * 
- * NEW ARCHITECTURE: "My World Changed"
- * 
- * This page must shock positively. Required content:
- * - Alertes déclenchées (top)
- * - Impacts sur MA watchlist
- * - 3 Decision Points clairs
- * - Exposition qui change
- * 
- * If a user arrives here and doesn't know what to do, it's failed.
+ *
+ * Layout priority (top → bottom):
+ * 1. KPI Strip — instant numerical pulse
+ * 2. Attention Required — alerts + decision points (hidden if empty)
+ * 3. Situation Briefing (8col) + Sidebar: Market Movers / Risks / Opportunities (4col)
+ * 4. Top Signals Table (full width)
+ * 5. Recent Events (6col) + Event Timeline (6col)
+ *
+ * Principle: answer 3 questions in 10 seconds:
+ *   "What changed?" → KPIs + Alerts
+ *   "What does it mean?" → Narrative + Risks
+ *   "What should I do?" → Decision Points + Emerging Signals
  */
 
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
 import AppShell from '../components/layout/AppShell';
 import HeaderBar from '../components/overview/HeaderBar';
 import KPIGrid from '../components/overview/KPIGrid';
@@ -29,17 +30,41 @@ import OpportunitiesCard from '../components/overview/OpportunitiesCard';
 import RecentEventsFeed from '../components/overview/RecentEventsFeed';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
-import { Bell, AlertCircle } from 'lucide-react';
-import Badge from '../components/ui/Badge';
+import { AlertTriangle, CheckCircle } from 'lucide-react';
 
 function OverviewContent() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [alertCount, setAlertCount] = useState<number | null>(null);
+  const [watchlistCount, setWatchlistCount] = useState<number | null>(null);
 
   useEffect(() => {
-    // Load overview data
     setLoading(false);
   }, []);
+
+  const handleAlertDataLoaded = useCallback((count: number) => {
+    setAlertCount(count);
+  }, []);
+
+  const handleWatchlistDataLoaded = useCallback((count: number) => {
+    setWatchlistCount(count);
+  }, []);
+
+  // Show attention section if we're still loading data or if there's content
+  const attentionDataReady = alertCount !== null && watchlistCount !== null;
+  const hasAttentionContent = !attentionDataReady || (alertCount ?? 0) > 0 || (watchlistCount ?? 0) > 0;
+
+  // Determine how many columns are visible in attention section
+  const attentionVisibleCards = [
+    (alertCount ?? 0) > 0 || !attentionDataReady,
+    true, // ActionItems always shows (hardcoded data for now)
+    (watchlistCount ?? 0) > 0 || !attentionDataReady,
+  ].filter(Boolean).length;
+
+  const attentionGridCols = attentionVisibleCards === 3
+    ? 'lg:grid-cols-3'
+    : attentionVisibleCards === 2
+    ? 'lg:grid-cols-2'
+    : 'lg:grid-cols-1';
 
   if (loading) {
     return (
@@ -53,7 +78,7 @@ function OverviewContent() {
 
   return (
     <AppShell>
-      <SEO 
+      <SEO
         title="Overview — Nucigen"
         description="Command Center: What changed and what to do"
       />
@@ -63,64 +88,77 @@ function OverviewContent() {
         <HeaderBar />
       </div>
 
-      {/* NEW: Command Center Section - Top Priority */}
-      <div className="col-span-1 sm:col-span-12 mb-6">
-        <div className="backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/10 to-[#E1463E]/5 border border-[#E1463E]/20 rounded-2xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Bell className="w-5 h-5 text-[#E1463E]" />
-            <h2 className="text-xl font-semibold text-text-primary">My World Changed</h2>
-          </div>
-          <p className="text-sm text-text-secondary mb-6">
-            Here's what changed for you, now, and what you need to do.
-          </p>
-          
-          {/* Command Center Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Alertes déclenchées */}
-            <div className="lg:col-span-1">
-              <TriggeredAlertsFeed />
-            </div>
-            
-            {/* Decision Points */}
-            <div className="lg:col-span-1">
-              <ActionItemsCard />
-            </div>
-            
-            {/* Watchlist Changes */}
-            <div className="lg:col-span-1">
-              <WatchlistChangesCard />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Row 2: KPIGrid (4 cards) */}
+      {/* Row 2: KPI Strip — instant numerical pulse */}
       <div className="col-span-1 sm:col-span-12">
         <KPIGrid />
       </div>
 
-      {/* Row 3: Left (8) + Right (4) */}
+      {/* Row 3: Attention Required — alerts + decision points */}
+      {hasAttentionContent ? (
+        <div className="col-span-1 sm:col-span-12">
+          <div className="backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/8 to-[#E1463E]/3 border border-[#E1463E]/15 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertTriangle className="w-4 h-4 text-[#E1463E]" />
+              <h2 className="text-lg font-medium text-text-primary">Attention Required</h2>
+            </div>
+
+            <div className={`grid grid-cols-1 ${attentionGridCols} gap-4`}>
+              {/* Triggered Alerts — only show if has data or still loading */}
+              {((alertCount ?? 0) > 0 || !attentionDataReady) && (
+                <div>
+                  <TriggeredAlertsFeed onDataLoaded={handleAlertDataLoaded} />
+                </div>
+              )}
+
+              {/* Decision Points — always visible */}
+              <div>
+                <ActionItemsCard />
+              </div>
+
+              {/* Watchlist Changes — only show if has data or still loading */}
+              {((watchlistCount ?? 0) > 0 || !attentionDataReady) && (
+                <div>
+                  <WatchlistChangesCard onDataLoaded={handleWatchlistDataLoaded} />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="col-span-1 sm:col-span-12">
+          <div className="flex items-center gap-3 py-4 px-5 bg-green-500/5 border border-green-500/15 rounded-xl">
+            <CheckCircle className="w-4 h-4 text-green-500" />
+            <span className="text-sm text-text-secondary">All clear — no alerts or watchlist changes requiring attention.</span>
+            {/* Hidden components to still trigger data loading */}
+            <div className="hidden">
+              <TriggeredAlertsFeed onDataLoaded={handleAlertDataLoaded} />
+              <WatchlistChangesCard onDataLoaded={handleWatchlistDataLoaded} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Row 4: Situation Briefing (8col) + Sidebar (4col) */}
       <div className="col-span-1 sm:col-span-8 space-y-6">
         <NarrativeCard />
-        <TimelineCard />
       </div>
-      <div className="col-span-1 sm:col-span-4 space-y-6">
+      <div className="col-span-1 sm:col-span-4 space-y-4">
         <MarketMoversCard />
         <TopRisksCard />
         <OpportunitiesCard />
       </div>
 
-      {/* Row 4: TopSignalsTable (Top 5) */}
+      {/* Row 5: Top Signals Table (full width) */}
       <div className="col-span-1 sm:col-span-12">
         <TopSignalsTable limit={5} />
       </div>
 
-      {/* Row 5: Left (6) + Right (6) */}
+      {/* Row 6: Recent Events (6col) + Event Timeline (6col) */}
       <div className="col-span-1 sm:col-span-6">
         <RecentEventsFeed />
       </div>
       <div className="col-span-1 sm:col-span-6">
-        {/* Additional context can go here */}
+        <TimelineCard />
       </div>
     </AppShell>
   );
