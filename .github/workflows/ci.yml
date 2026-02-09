@@ -1,4 +1,4 @@
-# CI: build on push (pour les status checks GitHub)
+# CI: build, typecheck et tests on push
 # Lint désactivé tant que le projet n'est pas au vert (trop d'erreurs ESLint existantes)
 name: CI
 
@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    name: Build
+    name: Build & Verify
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +23,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run tests
+        run: npm test
 
       - name: Build
         run: npm run build
