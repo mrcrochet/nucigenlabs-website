@@ -65,14 +65,17 @@ export default function EventCard({ event, onClick }: EventCardProps) {
         </div>
       )}
 
-      {/* Sector chip */}
-      {event.sectors.length > 0 && (
-        <div className="mb-3">
+      {/* Sector + category (event_type) — classification badges */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        {event.sectors.length > 0 && (
           <Badge variant="sector">{event.sectors[0]}</Badge>
-        </div>
-      )}
+        )}
+        {(event as Event & { event_type?: string }).event_type && (
+          <Badge variant="category">{(event as Event & { event_type?: string }).event_type}</Badge>
+        )}
+      </div>
 
-      {/* Bottom row: Sources + Market Reaction */}
+      {/* Bottom row: Sources (micro-source) + Market Reaction */}
       <div className="flex items-center justify-between pt-3 border-t border-borders-subtle">
         {/* Source count + logos */}
         <div className="flex items-center gap-2">

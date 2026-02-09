@@ -5,7 +5,7 @@
  * results where the entity appears, and graph links involving this entity.
  */
 
-import { X, FileText, Link2 } from 'lucide-react';
+import { X, FileText, Link2, Focus } from 'lucide-react';
 import type { GraphNode, KnowledgeGraph, SearchResult } from '../../types/search';
 
 interface EntityDetailsDrawerProps {
@@ -14,6 +14,8 @@ interface EntityDetailsDrawerProps {
   graph: KnowledgeGraph;
   isOpen: boolean;
   onClose: () => void;
+  /** When set, shows a button to view the subgraph around this entity */
+  onFocusSubgraph?: (nodeId: string) => void;
 }
 
 function getNodeLabelById(graph: KnowledgeGraph, id: string): string {
@@ -27,6 +29,7 @@ export default function EntityDetailsDrawer({
   graph,
   isOpen,
   onClose,
+  onFocusSubgraph,
 }: EntityDetailsDrawerProps) {
   if (!isOpen) return null;
 
@@ -61,6 +64,19 @@ export default function EntityDetailsDrawer({
               <X className="w-5 h-5 text-text-secondary" />
             </button>
           </div>
+
+          {onFocusSubgraph && (
+            <div>
+              <button
+                type="button"
+                onClick={() => onFocusSubgraph(entityNode.id)}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-borders-subtle bg-background-glass-subtle hover:bg-background-glass-medium text-text-primary text-sm"
+              >
+                <Focus className="w-4 h-4" />
+                Voir le sous-graphe
+              </button>
+            </div>
+          )}
 
           {resultsWhereEntityAppears.length > 0 && (
             <div>

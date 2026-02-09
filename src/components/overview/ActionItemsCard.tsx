@@ -92,14 +92,14 @@ export default function ActionItemsCard() {
 
   if (loading) {
     return (
-      <Card className="p-5">
+      <Card>
         <div className="h-64 animate-pulse bg-background-glass-subtle rounded-lg" />
       </Card>
     );
   }
 
   return (
-    <Card className="p-5">
+    <Card>
       <SectionHeader title="Decision Points" subtitle="What to do now — Données indicatives" />
       
       <div className="mt-4 space-y-3">

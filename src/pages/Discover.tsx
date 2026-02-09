@@ -33,11 +33,13 @@ import ViewModeToggle, { type ViewMode } from '../components/discover/ViewModeTo
 import AdvancedFilters, { type AdvancedFilters as AdvancedFiltersType } from '../components/discover/AdvancedFilters';
 import { DiscoverErrorBoundary } from '../components/discover/DiscoverErrorBoundary';
 import SkeletonCard from '../components/ui/SkeletonCard';
-import EventFiltersRail from '../components/events/EventFiltersRail';
-import EventsList from '../components/events/EventsList';
 import ContextInspector from '../components/events/ContextInspector';
-import { Loader2, Filter, Sparkles, Newspaper } from 'lucide-react';
+import DiscoverGlobeView from '../components/discover/DiscoverGlobeView';
+import PageContextPanel from '../components/discover/PageContextPanel';
+import { GLOBE_CATEGORIES, eventToGlobeCategory } from '../constants/globe-semantics';
+import { Loader2, Filter, Newspaper, X, Globe } from 'lucide-react';
 import { getOrCreateSupabaseUserId, updateUserPreferences } from '../lib/supabase';
+import { apiUrl } from '../lib/api-base';
 import type { Event } from '../types/intelligence';
 import { trackPageView, trackItemView, trackItemSave, trackItemShare, trackFilterChange, trackViewModeChange, trackAdvancedFilterApply, trackSectorFilter, trackRegionFilter, trackEntityFilter, trackPredictionView, trackVirtualScrollEnabled } from '../lib/analytics';
 
@@ -134,6 +136,9 @@ function DiscoverContent() {
   const [events, setEvents] = useState<Event[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [contextPanelOpen, setContextPanelOpen] = useState(false);
+  const [pageContext, setPageContext] = useState<string | null>(null);
+  const [contextLoading, setContextLoading] = useState(false);
 
   // Persist view mode preference
   useEffect(() => {
@@ -179,7 +184,7 @@ function DiscoverContent() {
 
   // Actualité: fetch events when segment is actualité and filters change
   useEffect(() => {
-    if (sourceMode !== 'actualite') return;
+    if (sourceMode !== 'discover') return;
 
     const controller = new AbortController();
     const isActiveRef = { current: true };
@@ -232,6 +237,34 @@ function DiscoverContent() {
       controller.abort();
     };
   }, [sourceMode, eventFilters, user?.id]);
+
+  const fetchPageContext = useCallback(async () => {
+    setContextLoading(true);
+    setPageContext(null);
+    try {
+      const timeRange = eventFilters.timeRange || '7d';
+      const eventSummaries = events.slice(0, 80).map((e) => ({
+        headline: e.headline ?? '',
+        category: GLOBE_CATEGORIES[eventToGlobeCategory(e)].shortLabel,
+        region: e.region || e.country || undefined,
+      }));
+      const res = await fetch(apiUrl('/api/discover/page-context'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timeRange, eventSummaries }),
+      });
+      const data = await res.json();
+      if (data.success && typeof data.context === 'string') {
+        setPageContext(data.context);
+      } else {
+        setPageContext('Impossible de générer le contexte. Vérifiez OPENAI_API_KEY.');
+      }
+    } catch (_) {
+      setPageContext('Erreur lors de la génération du contexte.');
+    } finally {
+      setContextLoading(false);
+    }
+  }, [events, eventFilters.timeRange]);
 
   // Keyboard shortcuts
   useHotkeys('esc', () => {
@@ -446,15 +479,15 @@ function DiscoverContent() {
   // Save mutation with optimistic updates
   const saveMutation = useMutation({
     mutationFn: async (itemId: string) => {
-      const userId = user ? await getOrCreateSupabaseUserId(user.id) : undefined;
-      if (!userId) {
-        throw new Error('User ID required');
+      if (!user?.id) {
+        throw new Error('Connectez-vous pour sauvegarder');
       }
 
-      const response = await fetch(`/api/discover/${itemId}/save?userId=${userId}`, {
+      const response = await fetch(apiUrl(`/api/discover/${itemId}/save`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-clerk-user-id': user.id,
         },
       });
 
@@ -570,7 +603,7 @@ function DiscoverContent() {
     }
   }, [items, queryClient, user]);
 
-  if (sourceMode === 'discover' && isLoading) {
+  if (sourceMode === 'actualite' && isLoading) {
     return (
       <AppShell>
         <SEO title="Discover — Nucigen" description="Explore insights, trends, and analysis" />
@@ -585,7 +618,7 @@ function DiscoverContent() {
     );
   }
 
-  if (sourceMode === 'discover' && isError && items.length === 0) {
+  if (sourceMode === 'actualite' && isError && items.length === 0) {
     const errorMessage = error instanceof Error ? error.message : 'Failed to load discover items';
     return (
       <AppShell>
@@ -607,10 +640,33 @@ function DiscoverContent() {
     );
   }
 
-  const showRightInspector = sourceMode === 'actualite' && !!selectedEventId;
-  const rightInspectorContent = sourceMode === 'actualite' && selectedEventId
-    ? <ContextInspector eventId={selectedEventId} />
-    : null;
+  const showRightInspector = sourceMode === 'discover' && (!!selectedEventId || contextPanelOpen);
+  const rightInspectorContent = sourceMode === 'discover' ? (
+    selectedEventId ? (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-end gap-2 mb-3 pb-2 border-b border-[#2A2A2A]">
+          <button
+            type="button"
+            onClick={() => setSelectedEventId(null)}
+            className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Fermer le panneau"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <ContextInspector eventId={selectedEventId} />
+        </div>
+      </div>
+    ) : contextPanelOpen ? (
+      <PageContextPanel
+        context={pageContext}
+        loading={contextLoading}
+        onRegenerate={fetchPageContext}
+        onClose={() => setContextPanelOpen(false)}
+      />
+    ) : null
+  ) : null;
 
   return (
     <AppShell
@@ -618,25 +674,13 @@ function DiscoverContent() {
       rightInspectorContent={rightInspectorContent}
     >
       <SEO
-        title={sourceMode === 'actualite' ? 'Actualité — Nucigen' : 'Discover — Nucigen'}
-        description={sourceMode === 'actualite' ? 'Flux factuel : qui, quoi, où, quand et preuves' : 'Explore insights, trends, and analysis'}
+        title={sourceMode === 'actualite' ? 'Actualité — Nucigen' : 'Discover what\'s happening in the world — Nucigen'}
+        description={sourceMode === 'actualite' ? 'Actualités entreprises, marchés, géopolitique — filtrez par catégorie et par période.' : 'Flux factuel : qui, quoi, où, quand et preuves'}
       />
 
-      {/* Segment toggle: Discover | Actualité */}
+      {/* Segment toggle: Actualité (news) | Discover what's happening in the world (globe) */}
       <div className="col-span-1 sm:col-span-12 mb-4">
         <div className="flex items-center gap-1 p-1 bg-white/[0.03] rounded-lg border border-white/[0.06] w-full sm:w-fit">
-          <button
-            type="button"
-            onClick={() => setSourceMode('discover')}
-            className={`flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-md text-sm font-light transition-colors min-h-[44px] ${
-              sourceMode === 'discover'
-                ? 'bg-white/10 text-white'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 flex-shrink-0" />
-            <span>Discover</span>
-          </button>
           <button
             type="button"
             onClick={() => setSourceMode('actualite')}
@@ -649,75 +693,71 @@ function DiscoverContent() {
             <Newspaper className="w-4 h-4 flex-shrink-0" />
             <span>Actualité</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setSourceMode('discover')}
+            className={`flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2.5 sm:py-2 rounded-md text-sm font-light transition-colors min-h-[44px] ${
+              sourceMode === 'discover'
+                ? 'bg-white/10 text-white'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Globe className="w-4 h-4 flex-shrink-0" />
+            <span>Discover what&apos;s happening in the world</span>
+          </button>
         </div>
       </div>
 
-      {/* Header */}
-      <div className="col-span-1 sm:col-span-12 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl sm:text-4xl font-light text-white mb-1">
-            {sourceMode === 'actualite' ? 'Actualité' : 'Discover'}
-          </h1>
-          <p className="text-slate-400 text-sm font-light">
-            {sourceMode === 'actualite'
-              ? 'Flux factuel : qui, quoi, où, quand — filtrez par type, région, secteur et période.'
-              : 'Actualités entreprises, marchés, géopolitique — filtrez par catégorie et par période.'}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            if (sourceMode === 'actualite') {
-              setEventFilters((f) => ({ ...f })); // trigger events refetch
-            } else {
-              refetch();
-            }
-          }}
-          disabled={sourceMode === 'actualite' ? eventsLoading : isRefreshing}
-          className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light shrink-0 self-start sm:self-center disabled:opacity-50"
-          aria-label="Actualiser le fil"
-        >
-          <Loader2 className={`w-4 h-4 ${(sourceMode === 'actualite' ? eventsLoading : isRefreshing) ? 'animate-spin' : ''}`} />
-          Actualiser
-        </button>
-      </div>
-
-      {/* Mode Actualité: EventFiltersRail + EventsList */}
-      {sourceMode === 'actualite' && (
-        <div className="col-span-1 sm:col-span-12">
-          {/* Mobile: time range only */}
-          <div className="lg:hidden mb-4 flex gap-2">
-            {(['24h', '7d', '30d'] as const).map((range) => (
-              <button
-                key={range}
-                onClick={() => setEventFilters((f) => ({ ...f, timeRange: range }))}
-                className={`flex-1 px-3 py-2 rounded-lg text-sm font-light transition-colors ${
-                  eventFilters.timeRange === range
-                    ? 'bg-[#E1463E]/20 text-[#E1463E] border border-[#E1463E]/40'
-                    : 'bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                {range}
-              </button>
-            ))}
+      {/* Header (hidden when globe for full-screen) */}
+      {sourceMode !== 'discover' && (
+        <div className="col-span-1 sm:col-span-12 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-light text-white mb-1">
+              {sourceMode === 'actualite' ? 'Actualité' : 'Discover what\'s happening in the world'}
+            </h1>
+            <p className="text-slate-400 text-sm font-light">
+              {sourceMode === 'actualite'
+                ? 'Actualités entreprises, marchés, géopolitique — filtrez par catégorie et par période.'
+                : 'Flux factuel : qui, quoi, où, quand — filtrez par type, région, secteur et période.'}
+            </p>
           </div>
-          <div className="flex gap-6">
-            <div className="w-56 flex-shrink-0 hidden lg:block">
-              <EventFiltersRail filters={eventFilters} onFiltersChange={setEventFilters} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <EventsList
-                events={events}
-                loading={eventsLoading}
-                onEventClick={(eventId) => setSelectedEventId(eventId)}
-              />
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (sourceMode === 'discover') {
+                setEventFilters((f) => ({ ...f })); // trigger events refetch
+              } else {
+                refetch();
+              }
+            }}
+            disabled={sourceMode === 'discover' ? eventsLoading : isRefreshing}
+            className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white hover:bg-white/10 transition-colors text-sm font-light shrink-0 self-start sm:self-center disabled:opacity-50"
+            aria-label="Actualiser le fil"
+          >
+            <Loader2 className={`w-4 h-4 ${(sourceMode === 'discover' ? eventsLoading : isRefreshing) ? 'animate-spin' : ''}`} />
+            Actualiser
+          </button>
         </div>
       )}
 
-      {/* Mode Discover: Filters + View Mode + Main Content */}
+      {/* Mode Discover: globe (what's happening in the world) */}
       {sourceMode === 'discover' && (
+        <div className="col-span-1 sm:col-span-12 relative min-h-[70vh] sm:min-h-[calc(100vh-14rem)]">
+          <DiscoverGlobeView
+            events={events}
+            loading={eventsLoading}
+            timeRange={eventFilters.timeRange}
+            onTimeRangeChange={(timeRange) => setEventFilters((f) => ({ ...f, timeRange }))}
+            onRefresh={() => setEventFilters((f) => ({ ...f }))}
+            onEventClick={(eventId) => setSelectedEventId(eventId)}
+            onFetchPageContext={fetchPageContext}
+            onOpenContextPanel={() => setContextPanelOpen(true)}
+          />
+        </div>
+      )}
+
+      {/* Mode Actualité: news feed (Filters + View Mode + Main Content) */}
+      {sourceMode === 'actualite' && (
         <>
           {/* Filters + View Mode Toggle */}
           <div className="col-span-1 sm:col-span-12 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

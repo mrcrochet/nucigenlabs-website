@@ -55,9 +55,6 @@ const IntelligenceFeed = lazy(() => import('./pages/IntelligenceFeed'));
 const Research = lazy(() => import('./pages/Research'));
 const SearchHome = lazy(() => import('./pages/SearchHome'));
 const SearchWorkspace = lazy(() => import('./pages/SearchWorkspace'));
-const SearchResponsePage = lazy(() => import('./pages/SearchResponsePage'));
-const InvestigationsPage = lazy(() => import('./pages/InvestigationsPage'));
-const InvestigationWorkspacePage = lazy(() => import('./pages/InvestigationWorkspacePage'));
 const Recommendations = lazy(() => import('./pages/Recommendations'));
 
 // User / System
@@ -120,7 +117,7 @@ function App() {
     // Legacy routes (redirected)
     '/intelligence', '/intelligence-feed', '/signals-feed', '/corporate-impact', '/discover', '/impacts',
     // Other app routes
-    '/research', '/search', '/investigations', '/recommendations', '/quality',
+    '/research', '/search', '/library', '/recommendations', '/quality',
     '/profile', '/settings', '/onboarding'
   ];
   
@@ -217,9 +214,9 @@ function App() {
         <Route path="/research" element={<ProtectedRoute><Research /></ProtectedRoute>} />
         <Route path="/search" element={<ProtectedRoute><SearchHome /></ProtectedRoute>} />
         <Route path="/search/session/:sessionId" element={<ProtectedRoute><SearchWorkspace /></ProtectedRoute>} />
-        <Route path="/search/session/:sessionId/reponse" element={<ProtectedRoute><SearchResponsePage /></ProtectedRoute>} />
-        <Route path="/investigations" element={<ProtectedRoute><InvestigationsPage /></ProtectedRoute>} />
-        <Route path="/investigations/:threadId" element={<ProtectedRoute><InvestigationWorkspacePage /></ProtectedRoute>} />
+        <Route path="/search/session/:sessionId/reponse" element={<Navigate to="/search" replace />} />
+        <Route path="/investigations" element={<Navigate to="/search" replace />} />
+        <Route path="/investigations/:threadId" element={<Navigate to="/search" replace />} />
         <Route path="/recommendations" element={<ProtectedRoute><Recommendations /></ProtectedRoute>} />
         
         {/* User / System */}

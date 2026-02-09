@@ -36,6 +36,29 @@ export default {
           medium: 'rgba(255, 255, 255, 0.15)',
           strong: 'rgba(255, 255, 255, 0.2)',
         },
+        // Analyst / Detective UI – same spectrum as Search workspace & Investigation
+        // Use for: Search, Detective, Intelligence, any analyst-grade view
+        analyst: {
+          bg: '#000000',
+          'bg-panel': 'rgba(17, 24, 39, 0.3)',   /* gray-900/30 */
+          'bg-surface': 'rgb(31, 41, 55)',       /* gray-800 */
+          'bg-hover': 'rgb(17, 24, 39)',          /* gray-900 */
+          border: 'rgb(31, 41, 55)',              /* gray-800 */
+          'border-light': 'rgb(55, 65, 81)',     /* gray-700 */
+          'border-section': 'rgb(17, 24, 39)',   /* gray-900 */
+          'text-primary': 'rgb(229, 231, 235)',  /* gray-200 */
+          'text-secondary': 'rgb(209, 213, 219)', /* gray-300 */
+          'text-muted': 'rgb(156, 163, 175)',    /* gray-400 */
+          'text-tertiary': 'rgb(107, 114, 128)', /* gray-500 */
+          'text-quiet': 'rgb(75, 85, 99)',       /* gray-600 */
+          accent: 'rgb(248, 113, 113)',          /* red-400 */
+          'accent-strong': 'rgb(239, 68, 68)',   /* red-500 */
+          'accent-soft': 'rgba(127, 29, 29, 0.2)',  /* red-900/20 */
+          'accent-soft-border': 'rgba(127, 29, 29, 0.5)',
+          relevance: 'rgb(34, 197, 94)',        /* green-500 */
+          credibility: 'rgb(251, 191, 36)',      /* amber-400 */
+          'credibility-icon': 'rgb(245, 158, 11)', /* amber-500 */
+        },
       },
       // Typography
       fontFamily: {

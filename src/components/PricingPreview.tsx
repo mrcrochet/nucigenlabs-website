@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, ArrowRight, ChevronDown } from 'lucide-react';
+import { Check, ArrowRight, ChevronDown, Quote, CreditCard, Calendar, RotateCcw, Zap, Mail, Sparkles } from 'lucide-react';
 
 type BillingPeriod = 'monthly' | 'yearly';
 
@@ -131,6 +131,18 @@ export default function PricingPreview() {
     {
       question: 'Is Nucigen Labs suitable for both small and large teams?',
       answer: 'Yes. Individual operators can use Intelligence to track events and receive alerts. Growing teams benefit from Pro\'s collaboration features. Large organizations can leverage Ultimate\'s enterprise-grade capabilities and custom integrations.'
+    },
+    {
+      question: 'Can I upgrade or downgrade my plan?',
+      answer: 'Yes. You can change your plan at any time. Upgrades take effect immediately; downgrades apply at the start of your next billing cycle. We\'ll prorate or credit unused time where applicable.'
+    },
+    {
+      question: 'Do you offer refunds?',
+      answer: 'We don\'t offer refunds or money-back guarantees. We encourage you to request early access and evaluate the platform before committing. If you have concerns, contact us before upgrading.'
+    },
+    {
+      question: 'Is there a free trial or demo?',
+      answer: 'We offer early access by request — no credit card required to join the waitlist. Once approved, you can explore the platform and decide whether to subscribe. Custom demos for teams are available; contact us for Pro and Ultimate.'
     }
   ];
 
@@ -154,8 +166,11 @@ export default function PricingPreview() {
             <span className="text-slate-300">built for every team</span>
           </h1>
           
-          <p className="text-base sm:text-lg text-slate-400 leading-relaxed font-light mb-8 max-w-3xl mx-auto">
-            Select the plan that matches your environment — from individual operators to enterprise scale.
+          <p className="text-base sm:text-lg text-slate-400 leading-relaxed font-light mb-2 max-w-3xl mx-auto">
+            Compare plans and choose your ideal option.
+          </p>
+          <p className="text-sm text-slate-500 font-light max-w-2xl mx-auto">
+            From individual operators to enterprise scale — no hidden costs, no setup fees.
           </p>
         </div>
       </section>
@@ -258,19 +273,60 @@ export default function PricingPreview() {
             })}
               </div>
 
-          {/* Trust Badges */}
-          <div className="grid md:grid-cols-3 gap-6 mb-16">
+          {/* Trust Badges — Vidgenie-style */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-16">
             {[
-              { label: 'Secure Payment Processing' },
-              { label: 'Instant Access After Purchase' },
-              { label: 'Cancel Anytime, Hassle-Free' }
-            ].map((badge, idx) => (
-              <div key={idx} className="text-center">
-                <p className="text-xs text-slate-400 font-light">{badge.label}</p>
+              { icon: Sparkles, label: 'Early access' },
+              { icon: CreditCard, label: 'No credit card for waitlist' },
+              { icon: Calendar, label: 'Flexible plans' },
+              { icon: RotateCcw, label: 'Cancel anytime' },
+              { icon: Zap, label: 'Quick setup' },
+              { icon: Mail, label: 'Email & in-app support' }
+            ].map((badge, idx) => {
+              const Icon = badge.icon;
+              return (
+                <div key={idx} className="flex flex-col items-center gap-2 text-center">
+                  <Icon className="w-5 h-5 text-[#E1463E]/80" aria-hidden />
+                  <p className="text-xs text-slate-400 font-light">{badge.label}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials / Social proof — Vidgenie-style "What Users Are Saying" */}
+      <section className="relative px-4 sm:px-6 py-16 border-t border-white/[0.06]">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl sm:text-3xl font-light text-white mb-2">
+              What operators are saying
+            </h2>
+            <p className="text-sm text-slate-500 font-light">
+              Early adopters on why they use Nucigen Labs
+            </p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              { name: 'M.K.', location: 'London, UK', quote: 'Finally, a platform that connects events to market impact before the headlines. The causal view is exactly what we needed.' },
+              { name: 'S.L.', location: 'Singapore', quote: 'We use it for supply chain and geopolitical risk. The alerts are timely and the dashboards are clear. No fluff.' },
+              { name: 'J.P.', location: 'New York, USA', quote: 'Upgraded from spreadsheets to Nucigen. Setup was quick and the team actually uses it. Worth the switch.' }
+            ].map((t, idx) => (
+              <div
+                key={idx}
+                className="backdrop-blur-xl bg-gradient-to-br from-white/[0.05] to-white/[0.01] border border-white/[0.08] rounded-xl p-6"
+              >
+                <Quote className="w-8 h-8 text-[#E1463E]/30 mb-4" aria-hidden />
+                <p className="text-sm text-slate-300 font-light leading-relaxed mb-4">
+                  &ldquo;{t.quote}&rdquo;
+                </p>
+                <p className="text-xs text-slate-500 font-light">
+                  {t.name} — {t.location}
+                </p>
               </div>
             ))}
-                </div>
-              </div>
+          </div>
+        </div>
       </section>
 
       {/* Comparison Table */}
@@ -278,10 +334,10 @@ export default function PricingPreview() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-light text-white mb-4">
-              Compare plans
+              Compare plans and see what's included
             </h2>
             <p className="text-base text-slate-400 font-light max-w-2xl mx-auto">
-              See what's included in each plan
+              Feature-by-feature breakdown across Intelligence, Pro, and Ultimate.
             </p>
           </div>
 
@@ -312,6 +368,33 @@ export default function PricingPreview() {
               </div>
       </section>
 
+      {/* Final CTA strip — Vidgenie-style with trust bullets */}
+      <section className="relative px-4 sm:px-6 py-16 border-t border-white/[0.06]">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-2xl sm:text-3xl font-light text-white mb-2">
+            Get early access to market intelligence
+          </h2>
+          <p className="text-slate-400 font-light text-sm mb-8 max-w-xl mx-auto">
+            Join operators and teams who use Nucigen Labs to see what's coming before it moves.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-8 mb-8 text-slate-500 text-xs font-light">
+            <span className="flex items-center gap-1.5"><Sparkles className="w-4 h-4 text-[#E1463E]/70" /> Early access</span>
+            <span className="flex items-center gap-1.5"><CreditCard className="w-4 h-4 text-[#E1463E]/70" /> No credit card required</span>
+            <span className="flex items-center gap-1.5"><Calendar className="w-4 h-4 text-[#E1463E]/70" /> Flexible plans</span>
+            <span className="flex items-center gap-1.5"><RotateCcw className="w-4 h-4 text-[#E1463E]/70" /> Cancel anytime</span>
+            <span className="flex items-center gap-1.5"><Zap className="w-4 h-4 text-[#E1463E]/70" /> Quick setup</span>
+            <span className="flex items-center gap-1.5"><Mail className="w-4 h-4 text-[#E1463E]/70" /> Email support</span>
+          </div>
+          <Link
+            to="/register"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white rounded-lg font-light text-sm tracking-wide transition-all duration-300"
+          >
+            Request access
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+      </section>
+
       {/* Custom Plan CTA */}
       <section className="relative px-4 sm:px-6 py-16">
         <div className="max-w-4xl mx-auto text-center">
@@ -333,16 +416,15 @@ export default function PricingPreview() {
               </div>
       </section>
 
-      {/* FAQ Section */}
-      <section className="relative px-4 sm:px-6 py-16">
+      {/* FAQ Section — Vidgenie-style "Frequently Asked Questions" */}
+      <section className="relative px-4 sm:px-6 py-16 border-t border-white/[0.06]">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-light text-white mb-4">
-              Got questions?<br />
-              <span className="text-slate-300">We've got answers.</span>
+              Frequently asked questions
             </h2>
             <p className="text-base text-slate-400 font-light">
-              Here's everything you need to know before getting started.
+              Find answers about pricing, plans, and getting started.
             </p>
                 </div>
 

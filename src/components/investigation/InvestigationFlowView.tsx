@@ -59,8 +59,8 @@ export default function InvestigationFlowView({
   }
 
   const ordered = orderNodesForFlow(nodes);
-  const edgeByFromTo = new Map<string, { to: string; relation: InvestigationEdgeRelation; strength: number; confidence: number }>();
-  edges.forEach((e) => edgeByFromTo.set(e.from, { to: e.to, relation: e.relation, strength: e.strength, confidence: e.confidence }));
+  const edgeByKey = new Map<string, { relation: InvestigationEdgeRelation; strength: number; confidence: number }>();
+  edges.forEach((e) => edgeByKey.set(`${e.from}|${e.to}`, { relation: e.relation, strength: e.strength, confidence: e.confidence }));
 
   return (
     <div className={`rounded-xl border border-borders-subtle bg-background-base overflow-hidden ${className}`}>
@@ -107,39 +107,49 @@ export default function InvestigationFlowView({
                 )}
                 <span className="block text-xs text-text-muted mt-0.5">{node.confidence} %</span>
               </button>
-              {i < ordered.length - 1 && (
-                <div className="shrink-0 px-1 flex items-center">
-                  {edgeByFromTo.has(node.id) ? (() => {
-                    const edge = edgeByFromTo.get(node.id)!;
-                    const strokeW = Math.max(1, Math.round(edge.strength * 3));
-                    const opacity = 0.4 + edge.strength * 0.5;
-                    const edgeKey = `${node.id}|${edge.to}`;
-                    const isSelected = selectedEdgeKey === edgeKey;
-                    const colorClass = edgeColorClass(edge.relation);
-                    const content = (
-                      <svg width="32" height="24" viewBox="0 0 32 24" className={colorClass} aria-hidden>
-                        <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth={strokeW} strokeOpacity={opacity} />
-                        <path d="M 22 8 L 30 12 L 22 16 Z" fill="currentColor" opacity={opacity} />
-                      </svg>
-                    );
-                    return onEdgeClick ? (
+              {i < ordered.length - 1 && (() => {
+                const nextId = ordered[i + 1].id;
+                const edgeKey = `${node.id}|${nextId}`;
+                const edge = edgeByKey.get(edgeKey);
+                if (!edge) {
+                  return (
+                    <div className="shrink-0 px-1 flex items-center" key={edgeKey}>
+                      <span className="text-text-muted text-lg">→</span>
+                    </div>
+                  );
+                }
+                const strokeW = Math.max(1, Math.round(edge.strength * 3));
+                const opacity = 0.4 + edge.strength * 0.5;
+                const isSelected = selectedEdgeKey === edgeKey;
+                const colorClass = edgeColorClass(edge.relation);
+                const relationLabel = edge.relation;
+                const content = (
+                  <div className="flex flex-col items-center gap-0.5">
+                    <svg width="32" height="24" viewBox="0 0 32 24" className={colorClass} aria-hidden>
+                      <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth={strokeW} strokeOpacity={opacity} />
+                      <path d="M 22 8 L 30 12 L 22 16 Z" fill="currentColor" opacity={opacity} />
+                    </svg>
+                    <span className="text-[10px] text-text-muted uppercase tracking-wide max-w-[4rem] truncate" title={relationLabel}>{relationLabel}</span>
+                  </div>
+                );
+                return (
+                  <div className="shrink-0 px-1 flex items-center" key={edgeKey}>
+                    {onEdgeClick ? (
                       <button
                         type="button"
-                        onClick={() => onEdgeClick(node.id, edge.to)}
-                        className={`shrink-0 rounded p-0.5 transition-colors ${isSelected ? 'ring-2 ring-[#E1463E] ring-offset-1 ring-offset-background-base' : 'hover:bg-borders-subtle'}`}
-                        title="View edge details"
-                        aria-label="View edge details"
+                        onClick={() => onEdgeClick(node.id, nextId)}
+                        className={`rounded p-0.5 transition-colors ${isSelected ? 'ring-2 ring-[#E1463E] ring-offset-1 ring-offset-background-base' : 'hover:bg-borders-subtle'}`}
+                        title={`${relationLabel}: view details`}
+                        aria-label={`Relation ${relationLabel}`}
                       >
                         {content}
                       </button>
                     ) : (
                       content
-                    );
-                  })() : (
-                    <span className="text-text-muted text-lg">→</span>
-                  )}
-                </div>
-              )}
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           ))}
         </div>

@@ -160,6 +160,93 @@ export async function rebuildAndPersistGraph(
 }
 
 /**
+ * Persiste un graphe déjà construit (ex. depuis le Knowledge Graph Search) en base.
+ * Remplace entièrement les detective_nodes, detective_edges, detective_paths, detective_path_nodes.
+ * Utilisé par le pipeline qui construit le graphe avec la même tech que Search (entity-extractor + relationship-extractor + graph-builder).
+ */
+export async function persistInvestigationGraph(
+  supabase: SupabaseClient,
+  investigationId: string,
+  graph: InvestigationGraph
+): Promise<RebuildGraphResult> {
+  const errors: string[] = [];
+  let nodesCount = 0;
+  let edgesCount = 0;
+  let pathsCount = 0;
+  const { nodes, edges, paths } = graph;
+
+  if (nodes.length === 0) {
+    await deleteGraphForInvestigation(supabase, investigationId);
+    return { nodesCount: 0, edgesCount: 0, pathsCount: 0, errors: [] };
+  }
+
+  await deleteGraphForInvestigation(supabase, investigationId);
+
+  for (const node of nodes) {
+    const { error } = await supabase.from('detective_nodes').insert({
+      id: node.id,
+      investigation_id: investigationId,
+      type: node.type,
+      label: node.label,
+      date: node.date ?? null,
+      confidence: node.confidence / 100,
+    });
+    if (error) errors.push(`node ${node.id}: ${error.message}`);
+    else nodesCount += 1;
+  }
+
+  for (const edge of edges) {
+    const { error } = await supabase.from('detective_edges').insert({
+      investigation_id: investigationId,
+      from_node_id: edge.from,
+      to_node_id: edge.to,
+      relation: edge.relation,
+      strength: edge.strength,
+      confidence: edge.confidence / 100,
+    });
+    if (error) errors.push(`edge ${edge.from}->${edge.to}: ${error.message}`);
+    else edgesCount += 1;
+  }
+
+  const pathIdByIndex = new Map<number, string>();
+  for (let i = 0; i < paths.length; i++) {
+    const p = paths[i];
+    const { data: inserted, error } = await supabase
+      .from('detective_paths')
+      .insert({
+        investigation_id: investigationId,
+        status: p.status,
+        confidence: p.confidence,
+        hypothesis_label: p.hypothesis_label ?? null,
+      })
+      .select('id')
+      .single();
+    if (error) {
+      errors.push(`path ${i}: ${error.message}`);
+    } else if (inserted?.id) {
+      pathIdByIndex.set(i, inserted.id);
+      pathsCount += 1;
+    }
+  }
+
+  for (let i = 0; i < paths.length; i++) {
+    const pathId = pathIdByIndex.get(i);
+    if (!pathId) continue;
+    const p = paths[i];
+    for (let pos = 0; pos < p.nodes.length; pos++) {
+      const { error } = await supabase.from('detective_path_nodes').insert({
+        path_id: pathId,
+        node_id: p.nodes[pos],
+        position: pos,
+      });
+      if (error) errors.push(`path_node ${pathId}/${p.nodes[pos]}: ${error.message}`);
+    }
+  }
+
+  return { nodesCount, edgesCount, pathsCount, errors };
+}
+
+/**
  * Charge le graphe (nodes, edges, paths) depuis les tables detective_* pour une enquête.
  * Retourne null si l'enquête n'existe pas ou n'a pas de nodes.
  * Convention affichage : node.confidence et path.confidence en 0..100.

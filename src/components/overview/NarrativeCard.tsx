@@ -64,8 +64,8 @@ export default function NarrativeCard() {
 
   if (loading) {
     return (
-      <Card className="p-5">
-        <SectionHeader title="Situation Briefing" />
+      <Card>
+        <SectionHeader title="Today's Narrative" />
         <div className="h-48 animate-pulse bg-background-glass-subtle rounded-lg mt-4" />
       </Card>
     );
@@ -73,10 +73,10 @@ export default function NarrativeCard() {
 
   if (error || !data) {
     return (
-      <Card className="p-5">
-        <SectionHeader title="Situation Briefing" />
-        <div className="text-text-secondary text-sm mt-4">
-          {error || 'No narrative available'}
+      <Card>
+        <SectionHeader title="Today's Narrative" />
+        <div className="text-text-secondary text-sm mt-4 py-2">
+          No summary for this period.
         </div>
       </Card>
     );
@@ -89,9 +89,9 @@ export default function NarrativeCard() {
   }[data.confidence_level];
 
   return (
-    <Card className="p-5">
+    <Card>
       <div className="flex items-center justify-between mb-4">
-        <SectionHeader title="Situation Briefing" />
+        <SectionHeader title="Today's Narrative" />
         <div className="flex gap-2">
           <button
             onClick={() => setTimeframe('24h')}

@@ -1,86 +1,55 @@
 /**
- * Overview Page - Command Center
+ * Overview Page
  *
- * Layout priority (top → bottom):
- * 1. KPI Strip — instant numerical pulse
- * 2. Attention Required — alerts + decision points (hidden if empty)
- * 3. Situation Briefing (8col) + Sidebar: Market Movers / Risks / Opportunities (4col)
- * 4. Top Signals Table (full width)
- * 5. Recent Events (6col) + Event Timeline (6col)
- *
- * Principle: answer 3 questions in 10 seconds:
- *   "What changed?" → KPIs + Alerts
- *   "What does it mean?" → Narrative + Risks
- *   "What should I do?" → Decision Points + Emerging Signals
+ * Radar stratégique : lecture macro du monde en 10–15 secondes.
+ * 3 blocs uniquement : Global Situation | My World Changed | What to Watch Next.
+ * Pas de KPI dashboard, pas de long texte, pas d’analyse causale — Overview montre, Enquêtes expliquent.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import AppShell from '../components/layout/AppShell';
 import HeaderBar from '../components/overview/HeaderBar';
-import KPIGrid from '../components/overview/KPIGrid';
-import TriggeredAlertsFeed from '../components/overview/TriggeredAlertsFeed';
-import ActionItemsCard from '../components/overview/ActionItemsCard';
-import WatchlistChangesCard from '../components/overview/WatchlistChangesCard';
-import NarrativeCard from '../components/overview/NarrativeCard';
-import TimelineCard from '../components/overview/TimelineCard';
-import MarketMoversCard from '../components/overview/MarketMoversCard';
-import TopSignalsTable from '../components/overview/TopSignalsTable';
-import TopRisksCard from '../components/overview/TopRisksCard';
-import OpportunitiesCard from '../components/overview/OpportunitiesCard';
-import RecentEventsFeed from '../components/overview/RecentEventsFeed';
+import MarketSummaryBlock from '../components/overview/MarketSummaryBlock';
+import GlobalSituationMap from '../components/overview/GlobalSituationMap';
+import OverviewMapSidePanel from '../components/overview/OverviewMapSidePanel';
+import MyWorldChangedSection from '../components/overview/MyWorldChangedSection';
+import WhatToWatchNextSection from '../components/overview/WhatToWatchNextSection';
+import HowWeValidate from '../components/ui/HowWeValidate';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
-import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { getOverviewMapData } from '../lib/api/overview-api';
+import type { OverviewMapData } from '../types/overview';
 
 function OverviewContent() {
   const [loading, setLoading] = useState(true);
-  const [alertCount, setAlertCount] = useState<number | null>(null);
-  const [watchlistCount, setWatchlistCount] = useState<number | null>(null);
+  const [mapData, setMapData] = useState<OverviewMapData | null>(null);
 
   useEffect(() => {
-    setLoading(false);
+    getOverviewMapData().then((data) => {
+      setMapData(data);
+      setLoading(false);
+    });
   }, []);
-
-  const handleAlertDataLoaded = useCallback((count: number) => {
-    setAlertCount(count);
-  }, []);
-
-  const handleWatchlistDataLoaded = useCallback((count: number) => {
-    setWatchlistCount(count);
-  }, []);
-
-  // Show attention section if we're still loading data or if there's content
-  const attentionDataReady = alertCount !== null && watchlistCount !== null;
-  const hasAttentionContent = !attentionDataReady || (alertCount ?? 0) > 0 || (watchlistCount ?? 0) > 0;
-
-  // Determine how many columns are visible in attention section
-  const attentionVisibleCards = [
-    (alertCount ?? 0) > 0 || !attentionDataReady,
-    true, // ActionItems always shows (hardcoded data for now)
-    (watchlistCount ?? 0) > 0 || !attentionDataReady,
-  ].filter(Boolean).length;
-
-  const attentionGridCols = attentionVisibleCards === 3
-    ? 'lg:grid-cols-3'
-    : attentionVisibleCards === 2
-    ? 'lg:grid-cols-2'
-    : 'lg:grid-cols-1';
 
   if (loading) {
     return (
       <AppShell>
         <div className="col-span-1 sm:col-span-12 flex items-center justify-center h-64">
-          <div className="text-text-secondary">Loading overview...</div>
+          <div className="text-text-secondary">Chargement…</div>
         </div>
       </AppShell>
     );
   }
 
+  const signals = mapData?.signals ?? [];
+  const top_events = mapData?.top_events ?? [];
+  const top_impacts = mapData?.top_impacts ?? [];
+
   return (
     <AppShell>
       <SEO
         title="Overview — Nucigen"
-        description="Command Center: What changed and what to do"
+        description="Lecture macro du monde : où ça bouge, quoi est important, où creuser."
       />
 
       {/* Row 1: HeaderBar */}
@@ -88,78 +57,51 @@ function OverviewContent() {
         <HeaderBar />
       </div>
 
-      {/* Row 2: KPI Strip — instant numerical pulse */}
-      <div className="col-span-1 sm:col-span-12">
-        <KPIGrid />
+      {/* Market summary (daily digest) */}
+      <div className="col-span-1 sm:col-span-12 mb-4">
+        <MarketSummaryBlock />
       </div>
 
-      {/* Row 3: Attention Required — alerts + decision points */}
-      {hasAttentionContent ? (
-        <div className="col-span-1 sm:col-span-12">
-          <div className="backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/8 to-[#E1463E]/3 border border-[#E1463E]/15 rounded-2xl p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <AlertTriangle className="w-4 h-4 text-[#E1463E]" />
-              <h2 className="text-lg font-medium text-text-primary">Attention Required</h2>
-            </div>
+      {/* How we validate market data — credibility */}
+      <div className="col-span-1 sm:col-span-12 mb-6">
+        <HowWeValidate variant="markets" />
+      </div>
 
-            <div className={`grid grid-cols-1 ${attentionGridCols} gap-4`}>
-              {/* Triggered Alerts — only show if has data or still loading */}
-              {((alertCount ?? 0) > 0 || !attentionDataReady) && (
-                <div>
-                  <TriggeredAlertsFeed onDataLoaded={handleAlertDataLoaded} />
-                </div>
-              )}
-
-              {/* Decision Points — always visible */}
-              <div>
-                <ActionItemsCard />
-              </div>
-
-              {/* Watchlist Changes — only show if has data or still loading */}
-              {((watchlistCount ?? 0) > 0 || !attentionDataReady) && (
-                <div>
-                  <WatchlistChangesCard onDataLoaded={handleWatchlistDataLoaded} />
-                </div>
-              )}
-            </div>
+      {/* Bloc 1: Global Situation — carte + side panel */}
+      <div className="col-span-1 sm:col-span-12 mb-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div className="lg:col-span-9 min-h-[400px]">
+            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              Global Situation
+            </h2>
+            <GlobalSituationMap signals={signals} />
+          </div>
+          <div className="lg:col-span-3 min-h-[400px]">
+            <OverviewMapSidePanel top_events={top_events} top_impacts={top_impacts} />
           </div>
         </div>
-      ) : (
-        <div className="col-span-1 sm:col-span-12">
-          <div className="flex items-center gap-3 py-4 px-5 bg-green-500/5 border border-green-500/15 rounded-xl">
-            <CheckCircle className="w-4 h-4 text-green-500" />
-            <span className="text-sm text-text-secondary">All clear — no alerts or watchlist changes requiring attention.</span>
-            {/* Hidden components to still trigger data loading */}
-            <div className="hidden">
-              <TriggeredAlertsFeed onDataLoaded={handleAlertDataLoaded} />
-              <WatchlistChangesCard onDataLoaded={handleWatchlistDataLoaded} />
-            </div>
-          </div>
+      </div>
+
+      {/* Bloc 2: My World Changed — Triggered Alerts | Decision Points | Watchlist */}
+      <MyWorldChangedSection />
+
+      {/* Bloc 3: What to Watch Next — Emerging Signals */}
+      <WhatToWatchNextSection />
+
+      {/* Phase 3.3: Portfolio / Watchlist placeholder (finance dashboard inspiration) */}
+      <section className="col-span-1 sm:col-span-12 mt-6" aria-labelledby="portfolio-watchlist-heading">
+        <h2 id="portfolio-watchlist-heading" className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+          Portfolio & Watchlist
+        </h2>
+        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-6 sm:p-8 text-center">
+          <p className="text-slate-400 text-sm mb-2">
+            Track your watchlist and key metrics in one place.
+          </p>
+          <p className="text-slate-500 text-xs">
+            Coming soon — meanwhile use Corporate Impact and Stock Portfolio Researcher for company-level insights.
+          </p>
         </div>
-      )}
-
-      {/* Row 4: Situation Briefing (8col) + Sidebar (4col) */}
-      <div className="col-span-1 sm:col-span-8 space-y-6">
-        <NarrativeCard />
-      </div>
-      <div className="col-span-1 sm:col-span-4 space-y-4">
-        <MarketMoversCard />
-        <TopRisksCard />
-        <OpportunitiesCard />
-      </div>
-
-      {/* Row 5: Top Signals Table (full width) */}
-      <div className="col-span-1 sm:col-span-12">
-        <TopSignalsTable limit={5} />
-      </div>
-
-      {/* Row 6: Recent Events (6col) + Event Timeline (6col) */}
-      <div className="col-span-1 sm:col-span-6">
-        <RecentEventsFeed />
-      </div>
-      <div className="col-span-1 sm:col-span-6">
-        <TimelineCard />
-      </div>
+      </section>
     </AppShell>
   );
 }

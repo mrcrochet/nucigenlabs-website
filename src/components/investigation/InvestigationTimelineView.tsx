@@ -104,9 +104,10 @@ export default function InvestigationTimelineView({
                           : 'border-borders-subtle bg-background-elevated hover:border-[#E1463E]/40'
                     }`}
                   >
+                    <span className="text-xs text-text-muted uppercase tracking-wider block mb-0.5">{node.type}</span>
                     <span className="font-medium text-text-primary block">{node.label}</span>
                     <span className="text-xs text-text-muted mt-1 block">
-                      Confidence: {node.confidence} % · {node.sources.length} source(s)
+                      {node.confidence} % · {node.sources.length} source(s)
                     </span>
                   </button>
                 ))}

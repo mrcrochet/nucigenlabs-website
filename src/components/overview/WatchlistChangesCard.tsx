@@ -25,10 +25,10 @@ interface WatchlistChange {
 }
 
 interface WatchlistChangesCardProps {
-  onDataLoaded?: (count: number) => void;
+  limit?: number;
 }
 
-export default function WatchlistChangesCard({ onDataLoaded }: WatchlistChangesCardProps) {
+export default function WatchlistChangesCard({ limit = 5 }: WatchlistChangesCardProps) {
   const { user } = useUser();
   const [changes, setChanges] = useState<WatchlistChange[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,8 +41,7 @@ export default function WatchlistChangesCard({ onDataLoaded }: WatchlistChangesC
       }
 
       try {
-        // Fetch watchlist changes analysis from API
-        const response = await fetch('/api/watchlists/changes?limit=5&hours_back=24', {
+        const response = await fetch(`/api/watchlists/changes?limit=${Math.max(limit, 10)}&hours_back=24`, {
           headers: {
             'x-clerk-user-id': user.id,
           },
@@ -67,22 +66,19 @@ export default function WatchlistChangesCard({ onDataLoaded }: WatchlistChangesC
             relatedEventId: change.related_event_id,
           }));
           setChanges(mappedChanges);
-          onDataLoaded?.(mappedChanges.length);
         } else {
           setChanges([]);
-          onDataLoaded?.(0);
         }
       } catch (error) {
         console.error('Error loading watchlist changes:', error);
         setChanges([]);
-        onDataLoaded?.(0);
       } finally {
         setLoading(false);
       }
     };
 
     loadWatchlistChanges();
-  }, [user?.id]);
+  }, [user?.id, limit]);
 
   const getChangeIcon = (changeType: WatchlistChange['changeType']) => {
     switch (changeType) {
@@ -110,14 +106,14 @@ export default function WatchlistChangesCard({ onDataLoaded }: WatchlistChangesC
 
   if (loading) {
     return (
-      <Card className="p-5">
+      <Card>
         <div className="h-64 animate-pulse bg-background-glass-subtle rounded-lg" />
       </Card>
     );
   }
 
   return (
-    <Card className="p-5">
+    <Card>
       <SectionHeader title="Watchlist Changes" subtitle="What changed for you" />
       
       <div className="mt-4 space-y-3">
@@ -126,7 +122,7 @@ export default function WatchlistChangesCard({ onDataLoaded }: WatchlistChangesC
             <p>No changes to your watchlist</p>
           </div>
         ) : (
-          changes.map((change) => (
+          changes.slice(0, limit).map((change) => (
             <div
               key={change.id}
               className="p-4 bg-background-glass-subtle rounded-lg border border-borders-subtle hover:border-borders-medium transition-colors"

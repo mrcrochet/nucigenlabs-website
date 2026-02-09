@@ -72,7 +72,7 @@ export default function OpportunitiesCard() {
 
   if (loading) {
     return (
-      <Card className="p-5">
+      <Card>
         <SectionHeader title="Opportunities" />
         <div className="h-32 animate-pulse bg-background-glass-subtle rounded-lg mt-4" />
       </Card>
@@ -81,7 +81,7 @@ export default function OpportunitiesCard() {
 
   if (opportunities.length === 0) {
     return (
-      <Card className="p-5">
+      <Card>
         <SectionHeader title="Opportunities" />
         <div className="text-text-secondary text-sm mt-4">
           No clear opportunities identified at this time.
@@ -91,7 +91,7 @@ export default function OpportunitiesCard() {
   }
 
   return (
-    <Card className="p-5">
+    <Card>
       <SectionHeader title="Opportunities" />
       
       <div className="space-y-4 mt-4">

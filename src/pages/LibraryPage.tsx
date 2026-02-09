@@ -13,29 +13,30 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import DiscoverCard, { type DiscoverItem } from '../components/discover/DiscoverCard';
 import DiscoverDetailModal from '../components/discover/DiscoverDetailModal';
 import SkeletonCard from '../components/ui/SkeletonCard';
-import { getOrCreateSupabaseUserId } from '../lib/supabase';
+import { apiUrl } from '../lib/api-base';
 import { Bookmark } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 function LibraryContent() {
   const { user } = useUser();
   const queryClient = useQueryClient();
-  const [userId, setUserId] = useState<string | undefined>(undefined);
   const [selectedItem, setSelectedItem] = useState<DiscoverItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  useEffect(() => {
-    if (user?.id) {
-      getOrCreateSupabaseUserId(user.id).then(setUserId);
-    }
-  }, [user?.id]);
+  const userId = user?.id ?? undefined;
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['discover-saved', userId],
     queryFn: async () => {
       if (!userId) return { items: [] };
-      const res = await fetch(`/api/discover/saved?userId=${userId}`);
-      if (!res.ok) throw new Error('Failed to load saved items');
+      const url = apiUrl(`/api/discover/saved?userId=${encodeURIComponent(userId)}`);
+      const res = await fetch(url, {
+        headers: { 'x-clerk-user-id': userId },
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error((errJson as { error?: string }).error || 'Failed to load saved items');
+      }
       const json = await res.json();
       return { items: json.items || [] };
     },
@@ -45,7 +46,11 @@ function LibraryContent() {
   const unsaveMutation = useMutation({
     mutationFn: async (itemId: string) => {
       if (!userId) throw new Error('User ID required');
-      const res = await fetch(`/api/discover/${itemId}/save?userId=${userId}`, { method: 'DELETE' });
+      const url = apiUrl(`/api/discover/${itemId}/save?userId=${encodeURIComponent(userId)}`);
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: { 'x-clerk-user-id': userId },
+      });
       if (!res.ok) throw new Error('Failed to remove from library');
       return res.json();
     },

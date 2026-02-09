@@ -467,7 +467,6 @@ export async function getOrCreateSupabaseUserId(clerkUserId: string, email?: str
   }
 
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:getOrCreateSupabaseUserId',message:'Getting or creating Supabase UUID',data:{clerkUserId:clerkUserId?.substring(0,15)+'...',hasEmail:!!email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'UUID_MAPPING'})}).catch(()=>{});
   // #endregion
 
   // Call the Supabase function to get or create the mapping
@@ -477,7 +476,6 @@ export async function getOrCreateSupabaseUserId(clerkUserId: string, email?: str
   });
 
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:getOrCreateSupabaseUserId',message:'RPC result',data:{hasData:!!data,hasError:!!error,error:error?.message,uuid:data?.substring(0,10)+'...'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'UUID_MAPPING'})}).catch(()=>{});
   // #endregion
 
   if (error) {
@@ -623,7 +621,6 @@ export async function updateUserProfile(updates: Partial<User>, userId?: string)
   }
 
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'Before upsert - checking if user exists',data:{targetUserId:targetUserId?.substring(0,10)+'...',hasUserId:!!userId,updatesKeys:Object.keys(updates)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'USER_EXISTS_CHECK'})}).catch(()=>{});
   // #endregion
 
   // Check if user exists in users table before upsert
@@ -634,7 +631,6 @@ export async function updateUserProfile(updates: Partial<User>, userId?: string)
     .maybeSingle();
 
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'User existence check result',data:{userExists:!!existingUser,checkError:checkError?.message,checkErrorCode:checkError?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'USER_EXISTS_CHECK'})}).catch(()=>{});
   // #endregion
 
   // If user doesn't exist, the upsert will try to INSERT
@@ -661,7 +657,6 @@ export async function updateUserProfile(updates: Partial<User>, userId?: string)
   // L'email est géré par Clerk et ne devrait pas être modifié dans Supabase
 
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'Before upsert - prepared data',data:{targetUserId:targetUserId?.substring(0,10)+'...',cleanUpdatesKeys:Object.keys(cleanUpdates),userExists:!!existingUser,willInsert:!existingUser},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'UPSERT_ATTEMPT'})}).catch(()=>{});
   // #endregion
 
   // Try using RPC function first (bypasses RLS with SECURITY DEFINER)
@@ -671,7 +666,6 @@ export async function updateUserProfile(updates: Partial<User>, userId?: string)
 
   try {
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'Attempting RPC upsert_user_profile',data:{targetUserId:targetUserId?.substring(0,10)+'...',hasEmail:!!email,hasCompany:!!cleanUpdates.company},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'RPC_UPSERT'})}).catch(()=>{});
     // #endregion
 
     const { data: rpcData, error: rpcError } = await supabase.rpc('upsert_user_profile', {
@@ -688,13 +682,11 @@ export async function updateUserProfile(updates: Partial<User>, userId?: string)
 
     if (!rpcError && rpcData) {
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'RPC upsert successful',data:{hasData:!!rpcData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'RPC_UPSERT'})}).catch(()=>{});
       // #endregion
       return rpcData;
     } else if (rpcError && rpcError.message?.includes('function') && rpcError.message?.includes('does not exist')) {
       // RPC function doesn't exist, fall back to direct upsert
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'RPC function not found, falling back to direct upsert',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'RPC_UPSERT'})}).catch(()=>{});
       // #endregion
     } else {
       // RPC error, throw it
@@ -704,7 +696,6 @@ export async function updateUserProfile(updates: Partial<User>, userId?: string)
     // If RPC fails for other reasons, fall back to direct upsert
     if (!rpcErr?.message?.includes('does not exist')) {
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'RPC error, falling back to direct upsert',data:{error:rpcErr?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'RPC_UPSERT'})}).catch(()=>{});
       // #endregion
     }
   }
@@ -717,7 +708,6 @@ export async function updateUserProfile(updates: Partial<User>, userId?: string)
   };
 
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'Direct upsert attempt',data:{id:targetUserId?.substring(0,10)+'...',hasCompany:!!upsertData.company,hasProfessionalRole:!!upsertData.professional_role,hasIntendedUse:!!upsertData.intended_use,hasSector:!!upsertData.sector},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'DIRECT_UPSERT'})}).catch(()=>{});
   // #endregion
 
   const { data: upsertResult, error: upsertError } = await supabase
@@ -729,7 +719,6 @@ export async function updateUserProfile(updates: Partial<User>, userId?: string)
     .single();
 
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:updateUserProfile',message:'Direct upsert result',data:{hasData:!!upsertResult,hasError:!!upsertError,errorMessage:upsertError?.message,errorCode:upsertError?.code,errorDetails:upsertError?.details,errorHint:upsertError?.hint},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'RLS_POLICY_VIOLATION'})}).catch(()=>{});
   // #endregion
 
   if (upsertError) {
@@ -1467,7 +1456,6 @@ export async function countSearchResults(
   }
 
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1068',message:'countSearchResults entry',data:{hasUserId:!!userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
   // #endregion
 
   let targetUserId: string | null = null;
@@ -1477,15 +1465,12 @@ export async function countSearchResults(
     targetUserId = await getOrCreateSupabaseUserId(userId);
   } else {
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1078',message:'Attempting supabase.auth.getSession',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
     // #endregion
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1081',message:'getSession result',data:{hasSession:!!session,hasError:!!sessionError},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
     // #endregion
     if (sessionError || !session) {
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1084',message:'No session - throwing',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
       // #endregion
       throw new Error('User not authenticated');
     }
@@ -1538,7 +1523,6 @@ export async function getEventsWithCausalChainsSearch(
   }
 
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1110',message:'getEventsWithCausalChainsSearch entry',data:{hasUserId:!!userId,userId:userId?.substring(0,10)+'...'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
   // #endregion
 
   let targetUserId: string | null = null;
@@ -1547,26 +1531,21 @@ export async function getEventsWithCausalChainsSearch(
     // Convert Clerk user ID to Supabase UUID
     targetUserId = await getOrCreateSupabaseUserId(userId);
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1118',message:'Using provided userId',data:{userId:userId?.substring(0,10)+'...'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
   } else {
     // Legacy: Try to get from Supabase Auth (for backward compatibility)
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1122',message:'Attempting supabase.auth.getSession',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1125',message:'getSession result',data:{hasSession:!!session,hasError:!!sessionError,error:sessionError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
     if (sessionError) {
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1128',message:'Session error - throwing',data:{error:sessionError.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
       // #endregion
       throw new Error('User not authenticated');
     }
     if (!session) {
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1132',message:'No session - throwing',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
       // #endregion
       throw new Error('User not authenticated');
     }
@@ -1575,7 +1554,6 @@ export async function getEventsWithCausalChainsSearch(
 
   if (!targetUserId) {
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1138',message:'No targetUserId - throwing',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
     throw new Error('User not authenticated');
   }
@@ -1834,7 +1812,6 @@ export async function getUserRecommendations(
   }
 
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1372',message:'getUserRecommendations entry',data:{hasUserId:!!userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
   // #endregion
 
   let targetUserId: string | null = null;
@@ -1844,15 +1821,12 @@ export async function getUserRecommendations(
     targetUserId = await getOrCreateSupabaseUserId(userId);
   } else {
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1385',message:'Attempting supabase.auth.getSession',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1388',message:'getSession result',data:{hasSession:!!session,hasError:!!sessionError},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
     if (sessionError || !session) {
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1391',message:'No session - throwing',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       // #endregion
       throw new Error('User not authenticated');
     }
@@ -1887,7 +1861,6 @@ export async function getUnreadRecommendationsCount(userId?: string): Promise<nu
   }
 
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1404',message:'getUnreadRecommendationsCount entry',data:{hasUserId:!!userId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
   // #endregion
 
   let targetUserId: string | null = null;
@@ -1897,15 +1870,12 @@ export async function getUnreadRecommendationsCount(userId?: string): Promise<nu
     targetUserId = await getOrCreateSupabaseUserId(userId);
   } else {
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1415',message:'Attempting supabase.auth.getSession',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
     // #endregion
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1418',message:'getSession result',data:{hasSession:!!session,hasError:!!sessionError},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
     // #endregion
     if (sessionError || !session) {
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'supabase.ts:1421',message:'No session - throwing',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
       // #endregion
       throw new Error('User not authenticated');
     }

@@ -132,6 +132,12 @@ export interface GraphNode {
   data: any;
   x?: number;
   y?: number;
+  /** Backend: node confidence 0–1 */
+  confidence?: number;
+  /** Backend: number of sources mentioning this node */
+  sourceCount?: number;
+  validFrom?: string;
+  validTo?: string | null;
 }
 
 export interface GraphLink {
@@ -139,6 +145,10 @@ export interface GraphLink {
   target: string;
   type: 'causes' | 'precedes' | 'related_to' | 'operates_in' | 'exposes_to' | 'impacts';
   strength: number;
+  confidence?: number;
+  sourceCount?: number;
+  validFrom?: string;
+  validTo?: string | null;
 }
 
 export interface SearchState {

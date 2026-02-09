@@ -56,21 +56,18 @@ export default function TimelineCard() {
 
   if (loading) {
     return (
-      <Card className="p-5">
+      <Card>
         <div className="h-64 animate-pulse bg-background-glass-subtle rounded-lg" />
       </Card>
     );
   }
 
   return (
-    <Card className="p-5">
-      <SectionHeader
-        title="Event Timeline"
-        subtitle="Indices et mouvements de marché bientôt disponibles"
-      />
+    <Card>
+      <SectionHeader title="Event Timeline" />
       {events.length === 0 ? (
         <div className="mt-4 text-sm text-text-secondary">
-          Aucun événement sur la période
+          No events in range.
         </div>
       ) : (
         <div className="mt-4 space-y-3">

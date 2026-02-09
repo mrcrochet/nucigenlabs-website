@@ -6,30 +6,20 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import {
-  ArrowLeft,
-  Loader2,
-  CheckCircle,
-  AlertCircle,
-  XCircle,
-  Clock,
-  ExternalLink,
-  ChevronRight,
-  Eye,
-  EyeOff,
-} from 'lucide-react';
+import { ArrowLeft, Loader2, Clock, ExternalLink, Eye, EyeOff } from 'lucide-react';
 import AppShell from '../components/layout/AppShell';
 import SEO from '../components/SEO';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { buildBriefingPayload } from '../lib/investigation/build-briefing';
 import { getPlaygroundMockGraph } from '../lib/investigation/playground-mock-graph';
+import { PathCard } from '../features/investigations';
 import InvestigationBriefingView from '../components/investigation/InvestigationBriefingView';
 import InvestigationFlowView from '../components/investigation/InvestigationFlowView';
 import InvestigationTimelineView from '../components/investigation/InvestigationTimelineView';
 import InvestigationMapView from '../components/investigation/InvestigationMapView';
 import InvestigationDetailsPanel, { type DetailsSelection } from '../components/investigation/InvestigationDetailsPanel';
 import type { SearchResult, KnowledgeGraph as KnowledgeGraphType } from '../types/search';
-import type { InvestigationGraph, InvestigationGraphPath, InvestigationGraphNode } from '../types/investigation-graph';
+import type { InvestigationGraph } from '../types/investigation-graph';
 
 interface SearchSession {
   id: string;
@@ -41,139 +31,6 @@ interface SearchSession {
   meta: any;
   createdAt: string;
   investigationThreadId?: string;
-}
-
-function getStatusColor(status: 'active' | 'weak' | 'dead'): string {
-  if (status === 'active') return 'border-gray-600 bg-gray-900/50';
-  if (status === 'weak') return 'border-gray-700 bg-gray-900/30';
-  return 'border-gray-800 bg-gray-900/20';
-}
-
-function getConfidenceBarColor(status: 'active' | 'weak' | 'dead'): string {
-  if (status === 'active') return 'bg-gray-400';
-  if (status === 'weak') return 'bg-gray-600';
-  return 'bg-gray-700';
-}
-
-function PathCard({
-  path,
-  graph,
-  isSelected,
-  showDeadPaths,
-  onSelect,
-  onExplorePath,
-}: {
-  path: InvestigationGraphPath;
-  graph: InvestigationGraph;
-  isSelected: boolean;
-  showDeadPaths: boolean;
-  onSelect: () => void;
-  onExplorePath: () => void;
-}) {
-  const isVisible = showDeadPaths || path.status !== 'dead';
-  if (!isVisible) return null;
-
-  const pathNodeSet = new Set(path.nodes);
-  const edgeCount = graph.edges.filter((e) => pathNodeSet.has(e.from) && pathNodeSet.has(e.to)).length;
-  const keyNodes = path.nodes
-    .map((id) => graph.nodes.find((n) => n.id === id))
-    .filter(Boolean) as InvestigationGraphNode[];
-  const evidenceSources = keyNodes.flatMap((n) => n.sources || []).filter(Boolean);
-  const uniqueSources = Array.from(new Set(evidenceSources));
-
-  const statusLabel =
-    path.status === 'active' ? 'Piste active' : path.status === 'weak' ? 'Piste faible' : 'Piste morte';
-
-  return (
-    <div
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
-      className={`border p-4 mb-3 cursor-pointer transition-all touch-manipulation min-h-[44px] ${getStatusColor(path.status)} ${
-        isSelected ? 'border-gray-500' : ''
-      } ${path.status === 'dead' ? 'opacity-40' : ''}`}
-      onClick={() => onSelect()}
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            {path.status === 'active' && <CheckCircle className="w-4 h-4 text-gray-400 shrink-0" />}
-            {path.status === 'weak' && <AlertCircle className="w-4 h-4 text-gray-500 shrink-0" />}
-            {path.status === 'dead' && <XCircle className="w-4 h-4 text-gray-600 shrink-0" />}
-            <span className="text-xs text-gray-500 uppercase tracking-wider">{statusLabel}</span>
-            <span className="text-xs text-gray-600 font-mono">{path.confidence}%</span>
-          </div>
-          <h3 className="text-sm font-semibold text-gray-300 leading-snug mb-2">
-            {path.hypothesis_label || path.id}
-          </h3>
-          <div className="flex items-center gap-3 text-xs text-gray-600 flex-wrap">
-            <span>{path.nodes.length} nœuds</span>
-            <span>•</span>
-            <span>{edgeCount} liens</span>
-          </div>
-        </div>
-        <ChevronRight
-          className={`w-4 h-4 text-gray-600 shrink-0 transition-transform ${isSelected ? 'rotate-90' : ''}`}
-        />
-      </div>
-
-      <div className="mb-2">
-        <div className="h-1 bg-gray-800 overflow-hidden">
-          <div
-            className={`h-1 transition-all ${getConfidenceBarColor(path.status)}`}
-            style={{ width: `${Math.min(100, path.confidence)}%` }}
-          />
-        </div>
-      </div>
-
-      {isSelected && (
-        <div className="mt-4 pt-4 border-t border-gray-800 space-y-3">
-          <div>
-            <h4 className="text-xs text-gray-500 uppercase tracking-wider mb-2">
-              Éléments clés ({keyNodes.length})
-            </h4>
-            <div className="space-y-1">
-              {keyNodes.slice(0, 8).map((node) => (
-                <div key={node.id} className="flex items-center gap-2 text-xs">
-                  <span className="w-16 text-gray-600 capitalize shrink-0">{node.type}</span>
-                  <span className="text-gray-400 truncate">{node.label}</span>
-                </div>
-              ))}
-              {keyNodes.length > 8 && (
-                <div className="text-xs text-gray-600">+{keyNodes.length - 8} autres</div>
-              )}
-            </div>
-          </div>
-
-          {uniqueSources.length > 0 && (
-            <div>
-              <h4 className="text-xs text-gray-500 uppercase tracking-wider mb-2">
-                Sources ({uniqueSources.length})
-              </h4>
-              <div className="space-y-1">
-                {uniqueSources.slice(0, 4).map((src, idx) => (
-                  <div key={idx} className="text-xs text-gray-500 truncate" title={src}>
-                    {src}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onExplorePath();
-            }}
-            className="w-full px-3 py-2 border border-gray-700 text-gray-400 text-xs hover:bg-gray-800 transition-colors"
-          >
-            Explorer la piste →
-          </button>
-        </div>
-      )}
-    </div>
-  );
 }
 
 /** Étape 1 : ?mock=1 affiche un graphe mock (pas d’API). Étape 2 : sans mock = backend. Étape 3 : temps réel plus tard. */
@@ -373,7 +230,6 @@ function SearchResponsePageContent() {
 
   useEffect(() => {
     if (!session || !sessionId) return;
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'SearchResponsePage.tsx:render-state',message:'building/hasGraph state',data:{building,hasGraph,threadId:threadId||null,sessionId,showLoadingBlock},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
   }, [building, hasGraph, threadId, sessionId, session, showLoadingBlock]);
 
   return (

@@ -957,6 +957,7 @@ app.post('/api/investigations', async (req, res) => {
           investigationId: threadId,
           hypothesis: invHypothesis,
           runGraphRebuild: true,
+          useSearchGraph: true, // même Knowledge Graph que Search (Tavily → buildGraph), réponse = requête utilisateur
           supabase,
         });
         console.log('[API] Investigation graph generated for', threadId);
@@ -1148,6 +1149,7 @@ app.post('/api/investigations/:threadId/messages', async (req, res) => {
           skipTavily: true,
           rawTextChunks,
           runGraphRebuild: true,
+          useSearchGraph: true, // même Knowledge Graph que Search ; entrée = preuves de la réponse à la requête utilisateur
           supabase,
         });
       } catch (detectiveErr: any) {
@@ -1206,7 +1208,6 @@ app.get('/api/investigations/:threadId/signals', async (req, res) => {
 app.get('/api/investigations/:threadId/detective-graph', async (req, res) => {
   const threadIdParam = req.params.threadId;
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:detective-graph-entry',message:'GET detective-graph entry',data:{threadId:threadIdParam},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
   // #endregion
   try {
     const { threadId } = req.params;
@@ -1230,7 +1231,6 @@ app.get('/api/investigations/:threadId/detective-graph', async (req, res) => {
     const { loadGraphForInvestigation } = await import('./services/detective-graph-persistence.js');
     const graph = await loadGraphForInvestigation(supabase, threadId);
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:detective-graph-result',message:'GET detective-graph result',data:{threadId,hasGraph:!!graph,nodeCount:graph?.nodes?.length??0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
     // #endregion
     if (!graph) {
       return res.status(200).json({ success: true, graph: null });
@@ -1277,6 +1277,7 @@ app.post('/api/investigations/:threadId/generate-graph', async (req, res) => {
           investigationId: threadId,
           hypothesis,
           runGraphRebuild: true,
+          useSearchGraph: true, // même Knowledge Graph que Search ; graphe issu de la requête utilisateur
           supabase,
         });
         console.log('[API] Investigation graph generated for', threadId);
@@ -1872,6 +1873,90 @@ app.get('/api/overview/narrative', async (req, res) => {
       success: false,
       error: error.message || 'Internal server error',
     });
+  }
+});
+
+// GET /api/market-digest - Short daily market summary (Perplexity)
+app.get('/api/market-digest', async (req, res) => {
+  try {
+    const useCache = (req.query.cache as string) !== 'false';
+    const { getMarketDigest } = await import('./services/market-digest-service.js');
+    const digest = await getMarketDigest(useCache);
+    if (!digest) {
+      return res.json({ success: true, data: null, message: 'Market digest temporarily unavailable' });
+    }
+    res.json({ success: true, data: digest });
+  } catch (error: any) {
+    console.error('[API] Market digest error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch market digest' });
+  }
+});
+
+// GET /api/news/realtime — Phase 3: optional Newsfilter recent articles (set NEWSFILTER_API_KEY)
+app.get('/api/news/realtime', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt((req.query.limit as string) || '15', 10) || 15, 50);
+    const { fetchNewsfilterRecent } = await import('./services/newsfilter-service.js');
+    const articles = await fetchNewsfilterRecent(limit);
+    res.json({ success: true, data: articles, source: 'newsfilter' });
+  } catch (error: any) {
+    console.error('[API] News realtime error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch realtime news' });
+  }
+});
+
+// GET /api/openbb/fundamentals/:symbol — Phase 3: optional OpenBB Platform adapter (set OPENBB_API_URL)
+app.get('/api/openbb/fundamentals/:symbol', async (req, res) => {
+  try {
+    const symbol = (req.params.symbol || '').trim();
+    if (!symbol) {
+      return res.status(400).json({ success: false, error: 'Symbol is required' });
+    }
+    if (!process.env.OPENBB_API_URL) {
+      return res.json({
+        success: true,
+        data: null,
+        message: 'OpenBB adapter not configured. Set OPENBB_API_URL to your OpenBB Platform API base URL.',
+      });
+    }
+    const { fetchOpenBBFundamentals } = await import('./services/openbb-adapter-service.js');
+    const data = await fetchOpenBBFundamentals(symbol);
+    res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('[API] OpenBB fundamentals error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch OpenBB data' });
+  }
+});
+
+// GET /api/overview/map - Global Situation map data (signals + top events + top corporate impacts)
+app.get('/api/overview/map', async (req, res) => {
+  try {
+    // V1: static fixture. Later: derive from events/signals with geo resolution.
+    const now = new Date().toISOString();
+    const data = {
+      signals: [
+        { id: '1', lat: -2.5, lon: 28.8, type: 'security', impact: 'regional', importance: 85, confidence: 82, occurred_at: now, label_short: 'DRC – North Kivu', subtitle_short: 'ADF activity escalation', impact_one_line: 'Gold supply risk', investigate_id: '/investigations' },
+        { id: '2', lat: 25.2, lon: 55.3, type: 'supply-chains', impact: 'global', importance: 78, confidence: 76, occurred_at: now, label_short: 'UAE – Dubai', subtitle_short: 'Gold trade hub disruption', impact_one_line: 'Precious metals flow', investigate_id: '/investigations' },
+        { id: '3', lat: 51.5, lon: -0.1, type: 'geopolitics', impact: 'global', importance: 90, confidence: 94, occurred_at: now, label_short: 'UK – London', subtitle_short: 'Sanctions policy update', impact_one_line: 'Financial compliance', investigate_id: '/investigations' },
+        { id: '4', lat: 55.7, lon: 37.6, type: 'energy', impact: 'regional', importance: 72, confidence: 88, occurred_at: now, label_short: 'Russia – Moscow', subtitle_short: 'Energy export reconfiguration', impact_one_line: 'Gas supply routes', investigate_id: '/investigations' },
+        { id: '5', lat: 39.9, lon: 116.4, type: 'supply-chains', impact: 'global', importance: 80, confidence: 79, occurred_at: now, label_short: 'China – Beijing', subtitle_short: 'Strategic minerals stockpiling', impact_one_line: 'Rare earth dominance', investigate_id: '/investigations' },
+        { id: '6', lat: 40.7, lon: -74.0, type: 'markets', impact: 'global', importance: 88, confidence: 91, occurred_at: now, label_short: 'USA – New York', subtitle_short: 'Financial markets volatility', impact_one_line: 'Commodity futures', investigate_id: '/investigations' },
+      ],
+      top_events: [
+        { id: '1', label_short: 'DRC – North Kivu', impact_one_line: 'Gold supply risk', investigate_id: '/investigations' },
+        { id: '2', label_short: 'UAE – Dubai', impact_one_line: 'Precious metals flow', investigate_id: '/investigations' },
+        { id: '3', label_short: 'UK – London', impact_one_line: 'Financial compliance', investigate_id: '/investigations' },
+      ],
+      top_impacts: [
+        { name: 'Barrick Gold', impact_one_line: 'Production disruption', investigate_id: '/investigations' },
+        { name: 'Gazprom', impact_one_line: 'Route reconfiguration', investigate_id: '/investigations' },
+        { name: 'HSBC', impact_one_line: 'Compliance costs', investigate_id: '/investigations' },
+      ],
+    };
+    res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('[API] Overview map error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Internal server error' });
   }
 });
 
@@ -3505,15 +3590,150 @@ app.get('/api/eventregistry/health', async (req, res) => {
   }
 });
 
+// POST /api/discover/page-context - Generate AI page context for Discover/Globe (OpenAI)
+app.post('/api/discover/page-context', async (req, res) => {
+  try {
+    const openaiApiKey = process.env.OPENAI_API_KEY;
+    if (!openaiApiKey) {
+      return res.status(503).json({
+        success: false,
+        error: 'OPENAI_API_KEY not configured. Configure it in .env to use page context.',
+      });
+    }
+    const body = req.body || {};
+    const timeRange = (body.timeRange as string) || '7d';
+    const eventSummaries = Array.isArray(body.eventSummaries) ? body.eventSummaries : [];
+    const summariesText =
+      eventSummaries.length > 0
+        ? eventSummaries
+            .slice(0, 80)
+            .map(
+              (s: { headline?: string; category?: string; region?: string }) =>
+                `- ${[s.headline || '', s.category || '', s.region || ''].filter(Boolean).join(' · ')}`
+            )
+            .join('\n')
+        : 'Aucun événement fourni pour cette période.';
+
+    const OpenAI = (await import('openai')).default;
+    const openai = new OpenAI({ apiKey: openaiApiKey });
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content:
+            'Tu es un analyste en veille stratégique. Tu synthétises en 2 à 4 phrases courtes le contexte géopolitique et économique de la période, sans inventer de faits. Réponds uniquement en français, ton professionnel et factuel.',
+        },
+        {
+          role: 'user',
+          content: `Période : ${timeRange}. Événements sur la carte :\n${summariesText}\n\nGénère un paragraphe de contexte stratégique pour cette vue (tendances, zones de tension, points d'attention).`,
+        },
+      ],
+      max_tokens: 400,
+      temperature: 0.4,
+    });
+    const context =
+      response.choices?.[0]?.message?.content?.trim() ||
+      'Impossible de générer le contexte pour le moment.';
+    res.json({ success: true, context });
+  } catch (error: any) {
+    console.error('[API] Discover page-context error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate page context',
+    });
+  }
+});
+
+// POST /api/stock-digest — Stock Portfolio Researcher (Tavily + OpenAI), inspired by tavily-ai/market-researcher
+app.post('/api/stock-digest', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const tickers = Array.isArray(body.tickers) ? body.tickers : [];
+    if (tickers.length === 0) {
+      return res.status(400).json({ success: false, error: 'tickers must be a non-empty array (e.g. ["AAPL", "GOOGL"])' });
+    }
+    const { generateStockDigest } = await import('./services/stock-digest-service.js');
+    const result = await generateStockDigest(tickers);
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('[API] Stock digest error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate stock digest',
+    });
+  }
+});
+
+// POST /api/meeting-brief — Meeting/company brief (Tavily + OpenAI), inspiration: meeting-prep-agent
+app.post('/api/meeting-brief', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const company = (body.company as string) || '';
+    if (!company.trim()) {
+      return res.status(400).json({ success: false, error: 'body.company is required' });
+    }
+    const { generateMeetingBrief } = await import('./services/meeting-brief-service.js');
+    const result = await generateMeetingBrief({
+      company: company.trim(),
+      ticker: body.ticker ? String(body.ticker).trim() : undefined,
+      meetingType: body.meetingType ? String(body.meetingType).trim() : undefined,
+      date: body.date ? String(body.date).trim() : undefined,
+    });
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('[API] Meeting brief error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate meeting brief',
+    });
+  }
+});
+
+// POST /api/esg/extract-from-document — Extract ESG indicators from text or PDF (base64)
+app.post('/api/esg/extract-from-document', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const text = typeof body.text === 'string' ? body.text.trim() : '';
+    let pdfBuffer: Buffer | undefined;
+    if (typeof body.pdfBase64 === 'string' && body.pdfBase64.length > 0) {
+      try {
+        pdfBuffer = Buffer.from(body.pdfBase64, 'base64');
+      } catch {
+        return res.status(400).json({ success: false, error: 'Invalid pdfBase64' });
+      }
+    }
+    if (!text && !pdfBuffer?.length) {
+      return res.status(400).json({
+        success: false,
+        error: 'Provide either body.text (document text) or body.pdfBase64 (PDF file as base64)',
+      });
+    }
+    const { extractESGFromDocument } = await import('./services/esg-extract-service.js');
+    const result = await extractESGFromDocument({ text: text || undefined, pdfBuffer });
+    res.json({ success: true, ...result });
+  } catch (error: any) {
+    console.error('[API] ESG extract error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to extract ESG from document',
+    });
+  }
+});
+
 // GET /api/discover/saved - List saved (library) items for user
 app.get('/api/discover/saved', async (req, res) => {
   try {
-    const userId = req.query.userId as string;
-    if (!userId) {
-      return res.status(401).json({ success: false, error: 'User ID required' });
+    const clerkUserId = (req.headers['x-clerk-user-id'] as string) || (req.query.userId as string);
+    if (!clerkUserId) {
+      return res.status(401).json({ success: false, error: 'User ID required (x-clerk-user-id header or userId query)' });
     }
     if (!supabase) {
       return res.status(503).json({ success: false, error: 'Database not configured' });
+    }
+    const userId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'User not found' });
     }
     const { data: rows, error } = await supabase
       .from('user_engagement')
@@ -3539,12 +3759,12 @@ app.get('/api/discover/saved', async (req, res) => {
 app.post('/api/discover/:id/save', async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = (req.query.userId as string) || (req.body?.userId as string);
+    const clerkUserId = (req.headers['x-clerk-user-id'] as string) || (req.query.userId as string) || (req.body?.userId as string);
 
-    if (!userId) {
+    if (!clerkUserId) {
       return res.status(401).json({
         success: false,
-        error: 'User ID required',
+        error: 'User ID required (x-clerk-user-id header or userId)',
       });
     }
 
@@ -3553,6 +3773,11 @@ app.post('/api/discover/:id/save', async (req, res) => {
         success: false,
         error: 'Database not configured',
       });
+    }
+
+    const userId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'User not found' });
     }
 
     // Track engagement (only UUID event ids are stored; Perplexity ids may fail silently)
@@ -3581,12 +3806,16 @@ app.post('/api/discover/:id/save', async (req, res) => {
 app.delete('/api/discover/:id/save', async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = (req.query.userId as string) || (req.body?.userId as string);
-    if (!userId) {
-      return res.status(401).json({ success: false, error: 'User ID required' });
+    const clerkUserId = (req.headers['x-clerk-user-id'] as string) || (req.query.userId as string) || (req.body?.userId as string);
+    if (!clerkUserId) {
+      return res.status(401).json({ success: false, error: 'User ID required (x-clerk-user-id header or userId)' });
     }
     if (!supabase) {
       return res.status(503).json({ success: false, error: 'Database not configured' });
+    }
+    const userId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'User not found' });
     }
     const { error } = await supabase
       .from('user_engagement')
@@ -3989,7 +4218,6 @@ app.post('/api/search', async (req, res) => {
 // POST /api/search/session - Create new search session
 app.post('/api/search/session', async (req, res) => {
   // #region agent log
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3225',message:'Endpoint entry',data:{body:req.body,headers:Object.keys(req.headers),hasSupabase:!!supabase},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,C'})}).catch(()=>{});
   // #endregion
 
   try {
@@ -3998,7 +4226,6 @@ app.post('/api/search/session', async (req, res) => {
     const clerkUserId = req.headers['x-clerk-user-id'] as string || null;
 
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3230',message:'Before userId extraction',data:{query,inputType,clerkUserId,hasSupabase:!!supabase},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C,D'})}).catch(()=>{});
     // #endregion
 
     let userId = null;
@@ -4006,11 +4233,9 @@ app.post('/api/search/session', async (req, res) => {
       try {
         userId = await getSupabaseUserId(clerkUserId, supabase);
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3236',message:'After userId extraction',data:{userId,clerkUserId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
         // #endregion
       } catch (userIdError: any) {
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3240',message:'UserId extraction error',data:{error:userIdError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
         // #endregion
         // Continue without userId if extraction fails
       }
@@ -4018,7 +4243,6 @@ app.post('/api/search/session', async (req, res) => {
 
     if (!query || typeof query !== 'string' || !query.trim()) {
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3248',message:'Query validation failed',data:{query,queryType:typeof query},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       // #endregion
       return res.status(400).json({
         success: false,
@@ -4029,7 +4253,6 @@ app.post('/api/search/session', async (req, res) => {
     console.log(`[API] Creating search session: "${query}" (type: ${inputType})`);
 
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3256',message:'Before search execution',data:{query,inputType,sessionId:`session-${Date.now()}-${Math.random().toString(36).substring(7)}`},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
 
     // Generate session ID
@@ -4039,7 +4262,6 @@ app.post('/api/search/session', async (req, res) => {
     
     if (inputType === 'url') {
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3262',message:'URL processing branch',data:{query:query.trim(),queryLength:query.trim().length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       // #endregion
 
       // Validate and clean URL
@@ -4050,7 +4272,6 @@ app.post('/api/search/session', async (req, res) => {
         cleanUrl = testUrl.href; // Normalize URL
       } catch (urlError: any) {
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3268',message:'Invalid URL format',data:{query:cleanUrl,error:urlError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
         throw new Error(`Invalid URL format: ${urlError.message}`);
       }
@@ -4059,18 +4280,15 @@ app.post('/api/search/session', async (req, res) => {
         // Process URL: Tavily context + Firecrawl extraction
         const { processLink } = await import('./services/link-intelligence.js');
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3277',message:'Before processLink',data:{cleanUrl,urlLength:cleanUrl.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
         const linkResult = await processLink(cleanUrl, undefined, { permissive: true });
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3271',message:'After processLink',data:{hasResult:!!linkResult.result,hasGraph:!!linkResult.graph,fallbackUsed:linkResult.fallbackUsed},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
         
         // Also search Tavily for context around the URL
         const { searchTavily } = await import('./services/tavily-unified-service.js');
         const domain = new URL(cleanUrl).hostname;
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3276',message:'Before searchTavily',data:{domain},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
         const tavilyContext = await searchTavily(domain, 'news', {
           searchDepth: 'advanced',
@@ -4078,7 +4296,6 @@ app.post('/api/search/session', async (req, res) => {
           includeRawContent: true,
         });
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3283',message:'After searchTavily',data:{articlesCount:tavilyContext.articles?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
 
       // Combine results
@@ -4116,29 +4333,24 @@ app.post('/api/search/session', async (req, res) => {
       };
       } catch (urlError: any) {
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3288',message:'URL processing error',data:{errorName:urlError?.name,errorMessage:urlError?.message,errorStack:urlError?.stack?.substring(0,500),errorCode:urlError?.code,errorType:urlError?.errorType},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
         console.error('[API] URL processing error:', urlError);
         throw urlError;
       }
     } else {
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3294',message:'Text search branch',data:{query:query.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       // #endregion
 
       try {
         // Text search: use search orchestrator
         const { search } = await import('./services/search-orchestrator.js');
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3298',message:'Before search orchestrator',data:{query:query.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
         searchResult = await search(query.trim(), 'standard', {}, userId);
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3301',message:'After search orchestrator',data:{resultsCount:searchResult?.results?.length||0,hasGraph:!!searchResult?.graph},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
       } catch (textError: any) {
         // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3305',message:'Text search error',data:{error:textError?.message,stack:textError?.stack?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
         // #endregion
         throw textError;
       }
@@ -4180,7 +4392,6 @@ app.post('/api/search/session', async (req, res) => {
     }
 
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3317',message:'Before response',data:{sessionId,resultsCount:session.results?.length||0,hasGraph:!!session.graph},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
 
     res.json({
@@ -4190,7 +4401,6 @@ app.post('/api/search/session', async (req, res) => {
     });
 
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3325',message:'Response sent',data:{success:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
   } catch (error: any) {
     // #region agent log
@@ -4203,7 +4413,6 @@ app.post('/api/search/session', async (req, res) => {
       errorString: String(error),
       errorKeys: error ? Object.keys(error) : [],
     };
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:3330',message:'Error caught in endpoint',data:errorDetails,timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
     // #endregion
     console.error('[API] Create session error:', error);
     console.error('[API] Error details:', errorDetails);
@@ -4218,7 +4427,6 @@ app.post('/api/search/session', async (req, res) => {
 app.get('/api/search/session/:id', async (req, res) => {
   // #region agent log
   const entryPayload = { location: 'api-server.ts:GET session entry', message: 'GET search session', data: { id: req.params?.id, hasClerk: !!(req.headers['x-clerk-user-id']), hasSupabase: !!supabase }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1,H2' };
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entryPayload) }).catch(() => {});
   debugLog(entryPayload);
   // #endregion
   try {
@@ -4227,7 +4435,6 @@ app.get('/api/search/session/:id', async (req, res) => {
     if (!clerkUserId || !supabase) {
       // #region agent log
       const p404 = { location: 'api-server.ts:GET session 404 no clerk/supabase', message: 'Early 404', data: {}, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1' };
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p404) }).catch(() => {});
       debugLog(p404);
       // #endregion
       return res.status(404).json({
@@ -4239,7 +4446,6 @@ app.get('/api/search/session/:id', async (req, res) => {
     if (!userId) {
       // #region agent log
       const p404u = { location: 'api-server.ts:GET session 404 no userId', message: 'No supabase userId', data: {}, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1' };
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p404u) }).catch(() => {});
       debugLog(p404u);
       // #endregion
       return res.status(404).json({
@@ -4255,7 +4461,6 @@ app.get('/api/search/session/:id', async (req, res) => {
       .maybeSingle();
     // #region agent log
     const qPayload = { location: 'api-server.ts:GET session query', message: 'Supabase query result', data: { hasRow: !!row, hasSnapshot: !!row?.session_snapshot, dbError: error?.message }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H2,H3' };
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(qPayload) }).catch(() => {});
     debugLog(qPayload);
     // #endregion
     if (error || !row?.session_snapshot) {
@@ -4271,7 +4476,6 @@ app.get('/api/search/session/:id', async (req, res) => {
   } catch (error: any) {
     // #region agent log
     const catchPayload = { location: 'api-server.ts:GET session catch', message: 'Exception', data: { err: error?.message }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H2' };
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(catchPayload) }).catch(() => {});
     debugLog(catchPayload);
     // #endregion
     console.error('[API] Get session error:', error);
@@ -4286,7 +4490,6 @@ app.get('/api/search/session/:id', async (req, res) => {
 app.post('/api/search/session/:sessionId/playground', async (req, res) => {
   // #region agent log
   const sessionIdParam = req.params.sessionId?.trim();
-  fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:playground-entry',message:'Playground POST entry',data:{sessionId:sessionIdParam,hasClerk:!!req.headers['x-clerk-user-id'],hasSupabase:!!supabase},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H3'})}).catch(()=>{});
   // #endregion
   try {
     const sessionId = sessionIdParam;
@@ -4305,7 +4508,6 @@ app.post('/api/search/session/:sessionId/playground', async (req, res) => {
       .eq('session_id', sessionId)
       .maybeSingle();
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:playground-session-fetch',message:'Playground session fetch',data:{sessionId,found:!!(row?.session_snapshot),dbError:error?.message||null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H3'})}).catch(()=>{});
     // #endregion
     if (error || !row?.session_snapshot) {
       return res.status(404).json({ success: false, error: 'Session not found' });
@@ -4313,7 +4515,6 @@ app.post('/api/search/session/:sessionId/playground', async (req, res) => {
     const session = row.session_snapshot as { query?: string; results?: Array<{ title?: string; summary?: string; url?: string }>; investigationThreadId?: string };
     const existingThreadId = session.investigationThreadId;
     if (existingThreadId) {
-      fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:playground-return-existing',message:'Playground return existing threadId',data:{sessionId,threadId:existingThreadId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
       return res.json({ success: true, threadId: existingThreadId, graph: null });
     }
     const query = (session.query || '').trim();
@@ -4357,6 +4558,7 @@ app.post('/api/search/session/:sessionId/playground', async (req, res) => {
           maxTavilyResults: 15,
           maxScrapeUrls: 8,
           runGraphRebuild: true,
+          useSearchGraph: true, // même Knowledge Graph que Search ; requête utilisateur → Tavily → buildGraph
           supabase,
           rawTextChunks,
         });
@@ -4376,12 +4578,10 @@ app.post('/api/search/session/:sessionId/playground', async (req, res) => {
       // Still return threadId so client can poll
     }
     // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:playground-return-new',message:'Playground return new threadId',data:{sessionId,threadId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
     // #endregion
     res.json({ success: true, threadId, graph: null });
   } catch (err: any) {
     console.error('[API] Playground create:', err);
-    fetch('http://127.0.0.1:7243/ingest/d5287a41-fd4f-411d-9c06-41570ed77474',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api-server.ts:playground-catch',message:'Playground error',data:{error:err?.message,sessionId:req.params.sessionId?.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1,H3'})}).catch(()=>{});
     res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
   }
 });
@@ -5199,6 +5399,29 @@ app.get('/api/account/export',
     context: (req) => ({ endpoint: '/api/account/export' }),
   })
 );
+
+// ============================================
+// ESG (Open Sustainability Index)
+// ============================================
+
+// GET /api/esg/scores - ESG scores by company name (Open Sustainability Index)
+app.get('/api/esg/scores', async (req, res) => {
+  try {
+    const company = (req.query.company as string) || (req.query.name as string) || '';
+    if (!company.trim()) {
+      return res.status(400).json({ success: false, error: 'Query parameter "company" or "name" is required' });
+    }
+    const { fetchESGScores } = await import('./services/open-sustainability-service.js');
+    const scores = await fetchESGScores(company);
+    if (!scores) {
+      return res.json({ success: true, data: null, message: 'No ESG data available for this company' });
+    }
+    res.json({ success: true, data: scores });
+  } catch (error: any) {
+    console.error('[API] ESG scores error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch ESG scores' });
+  }
+});
 
 // ============================================
 // Corporate Impact Endpoints
@@ -6544,6 +6767,7 @@ const server = app.listen(PORT, () => {
   console.log(`   Time Series: GET http://localhost:${PORT}/api/market-data/:symbol/timeseries`);
   console.log(`\n   Optional Endpoints (for performance):`);
   console.log(`   Overview KPIs: GET http://localhost:${PORT}/api/overview/kpis`);
+  console.log(`   Overview Map: GET http://localhost:${PORT}/api/overview/map`);
   console.log(`   Overview Narrative: GET http://localhost:${PORT}/api/overview/narrative`);
   console.log(`   Triggered Alerts: GET http://localhost:${PORT}/api/alerts/triggered`);
   console.log(`   Events List: GET http://localhost:${PORT}/api/events`);

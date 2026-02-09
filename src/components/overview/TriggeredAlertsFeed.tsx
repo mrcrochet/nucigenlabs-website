@@ -1,5 +1,5 @@
 /**
- * TriggeredAlertsFeed - 8 alerts
+ * TriggeredAlertsFeed - Alertes déclenchées (Overview: max 5).
  * Data: GET /api/alerts/triggered?range=7d&limit=8&userId=
  */
 
@@ -28,10 +28,10 @@ function normalizeSeverity(s: string | undefined): 'moderate' | 'high' | 'critic
 }
 
 interface TriggeredAlertsFeedProps {
-  onDataLoaded?: (count: number) => void;
+  limit?: number;
 }
 
-export default function TriggeredAlertsFeed({ onDataLoaded }: TriggeredAlertsFeedProps) {
+export default function TriggeredAlertsFeed({ limit = 8 }: TriggeredAlertsFeedProps) {
   const { user } = useUser();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,7 +47,7 @@ export default function TriggeredAlertsFeed({ onDataLoaded }: TriggeredAlertsFee
     let cancelled = false;
     setLoading(true);
     setError(null);
-    const url = apiUrl(`/api/alerts/triggered?range=7d&limit=8&userId=${encodeURIComponent(user.id)}`);
+    const url = apiUrl(`/api/alerts/triggered?range=7d&limit=${Math.max(limit, 8)}&userId=${encodeURIComponent(user.id)}`);
     fetch(url)
       .then((res) => {
         if (cancelled) return null;
@@ -61,25 +61,23 @@ export default function TriggeredAlertsFeed({ onDataLoaded }: TriggeredAlertsFee
       .then((json) => {
         if (cancelled || !json) return;
         if (json.success && json.data?.alerts) {
-          const mapped = json.data.alerts.map((a: { id: string; title: string; severity?: string; triggered_at: string; related_event_id?: string }) => ({
-            id: a.id,
-            title: a.title || 'Alert',
-            severity: normalizeSeverity(a.severity),
-            triggeredAt: a.triggered_at,
-            relatedEventId: a.related_event_id,
-          }));
-          setAlerts(mapped);
-          onDataLoaded?.(mapped.length);
+          setAlerts(
+            json.data.alerts.map((a: { id: string; title: string; severity?: string; triggered_at: string; related_event_id?: string }) => ({
+              id: a.id,
+              title: a.title || 'Alert',
+              severity: normalizeSeverity(a.severity),
+              triggeredAt: a.triggered_at,
+              relatedEventId: a.related_event_id,
+            }))
+          );
         } else {
           setAlerts([]);
-          onDataLoaded?.(0);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setError('Indisponible');
           setAlerts([]);
-          onDataLoaded?.(0);
         }
       })
       .finally(() => {
@@ -88,11 +86,11 @@ export default function TriggeredAlertsFeed({ onDataLoaded }: TriggeredAlertsFee
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user?.id, limit]);
 
   if (loading) {
     return (
-      <Card className="p-5">
+      <Card>
         <div className="h-64 animate-pulse bg-background-glass-subtle rounded-lg" />
       </Card>
     );
@@ -100,7 +98,7 @@ export default function TriggeredAlertsFeed({ onDataLoaded }: TriggeredAlertsFee
 
   if (alerts.length === 0) {
     return (
-      <Card className="p-5">
+      <Card>
         <SectionHeader title="Triggered Alerts" />
         <div className="mt-4 text-sm text-text-secondary flex items-center gap-2">
           <Bell className="w-4 h-4" />
@@ -122,11 +120,11 @@ export default function TriggeredAlertsFeed({ onDataLoaded }: TriggeredAlertsFee
   };
 
   return (
-    <Card className="p-5">
+    <Card>
       <SectionHeader title="Triggered Alerts" />
       
       <div className="mt-4 space-y-3">
-        {alerts.map((alert) => (
+        {alerts.slice(0, limit).map((alert) => (
           <Link
             key={alert.id}
             to={`/alerts/${alert.id}`}

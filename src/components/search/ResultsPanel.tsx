@@ -182,7 +182,7 @@ export default function ResultsPanel({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-[#E1463E] animate-spin" />
+        <Loader2 className="w-8 h-8 text-red-500 animate-spin" />
       </div>
     );
   }
@@ -190,7 +190,7 @@ export default function ResultsPanel({
   if (results.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-text-secondary">No results found. Try a different query.</p>
+        <p className="text-gray-400">No results found. Try a different query.</p>
       </div>
     );
   }
@@ -199,24 +199,22 @@ export default function ResultsPanel({
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-text-primary">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="text-sm font-semibold text-gray-200">
           {filteredAndSortedResults.length} {filteredAndSortedResults.length === 1 ? 'result' : 'results'}
           {filteredAndSortedResults.length !== results.length && (
-            <span className="text-sm font-normal text-text-tertiary ml-2">
-              (of {results.length} total)
-            </span>
+            <span className="text-gray-500 font-normal ml-1">(of {results.length} total)</span>
           )}
         </h2>
         <div className="flex items-center gap-2">
           {filteredAndSortedResults.length >= 2 && (
             <button
+              type="button"
               onClick={() => setShowComparison(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-background-glass-subtle hover:bg-background-glass-medium border border-borders-subtle rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 border border-gray-800 hover:bg-gray-900 text-xs text-gray-400 transition-colors"
               title="Compare sources"
             >
-              <GitCompare className="w-4 h-4" />
+              <GitCompare className="w-3 h-3" />
               Compare Sources
             </button>
           )}
@@ -288,10 +286,11 @@ export default function ResultsPanel({
       <div className="space-y-4">
         {filteredAndSortedResults.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-text-secondary mb-2">No results match your filters.</p>
+            <p className="text-gray-400 mb-2">No results match your filters.</p>
             <button
+              type="button"
               onClick={handleClearAll}
-              className="text-xs text-primary hover:text-primary-hover transition-colors"
+              className="text-xs text-red-400 hover:text-red-300 transition-colors"
             >
               Clear all filters
             </button>

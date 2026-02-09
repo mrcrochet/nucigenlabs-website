@@ -24,6 +24,22 @@ export type InvestigationEdgeRelation =
  */
 export type InvestigationPathStatus = 'active' | 'weak' | 'dead';
 
+/** Evidence item for a path (source + optional text + confidence level) */
+export type EvidenceConfidenceLevel = 'low' | 'medium' | 'high';
+
+export interface PathEvidence {
+  text?: string;
+  source: string;
+  confidence: EvidenceConfidenceLevel;
+}
+
+/** Key node summary for a path (id, type, label) */
+export interface PathKeyNode {
+  id: string;
+  type: InvestigationNodeType;
+  label: string;
+}
+
 /** Node: fact / event / actor in the graph */
 export interface InvestigationGraphNode {
   id: string;
@@ -32,6 +48,9 @@ export interface InvestigationGraphNode {
   date?: string | null;
   confidence: number;
   sources: string[];
+  /** Optional coordinates for map view (V1: mock or extended from backend) */
+  lat?: number | null;
+  lon?: number | null;
 }
 
 /** Edge: causal or influence relation between two nodes */
@@ -55,6 +74,14 @@ export interface InvestigationGraphPath {
   confidence: number;
   /** Optional label for UX (e.g. "Sanctions-driven supply shock"). Not computed in v1. */
   hypothesis_label?: string;
+  /** Last update time (ISO or display label). Optional; cockpit shows "—" if missing. */
+  lastUpdate?: string;
+  /** Key nodes in this path (id, type, label). Derivable from nodes + graph. */
+  keyNodes?: PathKeyNode[];
+  /** Evidence items: text (optional in V1), source, confidence. Derivable from node.sources in V1. */
+  evidence?: PathEvidence[];
+  /** Contradictions that invalidated this path (when status is dead). */
+  contradictions?: string[];
 }
 
 /** Full investigation graph — single state fed to all three views */

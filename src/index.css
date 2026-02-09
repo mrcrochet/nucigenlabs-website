@@ -381,4 +381,49 @@
     will-change: transform, opacity;
     transform: translateZ(0);
   }
+
+  /* Global Situation map – dark tooltip */
+  .global-situation-popup .mapboxgl-popup-content {
+    background: #171717;
+    border: 1px solid #404040;
+    border-radius: 6px;
+    padding: 10px 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+  .global-situation-popup .mapboxgl-popup-tip {
+    border-top-color: #171717;
+  }
+
+  /* Discover globe – dark popup */
+  .discover-globe-popup .mapboxgl-popup-content {
+    background: #171717;
+    border: 1px solid #404040;
+    border-radius: 6px;
+    padding: 10px 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+  .discover-globe-popup .mapboxgl-popup-tip {
+    border-top-color: #171717;
+  }
+
+  /* Discover globe – popups above all overlays (legend, panels) */
+  .discover-globe-map .mapboxgl-popup {
+    z-index: 9999;
+  }
+
+  /* Discover globe – pulse pour événements récents (<6h) */
+  @keyframes globe-marker-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.85; transform: scale(1.08); }
+  }
+  @keyframes globe-marker-pulse-dot {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(255, 255, 255, 0); }
+  }
+  .globe-marker-pulse {
+    animation: globe-marker-pulse 2s ease-in-out infinite;
+  }
+  .globe-marker-pulse-dot {
+    animation: globe-marker-pulse-dot 2s ease-in-out infinite;
+  }
 }

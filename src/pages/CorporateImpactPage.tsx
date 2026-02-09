@@ -11,6 +11,8 @@ import AppShell from '../components/layout/AppShell';
 import SEO from '../components/SEO';
 import ProtectedRoute from '../components/ProtectedRoute';
 import CorporateImpactHeader from '../components/corporate-impact/CorporateImpactHeader';
+import CorporateImpactHeroSection from '../components/corporate-impact/CorporateImpactHeroSection';
+import CorporateImpactTeaserCards from '../components/corporate-impact/CorporateImpactTeaserCards';
 import CorporateImpactFilters from '../components/corporate-impact/CorporateImpactFilters';
 import CorporateImpactReportCard from '../components/corporate-impact/CorporateImpactReportCard';
 import SignalCard from '../components/corporate-impact/SignalCard';
@@ -146,11 +148,24 @@ function CorporateImpactPageContent() {
   // Filtering is now done server-side, but keep client-side filter as fallback
   const filteredSignals = signals;
 
+  const showReportActions = signals.length > 0 || selectedSectors.length > 0;
+
   return (
     <div className="col-span-1 sm:col-span-12 bg-black min-h-screen">
-      <CorporateImpactHeader stats={stats} />
+      <CorporateImpactHeader stats={stats} showReportActions={showReportActions} />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6">
+      {/* v1 Hero: input, CTA, Track, Mini/Pro */}
+      <CorporateImpactHeroSection
+        onGenerate={(_tickers, _briefType) => {
+          // Scroll to report section; tickers/briefType reserved for future API
+          document.getElementById('corporate-impact-report')?.scrollIntoView({ behavior: 'smooth' });
+        }}
+      />
+
+      {/* 3 teaser cards + micro-text */}
+      <CorporateImpactTeaserCards />
+
+      <div id="corporate-impact-report" className="max-w-4xl mx-auto px-4 sm:px-6 pt-8 border-t border-gray-900">
         {/* Bandeau: Events | N signals | Company impact — stack on mobile */}
         <div className="flex flex-col sm:flex-row items-center justify-between py-4 border-y border-gray-900 gap-4 sm:gap-0">
           <div className="text-center flex-1 order-1 sm:order-1">
@@ -307,7 +322,7 @@ export default function CorporateImpactPage() {
     <ProtectedRoute>
       <SEO 
         title="Corporate Impact — Nucigen"
-        description="How real-world events are likely to affect companies"
+        description="What changed, why it matters, and what to do next. Event-to-impact intelligence for your portfolio."
       />
       <AppShell>
         <CorporateImpactPageContent />
