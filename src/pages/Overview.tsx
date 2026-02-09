@@ -1,28 +1,29 @@
 /**
- * Overview Page
- *
- * Radar stratégique : lecture macro du monde en 10–15 secondes.
- * 3 blocs uniquement : Global Situation | My World Changed | What to Watch Next.
- * Pas de KPI dashboard, pas de long texte, pas d’analyse causale — Overview montre, Enquêtes expliquent.
+ * Overview Page — Style Google Earth
+ * Globe en pleine page, partie d’or (header + panneaux) juxtaposée en overlay pour une navigation optimale.
  */
 
 import { useState, useEffect } from 'react';
+import { ChevronDown, ChevronRight, BarChart3 } from 'lucide-react';
 import AppShell from '../components/layout/AppShell';
 import HeaderBar from '../components/overview/HeaderBar';
 import MarketSummaryBlock from '../components/overview/MarketSummaryBlock';
 import GlobalSituationMap from '../components/overview/GlobalSituationMap';
 import OverviewMapSidePanel from '../components/overview/OverviewMapSidePanel';
-import MyWorldChangedSection from '../components/overview/MyWorldChangedSection';
-import WhatToWatchNextSection from '../components/overview/WhatToWatchNextSection';
-import HowWeValidate from '../components/ui/HowWeValidate';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import { getOverviewMapData } from '../lib/api/overview-api';
 import type { OverviewMapData } from '../types/overview';
 
+/** Hauteur TopNav (h-16) pour positionner le globe en dessous */
+const TOP_NAV_HEIGHT = '4rem';
+/** Hauteur barre Overview (compacte) */
+const OVERVIEW_HEADER_HEIGHT = '3rem';
+
 function OverviewContent() {
   const [loading, setLoading] = useState(true);
   const [mapData, setMapData] = useState<OverviewMapData | null>(null);
+  const [marketSummaryOpen, setMarketSummaryOpen] = useState(true);
 
   useEffect(() => {
     getOverviewMapData().then((data) => {
@@ -34,8 +35,11 @@ function OverviewContent() {
   if (loading) {
     return (
       <AppShell>
-        <div className="col-span-1 sm:col-span-12 flex items-center justify-center h-64">
-          <div className="text-text-secondary">Chargement…</div>
+        <div
+          className="col-span-1 sm:col-span-12 w-screen min-h-screen ml-[calc(50%-50vw)] flex flex-col items-center justify-center bg-gradient-to-b from-[#0a0a0f] via-[#0c0c14] to-[#0a0a0f]"
+        >
+          <div className="w-10 h-10 rounded-full border-2 border-white/20 border-t-[#E1463E]/80 animate-spin" />
+          <p className="mt-4 text-sm text-gray-400">Chargement du globe…</p>
         </div>
       </AppShell>
     );
@@ -52,56 +56,71 @@ function OverviewContent() {
         description="Lecture macro du monde : où ça bouge, quoi est important, où creuser."
       />
 
-      {/* Row 1: HeaderBar */}
-      <div className="col-span-1 sm:col-span-12">
-        <HeaderBar />
-      </div>
+      {/* Réserve la place dans le flux (évite collapse du main) */}
+      <div className="col-span-1 sm:col-span-12 relative min-h-[100vh]" aria-hidden>
+        {/* Globe fixe — occupe tout l’espace sous la TopNav, navigation optimale (drag, zoom, rotate) */}
+        <div
+          className="fixed left-0 right-0 bottom-0 overflow-hidden bg-gradient-to-b from-[#0a0a0f] via-[#0b0b12] to-[#08080d]"
+          style={{ top: TOP_NAV_HEIGHT }}
+        >
+          <GlobalSituationMap signals={signals} />
+        </div>
 
-      {/* Market summary (daily digest) */}
-      <div className="col-span-1 sm:col-span-12 mb-4">
-        <MarketSummaryBlock />
-      </div>
+        {/* Partie d’or : barre Overview (type Google Earth) — juxtaposée sur le globe */}
+        <div
+          className="fixed left-0 right-0 z-20 border-b border-white/[0.08] bg-black/40 backdrop-blur-xl"
+          style={{ top: TOP_NAV_HEIGHT }}
+        >
+          <HeaderBar />
+        </div>
 
-      {/* How we validate market data — credibility */}
-      <div className="col-span-1 sm:col-span-12 mb-6">
-        <HowWeValidate variant="markets" />
-      </div>
+        {/* Partie d’or : Market summary — gauche, sous la barre Overview, rétractable */}
+        <div
+          className="fixed left-4 z-20 w-full max-w-md max-h-[calc(100vh-7.5rem)] overflow-y-auto"
+          style={{ top: `calc(${TOP_NAV_HEIGHT} + ${OVERVIEW_HEADER_HEIGHT} + 0.5rem)` }}
+        >
+          {marketSummaryOpen ? (
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.06] backdrop-blur-xl overflow-hidden shadow-2xl shadow-black/30 ring-1 ring-white/[0.06]">
+              <button
+                type="button"
+                onClick={() => setMarketSummaryOpen(false)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 border-b border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.08] transition-colors text-left"
+                aria-label="Rétracter Market summary"
+              >
+                <span className="flex items-center gap-2 text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <BarChart3 className="w-4 h-4 text-[#E1463E]" aria-hidden />
+                  Market summary
+                </span>
+                <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" aria-hidden />
+              </button>
+              <div className="max-h-[50vh] overflow-y-auto bg-white/[0.02]">
+                <MarketSummaryBlock />
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setMarketSummaryOpen(true)}
+              className="flex items-center gap-2 px-3 py-2 rounded-2xl border border-white/[0.08] bg-white/[0.06] backdrop-blur-xl shadow-xl hover:bg-white/[0.1] transition-colors text-left ring-1 ring-white/[0.06]"
+              aria-label="Afficher Market summary"
+            >
+              <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" aria-hidden />
+              <BarChart3 className="w-4 h-4 text-[#E1463E]" aria-hidden />
+              <span className="text-xs font-medium text-gray-300 uppercase tracking-wider">Market summary</span>
+            </button>
+          )}
+        </div>
 
-      {/* Bloc 1: Global Situation — carte + side panel */}
-      <div className="col-span-1 sm:col-span-12 mb-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-9 min-h-[400px]">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">
-              Global Situation
-            </h2>
-            <GlobalSituationMap signals={signals} />
-          </div>
-          <div className="lg:col-span-3 min-h-[400px]">
+        {/* Partie d’or : Top events + Top corporate impacts — droite, sous la barre Overview */}
+        <div
+          className="fixed right-4 z-20 w-72 sm:w-80 max-h-[calc(100vh-7.5rem)] overflow-y-auto"
+          style={{ top: `calc(${TOP_NAV_HEIGHT} + ${OVERVIEW_HEADER_HEIGHT} + 0.5rem)` }}
+        >
+          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.06] backdrop-blur-xl overflow-hidden shadow-2xl shadow-black/30 ring-1 ring-white/[0.06]">
             <OverviewMapSidePanel top_events={top_events} top_impacts={top_impacts} />
           </div>
         </div>
       </div>
-
-      {/* Bloc 2: My World Changed — Triggered Alerts | Decision Points | Watchlist */}
-      <MyWorldChangedSection />
-
-      {/* Bloc 3: What to Watch Next — Emerging Signals */}
-      <WhatToWatchNextSection />
-
-      {/* Phase 3.3: Portfolio / Watchlist placeholder (finance dashboard inspiration) */}
-      <section className="col-span-1 sm:col-span-12 mt-6" aria-labelledby="portfolio-watchlist-heading">
-        <h2 id="portfolio-watchlist-heading" className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
-          Portfolio & Watchlist
-        </h2>
-        <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-6 sm:p-8 text-center">
-          <p className="text-slate-400 text-sm mb-2">
-            Track your watchlist and key metrics in one place.
-          </p>
-          <p className="text-slate-500 text-xs">
-            Coming soon — meanwhile use Corporate Impact and Stock Portfolio Researcher for company-level insights.
-          </p>
-        </div>
-      </section>
     </AppShell>
   );
 }

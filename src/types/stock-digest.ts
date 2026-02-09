@@ -19,6 +19,10 @@ export interface StockReport {
   price_outlook: string;
   market_cap?: number;
   pe_ratio?: number;
+  /** Pro report: current trading price (from sources) */
+  current_price?: number;
+  /** Pro report: open price (from sources) */
+  open_price?: number;
   sources: StockDigestSource[];
 }
 

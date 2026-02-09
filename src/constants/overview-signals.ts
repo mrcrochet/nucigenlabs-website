@@ -16,21 +16,22 @@ export const OVERVIEW_SIGNAL_DEFINITION = {
   isNot: ['une news', 'une alerte', 'une hypothèse', 'un micro-événement'],
 } as const;
 
-/** Une phrase par type de layer = angle de lecture du monde (pas un filtre technique). */
+/** Une phrase par type de layer = angle de lecture du monde (pas un filtre technique).
+ * Couleurs alignées avec utils/colorSystem.ts (palette dark/orange/gold, Markets = purple/magenta). */
 export const OVERVIEW_LAYER_SEMANTICS: Record<
   OverviewSignalType,
   { label: string; description: string; color: string }
 > = {
   geopolitics:
-    { label: 'Geopolitics', description: 'Décisions étatiques, conflits, sanctions, alignements.', color: '#ca8a04' },
+    { label: 'Geopolitics', description: 'Décisions étatiques, conflits, sanctions, alignements.', color: '#F9B234' },
   'supply-chains':
-    { label: 'Supply Chains', description: 'Flux physiques : matières premières, nourriture, métaux.', color: '#ea580c' },
+    { label: 'Supply Chains', description: 'Flux physiques : matières premières, nourriture, métaux.', color: '#FF6B35' },
   markets:
-    { label: 'Markets', description: 'Réactions financières visibles, volatilité, positions.', color: '#2563eb' },
+    { label: 'Markets', description: 'Réactions financières visibles, volatilité, positions.', color: '#D946EF' },
   energy:
-    { label: 'Energy', description: 'Routes, capacités, dépendances énergétiques.', color: '#d97706' },
+    { label: 'Energy', description: 'Routes, capacités, dépendances énergétiques.', color: '#FBBF24' },
   security:
-    { label: 'Security', description: 'Risques armés, instabilité, coercition.', color: '#dc2626' },
+    { label: 'Security', description: 'Risques armés, instabilité, coercition.', color: '#EF4444' },
 };
 
 /** Règle stricte : max signaux visibles sur la carte (répondre "où regarder" sans bruit). */

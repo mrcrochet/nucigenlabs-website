@@ -1,6 +1,6 @@
 /**
- * HeaderBar - Overview page header
- * Props: dateRange, scopeMode, globalSearchQuery
+ * HeaderBar - Barre compacte type Google Earth, juxtaposée sur le globe.
+ * Search + filtres 24h/Global pour une navigation optimale.
  */
 
 import { Calendar, Globe, Search } from 'lucide-react';
@@ -17,29 +17,26 @@ export default function HeaderBar({
   globalSearchQuery = '',
 }: HeaderBarProps) {
   return (
-    <div className="flex items-center justify-between py-4">
-      <div className="flex items-center gap-4">
-        <h1 className="text-2xl font-semibold text-text-primary">Overview</h1>
-        <div className="flex items-center gap-2 text-sm text-text-secondary">
-          <Calendar className="w-4 h-4" />
-          <span>{dateRange}</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-text-secondary">
-          <Globe className="w-4 h-4" />
-          <span className="capitalize">{scopeMode}</span>
-        </div>
+    <div className="flex items-center gap-3 sm:gap-4 py-2.5 px-4">
+      <span className="text-sm font-semibold text-white/95 shrink-0">Overview</span>
+      <div className="relative flex-1 max-w-xl">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
+        <input
+          type="text"
+          placeholder="Search events, entities, tickers..."
+          value={globalSearchQuery}
+          className="w-full pl-9 pr-4 py-2 rounded-lg bg-white/[0.08] border border-white/[0.1] text-white placeholder-white/40 text-sm focus:outline-none focus:border-white/20 focus:ring-1 focus:ring-white/10"
+        />
       </div>
-
-      <div className="flex-1 max-w-md ml-8">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-text-tertiary" />
-          <input
-            type="text"
-            placeholder="Search events, entities, tickers..."
-            value={globalSearchQuery}
-            className="w-full pl-10 pr-4 py-2 bg-background-glass-subtle border border-borders-subtle rounded-lg text-text-primary placeholder-text-tertiary focus:outline-none focus:border-borders-medium focus:bg-background-glass-medium"
-          />
-        </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-white/[0.08] border border-white/[0.08] text-xs text-white/80">
+          <Calendar className="w-3.5 h-3.5" />
+          {dateRange}
+        </span>
+        <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-white/[0.08] border border-white/[0.08] text-xs text-white/80">
+          <Globe className="w-3.5 h-3.5" />
+          <span className="capitalize">{scopeMode}</span>
+        </span>
       </div>
     </div>
   );

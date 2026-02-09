@@ -92,6 +92,21 @@
   --z-popover: 1060;
   --z-tooltip: 1070;
   --z-toast: 1080;
+
+  /* Overview / Globe — layer colors (Nucigen palette, no blue) */
+  --overview-geopolitics: #F9B234;
+  --overview-geopolitics-light: #FFC857;
+  --overview-supply-chains: #FF6B35;
+  --overview-supply-chains-light: #F77F00;
+  --overview-markets: #D946EF;
+  --overview-markets-light: #C026D3;
+  --overview-energy: #FBBF24;
+  --overview-energy-light: #FB923C;
+  --overview-security: #EF4444;
+  --overview-security-light: #DC2626;
+  --overview-accent: #06B6D4;
+  --overview-bg-start: #0A0A0F;
+  --overview-bg-end: #0F1419;
 }
 
 /* Utility classes for design tokens */

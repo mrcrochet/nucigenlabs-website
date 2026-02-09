@@ -20,6 +20,91 @@
   }
 }
 
+/* Perplexity-style research loading: bouncing dots */
+@keyframes research-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-8px);
+  }
+}
+.animate-research-dot {
+  animation: research-bounce 1.2s ease-in-out infinite;
+}
+.animate-research-dot-2 { animation-delay: 150ms; }
+.animate-research-dot-3 { animation-delay: 300ms; }
+
+/* Overview globe — marqueurs pulsants */
+@keyframes overview-marker-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.85;
+  }
+}
+@keyframes overview-halo-breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.25;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.4;
+  }
+}
+.overview-marker-dot {
+  animation: overview-marker-pulse 2s ease-in-out infinite;
+}
+.overview-marker-halo {
+  animation: overview-halo-breathe 2.5s ease-in-out infinite;
+}
+
+/* Staggered list animation (Top events / impacts) */
+@keyframes overview-stagger-in {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.overview-stagger-item {
+  animation: overview-stagger-in 0.4s ease-out forwards;
+}
+
+/* Tooltip entrance: scale + fade (150ms) */
+@keyframes overview-tooltip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.overview-tooltip-entrance .mapboxgl-popup-content {
+  animation: overview-tooltip-in 0.15s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .overview-tooltip-entrance .mapboxgl-popup-content {
+    animation: none;
+  }
+  .overview-marker-dot,
+  .overview-marker-halo {
+    animation: none;
+  }
+  .overview-stagger-item {
+    animation-duration: 0.01ms;
+  }
+}
+
 @layer base {
   * {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;

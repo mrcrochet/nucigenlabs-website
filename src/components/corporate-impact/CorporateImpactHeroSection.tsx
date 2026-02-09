@@ -16,12 +16,14 @@ interface CorporateImpactHeroSectionProps {
   onGenerate?: (tickers: string[], briefType: BriefType) => void;
   initialTickers?: string[];
   initialBriefType?: BriefType;
+  generating?: boolean;
 }
 
 export default function CorporateImpactHeroSection({
   onGenerate,
   initialTickers = [],
   initialBriefType = 'mini',
+  generating = false,
 }: CorporateImpactHeroSectionProps) {
   const [tickerInput, setTickerInput] = useState('');
   const [tickers, setTickers] = useState<string[]>(initialTickers);
@@ -137,9 +139,17 @@ export default function CorporateImpactHeroSection({
           <button
             type="button"
             onClick={handleGenerate}
-            className="px-6 py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 text-white text-sm font-medium rounded-lg transition-colors"
+            disabled={generating}
+            className="px-6 py-3 bg-[#E1463E] hover:bg-[#E1463E]/90 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
           >
-            Generate Impact Brief
+            {generating ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden />
+                Generating…
+              </>
+            ) : (
+              'Generate Impact Brief'
+            )}
           </button>
           <p className="text-xs text-gray-500 self-center sm:self-auto">
             Daily digest + alerts when pressure shifts.

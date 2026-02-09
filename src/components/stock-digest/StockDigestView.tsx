@@ -3,7 +3,7 @@
  * UI inspirée de https://github.com/tavily-ai/market-researcher/tree/main/UI
  */
 
-import { useState, KeyboardEvent } from 'react';
+import { useState, useEffect, KeyboardEvent } from 'react';
 import {
   Loader2,
   Sparkles,
@@ -17,7 +17,6 @@ import {
   ChevronDown,
   ChevronUp,
   ArrowLeft,
-  Circle,
 } from 'lucide-react';
 import { apiUrl } from '../../lib/api-base';
 import type { StockReport, StockDigestResponse } from '../../types/stock-digest';
@@ -46,6 +45,10 @@ function formatMarketCap(cap: number): string {
   return `$${cap.toLocaleString()}`;
 }
 
+function formatPrice(value: number): string {
+  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export default function StockDigestView() {
   const [tickers, setTickers] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -55,6 +58,17 @@ export default function StockDigestView() {
   const [selectedTicker, setSelectedTicker] = useState<string | null>(null);
   const [showSources, setShowSources] = useState(false);
   const [researchModel, setResearchModel] = useState<ResearchModel>('mini');
+  const [loadingStep, setLoadingStep] = useState(0);
+
+  const researchSteps = ['Searching sources…', 'Analyzing data…', 'Writing digest…'];
+
+  useEffect(() => {
+    if (!loading) return;
+    const t = setInterval(() => {
+      setLoadingStep((s) => (s + 1) % researchSteps.length);
+    }, 2200);
+    return () => clearInterval(t);
+  }, [loading]);
 
   const addTicker = () => {
     const t = inputValue.trim().toUpperCase();
@@ -132,50 +146,40 @@ export default function StockDigestView() {
     setShowSources(false);
   };
 
-  // ——— Report view (inspiré DailyDigestReport)
+  // ——— Report view: design aligné Company Impact — serif ticker, cartes gray-900/800, accent Market cap, 3 colonnes, sources repliables.
   if (data?.reports && Object.keys(data.reports).length > 0) {
     const reportTickers = Object.keys(data.reports);
     const current = selectedTicker && data.reports[selectedTicker] ? selectedTicker : reportTickers[0];
     const report = data.reports[current]!;
 
     return (
-      <div className="space-y-6">
-        {/* Header: Back + titre + date */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {/* Header: Back + date (minimal, comme Company Impact) */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <button
             type="button"
             onClick={handleReset}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-white/[0.1] text-slate-300 hover:bg-white/5 hover:text-white transition-colors text-sm"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-800 text-gray-400 hover:bg-gray-900 transition-colors text-sm font-light"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to input
           </button>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[#E1463E]/20">
-              <BarChart3 className="w-5 h-5 text-[#E1463E]" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white">
-                Portfolio digest
-              </h2>
-              <p className="text-xs text-slate-500">
-                {new Date(data.generated_at).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-              </p>
-            </div>
-          </div>
+          <p className="text-xs text-gray-500">
+            {new Date(data.generated_at).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+          </p>
         </div>
 
-        {/* Ticker selector */}
+        {/* Ticker selector — pills comme Company Impact */}
         <div className="flex flex-wrap gap-2">
           {reportTickers.map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setSelectedTicker(t)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-lg text-sm font-light transition-colors ${
                 t === current
                   ? 'bg-[#E1463E] text-white'
-                  : 'bg-white/[0.06] text-slate-400 hover:bg-white/10 hover:text-white border border-white/[0.08]'
+                  : 'bg-gray-800 border border-gray-700 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
               }`}
             >
               {t}
@@ -183,125 +187,155 @@ export default function StockDigestView() {
           ))}
         </div>
 
-        {/* Selected stock report */}
-        <div className="space-y-6">
-          {/* Stock header */}
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
-            <h3 className="text-xl font-bold text-white">{report.ticker}</h3>
-            <p className="text-slate-400">{report.company_name}</p>
-            {(report.market_cap != null || report.pe_ratio != null) && (
-              <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {report.market_cap != null && (
-                  <div className="p-3 rounded-lg bg-[#E1463E]/10 border border-[#E1463E]/20">
-                    <p className="text-xs text-slate-500">Market cap</p>
-                    <p className="text-sm font-semibold text-white">{formatMarketCap(report.market_cap)}</p>
-                  </div>
-                )}
-                {report.pe_ratio != null && (
-                  <div className="p-3 rounded-lg bg-[#E1463E]/10 border border-[#E1463E]/20">
-                    <p className="text-xs text-slate-500">P/E ratio</p>
-                    <p className="text-sm font-semibold text-white">{report.pe_ratio.toFixed(2)}</p>
-                  </div>
-                )}
+        {/* Company identification — serif ticker + sans company name (Company Impact style) */}
+        <div>
+          <h2 className="font-serif text-2xl sm:text-3xl font-light text-white tracking-tight">{report.ticker}</h2>
+          <p className="text-sm text-gray-400 font-light mt-0.5">{report.company_name}</p>
+        </div>
+
+        {/* Key metrics bar — Pro: 4 boxes (Current Price, Open, Market Cap, P/E); Mini: Market cap + P/E only */}
+        {(report.current_price != null ||
+          report.open_price != null ||
+          report.market_cap != null ||
+          report.pe_ratio != null) && (
+          <div className="flex flex-wrap gap-3">
+            {report.current_price != null && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-950/40 p-4 min-w-[120px]">
+                <p className="text-xs text-amber-200/80 uppercase tracking-wider font-medium mb-1">Current price</p>
+                <p className="text-lg font-light text-white font-mono">{formatPrice(report.current_price)}</p>
+              </div>
+            )}
+            {report.open_price != null && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-950/40 p-4 min-w-[120px]">
+                <p className="text-xs text-amber-200/80 uppercase tracking-wider font-medium mb-1">Open price</p>
+                <p className="text-lg font-light text-white font-mono">{formatPrice(report.open_price)}</p>
+              </div>
+            )}
+            {report.market_cap != null && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-950/40 p-4 min-w-[120px]">
+                <p className="text-xs text-amber-200/80 uppercase tracking-wider font-medium mb-1">Market cap</p>
+                <p className="text-lg font-light text-white font-mono">{formatMarketCap(report.market_cap)}</p>
+              </div>
+            )}
+            {report.pe_ratio != null && (
+              <div className="rounded-lg border border-amber-500/30 bg-amber-950/40 p-4 min-w-[100px]">
+                <p className="text-xs text-amber-200/80 uppercase tracking-wider font-medium mb-1">P/E ratio</p>
+                <p className="text-lg font-light text-white font-mono">{report.pe_ratio.toFixed(2)}</p>
               </div>
             )}
           </div>
+        )}
 
-          {/* Summary */}
-          {report.summary && (
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
-              <h4 className="text-sm font-semibold text-white mb-2">Summary</h4>
-              <p className="text-sm text-slate-300 leading-relaxed">{report.summary}</p>
-            </div>
-          )}
-
-          {/* Key Insights */}
-          {report.key_insights.length > 0 && (
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4 sm:p-6">
-              <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-[#E1463E]" />
-                Key insights
-              </h4>
-              <ul className="space-y-2">
-                {report.key_insights.map((insight, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-slate-300">
-                    <Circle className="w-4 h-4 text-[#E1463E] shrink-0 mt-0.5" fill="currentColor" />
-                    <span>{insight}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Analysis grid: Performance, Risk, Outlook */}
-          <div className="grid sm:grid-cols-3 gap-4">
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-              <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-[#E1463E]" />
-                Current performance
-              </h4>
-              <p className="text-sm text-slate-300 leading-relaxed">{report.current_performance || '—'}</p>
-            </div>
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-              <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-400" />
-                Risk assessment
-              </h4>
-              <p className="text-sm text-slate-300 leading-relaxed">{report.risk_assessment || '—'}</p>
-            </div>
-            <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
-              <h4 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-amber-400" />
-                Price outlook
-              </h4>
-              <p className="text-sm text-slate-300 leading-relaxed">{report.price_outlook || '—'}</p>
+        {/* Stock Overview / Summary — Pro reports use "Stock Overview" when metrics bar is present */}
+        {report.summary && (
+          <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4 sm:p-6">
+            <h3 className="text-sm font-semibold text-white mb-3">
+              {report.current_price != null || report.open_price != null ? 'Stock Overview' : 'Summary'}
+            </h3>
+            <div className="text-sm text-gray-400 font-light leading-relaxed prose prose-invert prose-sm max-w-none">
+              {report.summary.split(/\n\n+/).map((p, i) => (
+                <p key={i} className="mb-3 last:mb-0">
+                  {p}
+                </p>
+              ))}
             </div>
           </div>
+        )}
 
-          {/* Recommendation */}
-          {report.recommendation && (
-            <div className="rounded-xl border border-[#E1463E]/20 bg-[#E1463E]/5 p-4 sm:p-6">
-              <h4 className="text-sm font-semibold text-white mb-2">Recommendation</h4>
-              <p className="text-sm text-slate-300 leading-relaxed">{report.recommendation}</p>
+        {/* Key insights — icône + titre, puces orange-red */}
+        {report.key_insights.length > 0 && (
+          <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4 sm:p-6">
+            <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-[#E1463E]" aria-hidden />
+              Key insights
+            </h3>
+            <ul className="space-y-2">
+              {report.key_insights.map((insight, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-gray-400 font-light leading-relaxed">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#E1463E] shrink-0 mt-1.5" aria-hidden />
+                  <span>{insight}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Three columns: Performance, Risk, Price Outlook — Pro: multi-line / bullet content */}
+        <div className="grid sm:grid-cols-3 gap-4">
+          <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
+            <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-[#E1463E]" aria-hidden />
+              Current performance
+            </h3>
+            <p className="text-sm text-gray-400 font-light leading-relaxed whitespace-pre-line">{report.current_performance || 'Not available'}</p>
+          </div>
+          <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
+            <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400" aria-hidden />
+              Risk assessment
+            </h3>
+            <p className="text-sm text-gray-400 font-light leading-relaxed whitespace-pre-line">{report.risk_assessment || 'Not available'}</p>
+          </div>
+          <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
+            <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-amber-400" aria-hidden />
+              Price outlook
+            </h3>
+            <p className="text-sm text-gray-400 font-light leading-relaxed whitespace-pre-line">{report.price_outlook || 'Not available'}</p>
+          </div>
+        </div>
+
+        {/* Final Recommendation — Pro-style label when metrics bar present */}
+        {report.recommendation && (
+          <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4 sm:p-6">
+            <h3 className="text-sm font-semibold text-white mb-2">
+              {report.current_price != null || report.open_price != null ? 'Final Recommendation' : 'Recommendation'}
+            </h3>
+            <div className="text-sm text-gray-300 font-light leading-relaxed prose prose-invert prose-sm max-w-none">
+              {report.recommendation.split(/\n\n+/).map((p, i) => (
+                <p key={i} className="mb-3 last:mb-0">
+                  {p}
+                </p>
+              ))}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Sources (collapsible) */}
-          <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setShowSources(!showSources)}
-              className="w-full flex items-center justify-between p-4 text-left hover:bg-white/[0.03] transition-colors"
-            >
-              <span className="flex items-center gap-2 text-sm font-semibold text-white">
-                <ExternalLink className="w-4 h-4 text-[#E1463E]" />
-                Research sources ({report.sources?.length || 0})
-              </span>
-              {showSources ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-            </button>
-            {showSources && report.sources && report.sources.length > 0 && (
-              <div className="border-t border-white/[0.06] p-4 space-y-3">
-                {report.sources.map((src, i) => (
-                  <div key={i} className="flex items-start justify-between gap-3 p-3 rounded-lg bg-black/20 border border-white/[0.04]">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs text-slate-500 truncate">{src.published_date}</p>
-                      <p className="text-sm text-slate-300 line-clamp-2">{src.title}</p>
-                      <p className="text-xs text-[#E1463E] truncate mt-1">{formatUrlDisplay(src.url)}</p>
-                    </div>
-                    <a
-                      href={src.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="shrink-0 p-2 text-[#E1463E] hover:bg-[#E1463E]/10 rounded-lg transition-colors"
-                      aria-label="Open source"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
+        {/* Research sources — repliable, chevron, style Company Impact */}
+        <div className="rounded-lg border border-gray-800 bg-gray-900/50 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setShowSources(!showSources)}
+            className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-800/30 transition-colors"
+          >
+            <span className="flex items-center gap-2 text-sm font-semibold text-white">
+              <ExternalLink className="w-4 h-4 text-[#E1463E]" aria-hidden />
+              Research sources ({report.sources?.length || 0})
+            </span>
+            {showSources ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+          </button>
+          {showSources && report.sources && report.sources.length > 0 && (
+            <div className="border-t border-gray-800 p-4 space-y-3">
+              {report.sources.map((src, i) => (
+                <div key={i} className="flex items-start justify-between gap-3 p-3 rounded-lg bg-gray-800/50 border border-gray-700">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-gray-500 truncate">{src.published_date}</p>
+                    <p className="text-sm text-gray-300 font-light line-clamp-2">{src.title}</p>
+                    <p className="text-xs text-[#E1463E] truncate mt-1">{formatUrlDisplay(src.url)}</p>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  <a
+                    href={src.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 p-2 text-[#E1463E] hover:bg-[#E1463E]/10 rounded-lg transition-colors"
+                    aria-label="Open source"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -413,6 +447,18 @@ export default function StockDigestView() {
           </p>
         </div>
       </div>
+
+      {/* Perplexity-style loading animation while digest is generating */}
+      {loading && (
+        <div className="rounded-xl bg-gray-900/50 border border-gray-800 p-5 flex flex-col items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#E1463E] animate-research-dot" />
+            <span className="w-2 h-2 rounded-full bg-[#E1463E] animate-research-dot animate-research-dot-2" />
+            <span className="w-2 h-2 rounded-full bg-[#E1463E] animate-research-dot animate-research-dot-3" />
+          </div>
+          <p className="text-sm text-gray-400 font-light">{researchSteps[loadingStep]}</p>
+        </div>
+      )}
 
       {/* Research Model — same as Corporate Impact toggle: uppercase label, bg-gray-900 border-gray-800, font-light */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-2">

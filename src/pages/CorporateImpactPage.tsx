@@ -37,10 +37,41 @@ function CorporateImpactPageContent() {
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  const [dashboard, setDashboard] = useState<{
+    causal_drivers?: string[];
+    impact_score?: { average: number; count: number; trend: string } | null;
+    decision_points?: Array<{ label: string; reason: string; company?: string }>;
+  } | null>(null);
+  const [briefLoading, setBriefLoading] = useState(false);
+  const [briefError, setBriefError] = useState<string | null>(null);
+  const [briefResult, setBriefResult] = useState<{
+    brief: string;
+    briefType: 'mini' | 'pro';
+    scope?: 'tickers' | 'sectors';
+    signalsUsed: Array<{ id: string; company_name: string; type: string; event_title: string }>;
+    generated_at: string;
+    industries?: string[];
+  } | null>(null);
 
   useEffect(() => {
     loadSignals();
   }, [selectedFilter, selectedSector, selectedSectors, selectedCategory, searchQuery]);
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  const loadDashboard = async () => {
+    try {
+      const res = await fetch(apiUrl('/api/corporate-impact/dashboard'));
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.success && json.data) setDashboard(json.data);
+    } catch {
+      // Non-blocking
+    }
+  };
 
   const loadSignals = async () => {
     try {
@@ -112,6 +143,9 @@ function CorporateImpactPageContent() {
         if (data.data.stats) {
           setStats(data.data.stats);
         }
+        if (data.data.last_update) {
+          setLastUpdate(data.data.last_update);
+        }
         if (data.data.available_sectors) {
           setAvailableSectors(data.data.available_sectors);
         }
@@ -142,8 +176,75 @@ function CorporateImpactPageContent() {
     }
   };
 
-  // Demo signals removed - system is now live
-  // Only real signals from database are displayed
+  const handleGenerateBrief = async (tickers: string[], briefType: 'mini' | 'pro') => {
+    setBriefError(null);
+    setBriefResult(null);
+    setBriefLoading(true);
+    try {
+      const res = await fetch(apiUrl('/api/corporate-impact/brief'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tickers, briefType }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || res.statusText);
+      if (json.success && json.data) {
+        setBriefResult(json.data);
+        setBriefError(null);
+        document.getElementById('corporate-impact-report')?.scrollIntoView({ behavior: 'smooth' });
+        setTimeout(() => document.getElementById('impact-brief-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+      } else {
+        throw new Error(json.error || 'Failed to generate brief');
+      }
+    } catch (e: any) {
+      setBriefError(e.message || 'Failed to generate impact brief');
+    } finally {
+      setBriefLoading(false);
+    }
+  };
+
+  const handleGenerateSectorBrief = async () => {
+    if (selectedSectors.length === 0) return;
+    setBriefError(null);
+    setBriefResult(null);
+    setBriefLoading(true);
+    try {
+      const res = await fetch(apiUrl('/api/corporate-impact/brief'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ industries: selectedSectors, briefType: 'mini' }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || res.statusText);
+      if (json.success && json.data) {
+        setBriefResult(json.data);
+        setBriefError(null);
+        document.getElementById('corporate-impact-report')?.scrollIntoView({ behavior: 'smooth' });
+        setTimeout(() => document.getElementById('impact-brief-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+      } else {
+        throw new Error(json.error || 'Failed to generate sector brief');
+      }
+    } catch (e: any) {
+      setBriefError(e.message || 'Failed to generate sector brief');
+    } finally {
+      setBriefLoading(false);
+    }
+  };
+
+  function formatLastUpdate(iso: string | null): string {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffM = Math.floor(diffMs / 60000);
+    const diffH = Math.floor(diffMs / 3600000);
+    const diffD = Math.floor(diffMs / 86400000);
+    if (diffM < 1) return 'Just now';
+    if (diffM < 60) return `${diffM}m ago`;
+    if (diffH < 24) return `${diffH}h ago`;
+    if (diffD < 7) return `${diffD}d ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
 
   // Filtering is now done server-side, but keep client-side filter as fallback
   const filteredSignals = signals;
@@ -154,16 +255,14 @@ function CorporateImpactPageContent() {
     <div className="col-span-1 sm:col-span-12 bg-black min-h-screen">
       <CorporateImpactHeader stats={stats} showReportActions={showReportActions} />
 
-      {/* v1 Hero: input, CTA, Track, Mini/Pro */}
+      {/* Hero: input, CTA calls API to generate brief */}
       <CorporateImpactHeroSection
-        onGenerate={(_tickers, _briefType) => {
-          // Scroll to report section; tickers/briefType reserved for future API
-          document.getElementById('corporate-impact-report')?.scrollIntoView({ behavior: 'smooth' });
-        }}
+        onGenerate={handleGenerateBrief}
+        generating={briefLoading}
       />
 
-      {/* 3 teaser cards + micro-text */}
-      <CorporateImpactTeaserCards />
+      {/* 3 teaser cards — real data when dashboard loaded */}
+      <CorporateImpactTeaserCards dashboard={dashboard} />
 
       <div id="corporate-impact-report" className="max-w-4xl mx-auto px-4 sm:px-6 pt-8 border-t border-gray-900">
         {/* Bandeau: Events | N signals | Company impact — stack on mobile */}
@@ -203,6 +302,35 @@ function CorporateImpactPageContent() {
           availableCategories={availableCategories}
         />
 
+        {/* Impact Brief — generated from Hero CTA */}
+        {(briefResult || briefError) && (
+          <div id="impact-brief-card" className="py-4">
+            <div className="rounded-lg border border-gray-800 bg-gray-900/50 p-4 sm:p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="w-4 h-4 text-[#E1463E]" aria-hidden />
+                <h3 className="text-sm font-semibold text-white">
+                  {briefResult?.scope === 'sectors' && briefResult?.industries?.length
+                    ? `Sector Brief (${briefResult.industries.join(', ')})`
+                    : `Impact Brief${briefResult ? ` (${briefResult.briefType})` : ''}`}
+                </h3>
+              </div>
+              {briefError && (
+                <p className="text-sm text-[#E1463E] mb-3">{briefError}</p>
+              )}
+              {briefResult && (
+                <>
+                  <div className="text-sm text-gray-300 font-light leading-relaxed whitespace-pre-line mb-4">
+                    {briefResult.brief}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Based on {briefResult.signalsUsed.length} signal{briefResult.signalsUsed.length !== 1 ? 's' : ''} · Generated {new Date(briefResult.generated_at).toLocaleString()}
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Rapport Corporate Impact — affiché quand des industries sont sélectionnées */}
         {selectedSectors.length > 0 && !loading && (
           <div className="py-4">
@@ -212,6 +340,8 @@ function CorporateImpactPageContent() {
               opportunities={signals.filter((s) => s.type === 'opportunity').length}
               risks={signals.filter((s) => s.type === 'risk').length}
               topCompanies={signals.slice(0, 8).map((s) => s.company.name)}
+              onGenerateSectorBrief={handleGenerateSectorBrief}
+              sectorBriefLoading={briefLoading}
             />
           </div>
         )}
@@ -225,7 +355,7 @@ function CorporateImpactPageContent() {
             </span>
             <span className="flex items-center gap-2">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" aria-hidden />
-              Live feed · Last update: 1h ago
+              Live feed · Last update: {formatLastUpdate(lastUpdate)}
             </span>
           </div>
         </div>

@@ -42,6 +42,8 @@ export interface OverviewEventSummary {
   label_short: string;
   impact_one_line: string;
   investigate_id: string | null;
+  /** When set, used for color bar and icon (layer type) */
+  type?: OverviewSignalType;
 }
 
 /** One company line for the side panel "Top 3 corporate impacts" */

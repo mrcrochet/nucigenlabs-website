@@ -3653,8 +3653,9 @@ app.post('/api/stock-digest', async (req, res) => {
     if (tickers.length === 0) {
       return res.status(400).json({ success: false, error: 'tickers must be a non-empty array (e.g. ["AAPL", "GOOGL"])' });
     }
+    const researchModel = body.research_model === 'pro' ? 'pro' : 'mini';
     const { generateStockDigest } = await import('./services/stock-digest-service.js');
-    const result = await generateStockDigest(tickers);
+    const result = await generateStockDigest(tickers, researchModel);
     res.json({ success: true, ...result });
   } catch (error: any) {
     console.error('[API] Stock digest error:', error);
@@ -5549,6 +5550,19 @@ app.get('/api/corporate-impact/signals', async (req, res) => {
       uniqueCategories = [...new Set((events || []).map((e: any) => e.discover_category).filter(Boolean))];
     }
 
+    // Last update (max generated_at) for "Last update: X ago"
+    let last_update: string | null = null;
+    const { data: lastRow } = await supabase
+      .from('market_signals')
+      .select('generated_at')
+      .eq('is_active', true)
+      .order('generated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lastRow && (lastRow as any).generated_at) {
+      last_update = (lastRow as any).generated_at;
+    }
+
     // Get event categories for signals
     const signalEventIds = [...new Set((signals || []).map((s: any) => s.event_id).filter(Boolean))];
     let eventCategoriesMap: Record<string, string> = {};
@@ -5623,6 +5637,7 @@ app.get('/api/corporate-impact/signals', async (req, res) => {
       data: {
         signals: transformedSignals,
         total: count || 0,
+        last_update: last_update || undefined,
         stats: {
           total_signals: allSignals?.length || 0,
           opportunities,
@@ -5869,6 +5884,154 @@ app.post('/api/corporate-impact/trigger', async (req, res) => {
       error: error.message || 'Failed to generate Corporate Impact signals',
       timestamp: new Date().toISOString(),
     });
+  }
+});
+
+// POST /api/corporate-impact/brief - Generate impact brief for tickers and/or industries (mini or pro)
+app.post('/api/corporate-impact/brief', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const tickers = Array.isArray(body.tickers) ? body.tickers.map((t: unknown) => String(t).trim().toUpperCase()).filter(Boolean) : [];
+    const industries = Array.isArray(body.industries) ? body.industries.map((i: unknown) => String(i).trim()).filter(Boolean) : [];
+    const briefType = body.briefType === 'pro' ? 'pro' : 'mini';
+
+    if (tickers.length === 0 && industries.length === 0) {
+      return res.status(400).json({ success: false, error: 'Provide tickers (e.g. ["AAPL"]) and/or industries (e.g. ["Energy", "Materials"])' });
+    }
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Supabase not configured' });
+    }
+
+    const { generateImpactBrief } = await import('./services/corporate-impact-brief-service.js');
+    const result = await generateImpactBrief(supabase, tickers, briefType, industries.length > 0 ? industries : undefined);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error('[API] Corporate Impact brief error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to generate impact brief',
+    });
+  }
+});
+
+// GET /api/corporate-impact/status - Last update and counts (for UI "Last update: X ago")
+app.get('/api/corporate-impact/status', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Supabase not configured' });
+    }
+    const { data: lastRow } = await supabase
+      .from('market_signals')
+      .select('generated_at')
+      .eq('is_active', true)
+      .order('generated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const { count } = await supabase
+      .from('market_signals')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_active', true);
+    res.json({
+      success: true,
+      data: {
+        last_update: lastRow && (lastRow as any).generated_at ? (lastRow as any).generated_at : null,
+        signals_count: count ?? 0,
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Corporate Impact status error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to get status' });
+  }
+});
+
+// GET /api/corporate-impact/dashboard - Causal drivers, impact score summary, decision points (for teaser cards)
+app.get('/api/corporate-impact/dashboard', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Supabase not configured' });
+    }
+
+    const limit = 20;
+
+    // Causal drivers: recent event_impact_analyses → event_type + first step of causal_chain
+    const { data: analyses } = await supabase
+      .from('event_impact_analyses')
+      .select('event_type, causal_chain, impact_score')
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+
+    const causalDrivers: string[] = [];
+    const seen = new Set<string>();
+    for (const a of analyses || []) {
+      const type = (a as any).event_type || 'Event';
+      if (!seen.has(type)) {
+        seen.add(type);
+        causalDrivers.push(type);
+      }
+      const chain = (a as any).causal_chain;
+      if (Array.isArray(chain) && chain[0]) {
+        const first = String(chain[0]).slice(0, 60);
+        if (first && !seen.has(first)) {
+          seen.add(first);
+          causalDrivers.push(first);
+        }
+      }
+      if (causalDrivers.length >= 8) break;
+    }
+
+    // Impact score: average and distribution from analyses
+    const scores = (analyses || []).map((a: any) => a.impact_score).filter((n) => typeof n === 'number');
+    const avgScore = scores.length ? scores.reduce((s, n) => s + n, 0) / scores.length : null;
+    const impactScoreSummary = avgScore !== null
+      ? { average: Math.round(avgScore), count: scores.length, trend: 'neutral' as const }
+      : null;
+
+    // Decision points: from market_signals (opportunity → Accumulate, risk + high magnitude → Hedge/Exit)
+    const { data: recentSignals } = await supabase
+      .from('market_signals')
+      .select('type, prediction_magnitude, prediction_confidence, company_name')
+      .eq('is_active', true)
+      .order('generated_at', { ascending: false })
+      .limit(50);
+
+    const decisionPoints: Array<{ label: string; reason: string; company?: string }> = [];
+    for (const s of recentSignals || []) {
+      const type = (s as any).type;
+      const mag = (s as any).prediction_magnitude || '';
+      const conf = (s as any).prediction_confidence || '';
+      const name = (s as any).company_name || 'Company';
+      if (type === 'opportunity' && (conf === 'high' || conf === 'medium-high')) {
+        if (decisionPoints.every((d) => d.label !== 'Accumulate')) {
+          decisionPoints.push({ label: 'Accumulate', reason: 'High-confidence opportunity signal', company: name });
+        }
+      } else if (type === 'risk') {
+        if (mag && /high|critical|20%|25%|30%/.test(mag.toLowerCase()) && decisionPoints.every((d) => d.label !== 'Hedge')) {
+          decisionPoints.push({ label: 'Hedge', reason: `Risk signal: ${mag}`, company: name });
+        }
+      }
+      if (decisionPoints.length >= 5) break;
+    }
+    if (decisionPoints.length === 0 && (recentSignals || []).length > 0) {
+      decisionPoints.push(
+        { label: 'Hold', reason: 'Monitor event-driven exposure', company: (recentSignals as any[])[0]?.company_name }
+      );
+    }
+
+    res.json({
+      success: true,
+      data: {
+        causal_drivers: causalDrivers.slice(0, 8),
+        impact_score: impactScoreSummary,
+        decision_points: decisionPoints.slice(0, 5),
+      },
+    });
+  } catch (error: any) {
+    console.error('[API] Corporate Impact dashboard error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to get dashboard' });
   }
 });
 
