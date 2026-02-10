@@ -5,6 +5,7 @@
  */
 
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Building2, ChevronDown, ChevronRight } from 'lucide-react';
 import type {
   OverviewEventSummary,
@@ -15,6 +16,10 @@ import { getLayerColor } from '../../utils/colorSystem';
 export interface OverviewMapSidePanelProps {
   top_events: OverviewEventSummary[];
   top_impacts: OverviewCorporateImpactSummary[];
+  /** When provided, called on event click (for flyTo + navigate). Pass (event, signal) if signal has coords. */
+  onEventClick?: (event: OverviewEventSummary, signal?: { lon: number; lat: number }) => void;
+  /** When provided, called on impact click (for navigate). */
+  onImpactClick?: (impact: OverviewCorporateImpactSummary) => void;
 }
 
 const DEFAULT_EVENT_COLOR = '#F9B234';
@@ -26,6 +31,8 @@ function eventColor(event: OverviewEventSummary): string {
 export default function OverviewMapSidePanel({
   top_events,
   top_impacts,
+  onEventClick,
+  onImpactClick,
 }: OverviewMapSidePanelProps) {
   const [topEventsOpen, setTopEventsOpen] = useState(true);
 
@@ -59,7 +66,10 @@ export default function OverviewMapSidePanel({
         {topEventsOpen && (
           <div className="px-4 pb-5 pt-0">
             <ul className="space-y-2.5">
-              {top_events.slice(0, 3).map((event, index) => (
+              {top_events.length === 0 ? (
+                <li className="text-xs text-gray-500 py-2">Aucun événement pour cette période.</li>
+              ) : (
+              top_events.slice(0, 3).map((event, index) => (
                 <li
                   key={event.id}
                   className="overview-stagger-item overview-event-item flex gap-2 opacity-0 text-gray-200/95 rounded-lg py-1.5 pr-2 -mx-1 transition-all duration-200 hover:translate-x-1 hover:bg-white/[0.04]"
@@ -68,12 +78,27 @@ export default function OverviewMapSidePanel({
                     borderLeft: `3px solid ${eventColor(event)}`,
                   }}
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium">{event.label_short}</div>
-                    <div className="text-xs text-gray-400/85">{event.impact_one_line}</div>
-                  </div>
+                  {onEventClick ? (
+                    <button
+                      type="button"
+                      onClick={() => onEventClick(event)}
+                      className="flex-1 min-w-0 text-left w-full"
+                    >
+                      <div className="text-sm font-medium">{event.label_short}</div>
+                      <div className="text-xs text-gray-400/85">{event.impact_one_line}</div>
+                    </button>
+                  ) : (
+                    <Link
+                      to={event.investigate_id || '/search'}
+                      className="flex-1 min-w-0 block"
+                    >
+                      <div className="text-sm font-medium">{event.label_short}</div>
+                      <div className="text-xs text-gray-400/85">{event.impact_one_line}</div>
+                    </Link>
+                  )}
                 </li>
-              ))}
+              ))
+              )}
             </ul>
           </div>
         )}
@@ -93,16 +118,36 @@ export default function OverviewMapSidePanel({
           Top corporate impacts
         </h3>
         <ul className="space-y-2.5">
-          {top_impacts.slice(0, 3).map((impact, idx) => (
+          {top_impacts.length === 0 ? (
+            <li className="text-xs text-gray-500 py-2">Aucun impact corporate.</li>
+          ) : (
+          top_impacts.slice(0, 3).map((impact, idx) => (
             <li
               key={idx}
               className="overview-stagger-item opacity-0 text-gray-200/95 rounded-lg py-1.5 pr-2 -mx-1 transition-all duration-200 hover:translate-x-1 hover:bg-white/[0.04]"
               style={{ animationDelay: `${240 + idx * 50}ms` }}
             >
-              <div className="text-sm font-medium">{impact.name}</div>
-              <div className="text-xs text-gray-400/85">{impact.impact_one_line}</div>
+              {onImpactClick ? (
+                <button
+                  type="button"
+                  onClick={() => onImpactClick(impact)}
+                  className="text-left w-full"
+                >
+                  <div className="text-sm font-medium">{impact.name}</div>
+                  <div className="text-xs text-gray-400/85">{impact.impact_one_line}</div>
+                </button>
+              ) : (
+                <Link
+                  to={impact.investigate_id || '/search'}
+                  className="block"
+                >
+                  <div className="text-sm font-medium">{impact.name}</div>
+                  <div className="text-xs text-gray-400/85">{impact.impact_one_line}</div>
+                </Link>
+              )}
             </li>
-          ))}
+          ))
+          )}
         </ul>
       </div>
     </div>

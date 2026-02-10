@@ -5,6 +5,12 @@
 import type { OverviewMapData } from '../../types/overview';
 import { apiUrl } from '../api-base';
 
+export interface OverviewMapParams {
+  dateRange?: '24h' | '7d' | '30d';
+  scopeMode?: 'global' | 'watchlist';
+  q?: string;
+}
+
 const FALLBACK_DATA: OverviewMapData = {
   signals: [
     { id: '1', lat: -2.5, lon: 28.8, type: 'security', impact: 'regional', importance: 85, confidence: 82, occurred_at: new Date().toISOString(), label_short: 'DRC – North Kivu', subtitle_short: 'ADF activity escalation', impact_one_line: 'Gold supply risk', investigate_id: '/search' },
@@ -26,14 +32,19 @@ const FALLBACK_DATA: OverviewMapData = {
   ],
 };
 
-export async function getOverviewMapData(): Promise<OverviewMapData> {
-  try {
-    const res = await fetch(apiUrl('/api/overview/map'));
-    if (!res.ok) throw new Error('Overview map fetch failed');
-    const json = await res.json();
-    if (!json.success || !json.data) throw new Error('Invalid overview map response');
-    return json.data as OverviewMapData;
-  } catch {
-    return FALLBACK_DATA;
-  }
+export async function getOverviewMapData(params?: OverviewMapParams): Promise<OverviewMapData> {
+  const searchParams = new URLSearchParams();
+  if (params?.dateRange) searchParams.set('dateRange', params.dateRange);
+  if (params?.scopeMode) searchParams.set('scopeMode', params.scopeMode);
+  if (params?.q?.trim()) searchParams.set('q', params.q.trim());
+  const query = searchParams.toString();
+  const url = apiUrl('/api/overview/map') + (query ? `?${query}` : '');
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Overview map fetch failed');
+  const json = await res.json();
+  if (!json.success || !json.data) throw new Error('Invalid overview map response');
+  return json.data as OverviewMapData;
 }
+
+/** Fallback data when API fails (caller can use for degraded UX) */
+export { FALLBACK_DATA };

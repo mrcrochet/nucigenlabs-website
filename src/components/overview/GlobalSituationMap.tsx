@@ -3,7 +3,7 @@
  * Globe 3D avec rotation idle, fog, marqueurs pulsants, presets layers, tooltips.
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Map, { Marker, Popup } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -64,13 +64,29 @@ export interface GlobalSituationMapProps {
   onSignalClick?: (signal: OverviewSignal) => void;
 }
 
-export default function GlobalSituationMap({
-  signals,
-  defaultLayers = ['geopolitics', 'supply-chains'],
-  onSignalClick,
-}: GlobalSituationMapProps) {
+export interface GlobalSituationMapHandle {
+  flyTo: (lng: number, lat: number, zoom?: number) => void;
+}
+
+const GlobalSituationMapInner = forwardRef<GlobalSituationMapHandle, GlobalSituationMapProps>(
+  function GlobalSituationMapInner(
+    {
+      signals,
+      defaultLayers = ['geopolitics', 'supply-chains'],
+      onSignalClick,
+    },
+    ref
+  ) {
   const navigate = useNavigate();
   const mapRef = useRef<any>(null);
+
+  useImperativeHandle(ref, () => ({
+    flyTo: (lng: number, lat: number, zoom = 4) => {
+      const map = mapRef.current?.getMap?.();
+      if (!map) return;
+      map.flyTo({ center: [lng, lat], zoom, duration: 1200, essential: true });
+    },
+  }), []);
   const [selectedLayers, setSelectedLayers] = useState<OverviewSignalType[]>(defaultLayers);
   const [hoveredSignal, setHoveredSignal] = useState<OverviewSignal | null>(null);
   const [layersPanelOpen, setLayersPanelOpen] = useState(true);
@@ -340,4 +356,6 @@ export default function GlobalSituationMap({
       </Map>
     </div>
   );
-}
+});
+
+export default GlobalSituationMapInner;

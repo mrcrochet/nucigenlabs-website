@@ -3,7 +3,8 @@
  * Globe en pleine page, partie d’or (header + panneaux) juxtaposée en overlay pour une navigation optimale.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronRight, BarChart3 } from 'lucide-react';
 import AppShell from '../components/layout/AppShell';
 import HeaderBar from '../components/overview/HeaderBar';
@@ -12,8 +13,9 @@ import GlobalSituationMap from '../components/overview/GlobalSituationMap';
 import OverviewMapSidePanel from '../components/overview/OverviewMapSidePanel';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
-import { getOverviewMapData } from '../lib/api/overview-api';
-import type { OverviewMapData } from '../types/overview';
+import { getOverviewMapData, FALLBACK_DATA } from '../lib/api/overview-api';
+import type { OverviewMapData, OverviewEventSummary } from '../types/overview';
+import type { GlobalSituationMapHandle } from '../components/overview/GlobalSituationMap';
 
 /** Hauteur TopNav (h-16) pour positionner le globe en dessous */
 const TOP_NAV_HEIGHT = '4rem';
@@ -21,18 +23,58 @@ const TOP_NAV_HEIGHT = '4rem';
 const OVERVIEW_HEADER_HEIGHT = '3rem';
 
 function OverviewContent() {
+  const navigate = useNavigate();
+  const mapRef = useRef<GlobalSituationMapHandle>(null);
   const [loading, setLoading] = useState(true);
   const [mapData, setMapData] = useState<OverviewMapData | null>(null);
   const [marketSummaryOpen, setMarketSummaryOpen] = useState(true);
+  const [dateRange, setDateRange] = useState<'24h' | '7d' | '30d'>('24h');
+  const [scopeMode, setScopeMode] = useState<'global' | 'watchlist'>('global');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchSubmitted, setSearchSubmitted] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getOverviewMapData({
+        dateRange,
+        scopeMode,
+        q: searchSubmitted || undefined,
+      });
+      setMapData(data);
+    } catch (e) {
+      setMapData(FALLBACK_DATA);
+      setError('Mode démo — API non disponible');
+    } finally {
+      setLoading(false);
+    }
+  }, [dateRange, scopeMode, searchSubmitted]);
 
   useEffect(() => {
-    getOverviewMapData().then((data) => {
-      setMapData(data);
-      setLoading(false);
-    });
-  }, []);
+    fetchData();
+  }, [fetchData]);
 
-  if (loading) {
+  const handleEventClick = useCallback(
+    (event: OverviewEventSummary) => {
+      const signal = mapData?.signals.find((s) => s.id === event.id);
+      if (signal && mapRef.current) {
+        mapRef.current.flyTo(signal.lon, signal.lat, 4);
+      }
+      navigate(event.investigate_id || '/search');
+    },
+    [mapData?.signals, navigate]
+  );
+
+  const handleImpactClick = useCallback(
+    (impact: { investigate_id: string | null }) => {
+      navigate(impact.investigate_id || '/search');
+    },
+    [navigate]
+  );
+
+  if (loading && !mapData) {
     return (
       <AppShell>
         <div
@@ -63,7 +105,7 @@ function OverviewContent() {
           className="fixed left-0 right-0 bottom-0 overflow-hidden bg-gradient-to-b from-[#0a0a0f] via-[#0b0b12] to-[#08080d]"
           style={{ top: TOP_NAV_HEIGHT }}
         >
-          <GlobalSituationMap signals={signals} />
+          <GlobalSituationMap ref={mapRef} signals={signals} />
         </div>
 
         {/* Partie d’or : barre Overview (type Google Earth) — juxtaposée sur le globe */}
@@ -71,12 +113,31 @@ function OverviewContent() {
           className="fixed left-0 right-0 z-20 border-b border-white/[0.08] bg-black/40 backdrop-blur-xl"
           style={{ top: TOP_NAV_HEIGHT }}
         >
-          <HeaderBar />
+          <HeaderBar
+            dateRange={dateRange}
+            scopeMode={scopeMode}
+            searchQuery={searchQuery}
+            onDateRangeChange={setDateRange}
+            onScopeModeChange={setScopeMode}
+            onSearchChange={setSearchQuery}
+            onSearchSubmit={(v) => { setSearchQuery(v); setSearchSubmitted(v); }}
+          />
         </div>
+        {error && (
+          <div
+            className="fixed left-2 right-2 sm:left-4 sm:right-4 z-30 flex items-center justify-center gap-2 rounded-lg bg-white/[0.08] border border-white/10 px-4 py-2 text-sm text-gray-300"
+            style={{ top: `calc(${TOP_NAV_HEIGHT} + ${OVERVIEW_HEADER_HEIGHT} + 0.5rem)` }}
+          >
+            <span>{error}</span>
+            <button type="button" onClick={fetchData} className="text-amber-400 hover:text-amber-300 underline hover:no-underline font-medium">
+              Réessayer
+            </button>
+          </div>
+        )}
 
         {/* Partie d’or : Market summary — gauche, sous la barre Overview, rétractable */}
         <div
-          className="fixed left-4 z-20 w-full max-w-md max-h-[calc(100vh-7.5rem)] overflow-y-auto"
+          className="fixed left-2 sm:left-4 z-20 w-full max-w-[calc(100vw-1rem)] sm:max-w-md max-h-[calc(100vh-7.5rem)] overflow-y-auto"
           style={{ top: `calc(${TOP_NAV_HEIGHT} + ${OVERVIEW_HEADER_HEIGHT} + 0.5rem)` }}
         >
           {marketSummaryOpen ? (
@@ -113,11 +174,16 @@ function OverviewContent() {
 
         {/* Partie d’or : Top events + Top corporate impacts — droite, sous la barre Overview */}
         <div
-          className="fixed right-4 z-20 w-72 sm:w-80 max-h-[calc(100vh-7.5rem)] overflow-y-auto"
+          className="fixed right-2 sm:right-4 z-20 w-[min(18rem,calc(100vw-1rem))] sm:w-80 max-h-[calc(100vh-7.5rem)] overflow-y-auto"
           style={{ top: `calc(${TOP_NAV_HEIGHT} + ${OVERVIEW_HEADER_HEIGHT} + 0.5rem)` }}
         >
           <div className="rounded-2xl border border-white/[0.08] bg-white/[0.06] backdrop-blur-xl overflow-hidden shadow-2xl shadow-black/30 ring-1 ring-white/[0.06]">
-            <OverviewMapSidePanel top_events={top_events} top_impacts={top_impacts} />
+            <OverviewMapSidePanel
+              top_events={top_events}
+              top_impacts={top_impacts}
+              onEventClick={handleEventClick}
+              onImpactClick={handleImpactClick}
+            />
           </div>
         </div>
       </div>

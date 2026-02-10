@@ -7,8 +7,9 @@
     "node": "20.x"
   },
   "scripts": {
-    "dev": "npx vite",
-    "dev:all": "npx concurrently -n api,web -c yellow,cyan \"npx tsx src/server/api-server.ts\" \"npm run dev\"",
+    "dev": "npx concurrently -n api,web -c yellow,cyan \"npx tsx src/server/api-server.ts\" \"npx vite\"",
+    "dev:frontend": "npx vite",
+    "dev:all": "npm run dev",
     "build": "npx vite build",
     "lint": "npx eslint .",
     "preview": "npx vite preview",
