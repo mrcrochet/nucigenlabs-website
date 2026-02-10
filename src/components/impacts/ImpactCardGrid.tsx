@@ -190,10 +190,16 @@ export default function ImpactCardGrid({ filters, signalId, loading, onImpactsLo
               </div>
             </div>
 
-            {/* Timeframe */}
-            <div className="mb-4">
+            {/* Timeframe + classification */}
+            <div className="flex flex-wrap items-center gap-2 mb-4">
               <Badge variant="neutral">{impact.timeframe}</Badge>
+              <Badge variant="level">Event-driven</Badge>
             </div>
+
+            {/* Micro-source: validation */}
+            <p className="text-xs text-gray-500 mb-4">
+              Validated via back-testing where historical data exists. Not investment advice.
+            </p>
 
             {/* Linked Assets */}
             {impact.affected_assets && impact.affected_assets.length > 0 && (

@@ -34,7 +34,7 @@ export const GLOBE_CATEGORIES: Record<
   markets: {
     label: 'Markets / Finance',
     shortLabel: 'Markets',
-    color: '#2563eb', // blue
+    color: '#D946EF', // purple/magenta (Nucigen palette)
   },
   political: {
     label: 'Political Decision',

@@ -3,14 +3,16 @@
  * Shown when one or more industries are selected.
  */
 
-import { FileText, TrendingUp, TrendingDown, Building2 } from 'lucide-react';
+import { FileText, TrendingUp, TrendingDown, Building2, Sparkles } from 'lucide-react';
 
-interface CorporateImpactReportCardProps {
+export interface CorporateImpactReportCardProps {
   industries: string[];
   totalSignals: number;
   opportunities: number;
   risks: number;
   topCompanies?: string[];
+  onGenerateSectorBrief?: () => void;
+  sectorBriefLoading?: boolean;
 }
 
 export default function CorporateImpactReportCard({
@@ -19,6 +21,8 @@ export default function CorporateImpactReportCard({
   opportunities,
   risks,
   topCompanies = [],
+  onGenerateSectorBrief,
+  sectorBriefLoading = false,
 }: CorporateImpactReportCardProps) {
   if (industries.length === 0) return null;
 
@@ -59,9 +63,32 @@ export default function CorporateImpactReportCard({
         </div>
       </div>
       {topCompanies.length > 0 && (
-        <div>
+        <div className="mb-4">
           <p className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-2">Entreprises concernées (aperçu)</p>
           <p className="text-sm text-gray-400">{topCompanies.slice(0, 8).join(', ')}{topCompanies.length > 8 ? '…' : ''}</p>
+        </div>
+      )}
+      {onGenerateSectorBrief && (
+        <div className="pt-2 border-t border-gray-800">
+          <button
+            type="button"
+            onClick={onGenerateSectorBrief}
+            disabled={sectorBriefLoading}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#E1463E]/10 border border-[#E1463E]/30 text-[#E1463E] text-sm font-medium hover:bg-[#E1463E]/20 disabled:opacity-50 transition-colors"
+          >
+            {sectorBriefLoading ? (
+              <>
+                <span className="w-3.5 h-3.5 border-2 border-[#E1463E]/30 border-t-[#E1463E] rounded-full animate-spin" aria-hidden />
+                Generating…
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" aria-hidden />
+                Generate sector brief
+              </>
+            )}
+          </button>
+          <p className="text-xs text-gray-500 mt-1.5">Mini brief for {industries.join(', ')} based on current signals.</p>
         </div>
       )}
     </div>
