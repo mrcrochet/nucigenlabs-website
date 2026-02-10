@@ -1655,11 +1655,11 @@ app.post('/api/impacts/exposure', async (req, res) => {
 // Optional Endpoints - Overview
 // ============================================
 
-// GET /api/overview/kpis - KPIs for Overview page
+// GET /api/overview/kpis - KPIs for Overview page (source: nucigen_events, dateRange: 24h | 7d | 30d)
 app.get('/api/overview/kpis', async (req, res) => {
   try {
-    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
-    const range = (req.query.range as string) || '24h';
+    const dateRange = ((req.query.dateRange as string) || '24h') as '24h' | '7d' | '30d';
+    const validRange = dateRange === '7d' || dateRange === '30d' ? dateRange : '24h';
 
     if (!supabase) {
       return res.status(503).json({
@@ -1668,110 +1668,12 @@ app.get('/api/overview/kpis', async (req, res) => {
       });
     }
 
-    const supabaseUserId = userId ? await getSupabaseUserId(userId, supabase) : null;
-
-    // Import Supabase functions
-    const { getNormalizedEvents, getSignalsFromEvents } = await import('../lib/supabase.js');
-
-    // Calculate date range
-    const now = new Date();
-    let dateFrom: Date;
-    let dateTo = now;
-
-    if (range === '24h') {
-      dateFrom = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    } else if (range === '7d') {
-      dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    } else {
-      dateFrom = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    }
-
-    // Get events and signals
-    const [events24h, signals24h, eventsPrev, signalsPrev] = await Promise.all([
-      getNormalizedEvents({ dateFrom: dateFrom.toISOString(), dateTo: dateTo.toISOString() }, supabaseUserId || undefined),
-      getSignalsFromEvents({ dateFrom: dateFrom.toISOString(), dateTo: dateTo.toISOString() }, supabaseUserId || undefined),
-      getNormalizedEvents({
-        dateFrom: new Date(dateFrom.getTime() - (dateTo.getTime() - dateFrom.getTime())).toISOString(),
-        dateTo: dateFrom.toISOString(),
-      }, supabaseUserId || undefined),
-      getSignalsFromEvents({
-        dateFrom: new Date(dateFrom.getTime() - (dateTo.getTime() - dateFrom.getTime())).toISOString(),
-        dateTo: dateFrom.toISOString(),
-      }, supabaseUserId || undefined),
-    ]);
-
-    // Calculate trends (last 7 days)
-    const trendDataEvents = await Promise.all(
-      Array.from({ length: 7 }, async (_, i) => {
-        const date = new Date(now.getTime() - (6 - i) * 24 * 60 * 60 * 1000);
-        const dayEvents = await getNormalizedEvents(
-          {
-            dateFrom: new Date(date.setHours(0, 0, 0, 0)).toISOString(),
-            dateTo: new Date(date.setHours(23, 59, 59, 999)).toISOString(),
-          },
-          supabaseUserId || undefined
-        );
-        return dayEvents.length;
-      })
-    );
-
-    const trendDataSignals = await Promise.all(
-      Array.from({ length: 7 }, async (_, i) => {
-        const date = new Date(now.getTime() - (6 - i) * 24 * 60 * 60 * 1000);
-        const daySignals = await getSignalsFromEvents(
-          {
-            dateFrom: new Date(date.setHours(0, 0, 0, 0)).toISOString(),
-            dateTo: new Date(date.setHours(23, 59, 59, 999)).toISOString(),
-          },
-          supabaseUserId || undefined
-        );
-        return daySignals.length;
-      })
-    );
-
-    // Calculate deltas
-    const deltaEvents = events24h.length > 0 && eventsPrev.length > 0
-      ? ((events24h.length - eventsPrev.length) / eventsPrev.length) * 100
-      : 0;
-
-    const deltaSignals = signals24h.length > 0 && signalsPrev.length > 0
-      ? ((signals24h.length - signalsPrev.length) / signalsPrev.length) * 100
-      : 0;
-
-    // Get high-impact impacts (7d) - using signals with high impact as proxy
-    const impacts7d = await getSignalsFromEvents(
-      {
-        dateFrom: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        dateTo: now.toISOString(),
-        minImpact: 70,
-      },
-      supabaseUserId || undefined
-    );
+    const { getOverviewKpis } = await import('./services/overview-kpi-service.js');
+    const data = await getOverviewKpis(supabase, validRange);
 
     res.json({
       success: true,
-      data: {
-        events_24h: {
-          count: events24h.length,
-          delta: deltaEvents,
-          trend: trendDataEvents,
-        },
-        signals_24h: {
-          count: signals24h.length,
-          delta: deltaSignals,
-          trend: trendDataSignals,
-        },
-        high_impact_impacts_7d: {
-          count: impacts7d.length,
-          delta: 0,
-          trend: Array.from({ length: 7 }, () => Math.floor(Math.random() * 5)),
-        },
-        watchlist_volatility: {
-          value: '0%',
-          delta: 0,
-          trend: Array.from({ length: 7 }, () => Math.floor(Math.random() * 25) + 10),
-        },
-      },
+      data,
     });
   } catch (error: any) {
     console.error('[API] Overview KPIs error:', error);
@@ -1929,50 +1831,142 @@ app.get('/api/openbb/fundamentals/:symbol', async (req, res) => {
 });
 
 // GET /api/overview/map - Global Situation map data (signals + top events + top corporate impacts)
-// Query params: dateRange (24h|7d|30d), scopeMode (global|watchlist), q (search)
+// Query params: dateRange (24h|7d|30d), scopeMode (global|watchlist), q (search), userId (Clerk; optional, for watchlist)
+// Data: nucigen_events (RSS + pipeline) with geo-coordinates, or fixture fallback
 app.get('/api/overview/map', async (req, res) => {
   try {
     const dateRange = (req.query.dateRange as string) || '24h';
     const scopeMode = (req.query.scopeMode as string) || 'global';
     const q = (req.query.q as string) || '';
+    const clerkUserId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || undefined;
+    const countriesParam = req.query.countries as string | undefined;
+    const countries = countriesParam ? countriesParam.split(',').map((c) => c.trim()).filter(Boolean) : undefined;
+    const sourcesParam = req.query.sourcesEnabled as string | undefined;
+    let sourcesEnabled = sourcesParam ? sourcesParam.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
+    let maxSignals: number | undefined;
+    let typesEnabled: string[] | undefined;
+    let minImportance: number | undefined;
 
-    // V1: static fixture. Later: derive from getNormalizedEvents/getSignalsFromEvents with geo resolution.
-    const now = new Date().toISOString();
-    const signals = [
-      { id: '1', lat: -2.5, lon: 28.8, type: 'security', impact: 'regional', importance: 85, confidence: 82, occurred_at: now, label_short: 'DRC – North Kivu', subtitle_short: 'ADF activity escalation', impact_one_line: 'Gold supply risk', investigate_id: '/investigations' },
-      { id: '2', lat: 25.2, lon: 55.3, type: 'supply-chains', impact: 'global', importance: 78, confidence: 76, occurred_at: now, label_short: 'UAE – Dubai', subtitle_short: 'Gold trade hub disruption', impact_one_line: 'Precious metals flow', investigate_id: '/investigations' },
-      { id: '3', lat: 51.5, lon: -0.1, type: 'geopolitics', impact: 'global', importance: 90, confidence: 94, occurred_at: now, label_short: 'UK – London', subtitle_short: 'Sanctions policy update', impact_one_line: 'Financial compliance', investigate_id: '/investigations' },
-      { id: '4', lat: 55.7, lon: 37.6, type: 'energy', impact: 'regional', importance: 72, confidence: 88, occurred_at: now, label_short: 'Russia – Moscow', subtitle_short: 'Energy export reconfiguration', impact_one_line: 'Gas supply routes', investigate_id: '/investigations' },
-      { id: '5', lat: 39.9, lon: 116.4, type: 'supply-chains', impact: 'global', importance: 80, confidence: 79, occurred_at: now, label_short: 'China – Beijing', subtitle_short: 'Strategic minerals stockpiling', impact_one_line: 'Rare earth dominance', investigate_id: '/investigations' },
-      { id: '6', lat: 40.7, lon: -74.0, type: 'markets', impact: 'global', importance: 88, confidence: 91, occurred_at: now, label_short: 'USA – New York', subtitle_short: 'Financial markets volatility', impact_one_line: 'Commodity futures', investigate_id: '/investigations' },
-    ];
-    const top_events = [
-      { id: '1', label_short: 'DRC – North Kivu', impact_one_line: 'Gold supply risk', investigate_id: '/investigations', type: 'security' as const },
-      { id: '2', label_short: 'UAE – Dubai', impact_one_line: 'Precious metals flow', investigate_id: '/investigations', type: 'supply-chains' as const },
-      { id: '3', label_short: 'UK – London', impact_one_line: 'Financial compliance', investigate_id: '/investigations', type: 'geopolitics' as const },
-    ];
-    const top_impacts = [
-      { name: 'Barrick Gold', impact_one_line: 'Production disruption', investigate_id: '/investigations' },
-      { name: 'Gazprom', impact_one_line: 'Route reconfiguration', investigate_id: '/investigations' },
-      { name: 'HSBC', impact_one_line: 'Compliance costs', investigate_id: '/investigations' },
-    ];
+    let supabaseUserId: string | null = null;
+    if (clerkUserId && supabase) {
+      supabaseUserId = await getSupabaseUserId(clerkUserId, supabase);
+      if (supabaseUserId) {
+        const { data: config } = await supabase.from('overview_feed_config').select('sources_enabled, types_enabled, min_importance, max_signals').eq('user_id', supabaseUserId).maybeSingle();
+        if (config) {
+          const c = config as { sources_enabled?: string[]; types_enabled?: string[]; min_importance?: number; max_signals?: number };
+          if (!sourcesEnabled && c.sources_enabled?.length) sourcesEnabled = c.sources_enabled;
+          if (c.types_enabled?.length) typesEnabled = c.types_enabled;
+          if (c.min_importance != null) minImportance = c.min_importance;
+          if (c.max_signals != null) maxSignals = c.max_signals;
+        }
+      }
+    }
+    if (scopeMode !== 'watchlist') supabaseUserId = null;
 
-    // Filter by search query if provided
-    const filterByQ = (items: { label_short?: string; name?: string }[]) =>
-      !q.trim() ? items : items.filter((item) => {
-        const text = (item.label_short || item.name || '').toLowerCase();
-        return text.includes(q.toLowerCase());
-      });
-
-    const data = {
-      signals: filterByQ(signals),
-      top_events: filterByQ(top_events),
-      top_impacts,
-    };
+    const { getOverviewMapDataFromEvents } = await import('./services/overview-map-service.js');
+    const data = await getOverviewMapDataFromEvents(supabase, {
+      dateRange: dateRange as '24h' | '7d' | '30d',
+      scopeMode: scopeMode as 'global' | 'watchlist',
+      q: q.trim() || undefined,
+      countries,
+      supabaseUserId: supabaseUserId ?? undefined,
+      sourcesEnabled,
+      typesEnabled,
+      minImportance,
+      maxSignals,
+    });
     res.json({ success: true, data });
   } catch (error: any) {
     console.error('[API] Overview map error:', error);
     res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+  }
+});
+
+// GET /api/overview/situation - Perplexity-powered situation brief (by country or global)
+app.get('/api/overview/situation', async (req, res) => {
+  try {
+    const country = (req.query.country as string)?.trim() || null;
+    if (!process.env.PERPLEXITY_API_KEY) {
+      return res.status(503).json({
+        success: false,
+        error: 'PERPLEXITY_API_KEY not configured',
+      });
+    }
+    const { getOverviewSituation } = await import('./services/overview-situation-service.js');
+    const data = await getOverviewSituation(country);
+    res.json({ success: true, data });
+  } catch (error: any) {
+    console.error('[API] Overview situation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/overview/feed-config - Get Overview feed config for user
+app.get('/api/overview/feed-config', async (req, res) => {
+  try {
+    const clerkUserId = (req.query.userId as string) || (req.headers['x-user-id'] as string);
+    if (!clerkUserId || !supabase) {
+      return res.status(400).json({ success: false, error: 'userId required and Supabase must be configured' });
+    }
+    const supabaseUserId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!supabaseUserId) {
+      return res.status(400).json({ success: false, error: 'User not found' });
+    }
+    const { data, error } = await supabase
+      .from('overview_feed_config')
+      .select('id, sources_enabled, categories_enabled, types_enabled, min_importance, max_signals')
+      .eq('user_id', supabaseUserId)
+      .maybeSingle();
+    if (error) {
+      console.error('[API] Overview feed-config get error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    res.json({ success: true, data: data || null });
+  } catch (err: any) {
+    console.error('[API] Overview feed-config error:', err);
+    res.status(500).json({ success: false, error: err.message || 'Internal server error' });
+  }
+});
+
+// PUT /api/overview/feed-config - Upsert Overview feed config for user
+app.put('/api/overview/feed-config', async (req, res) => {
+  try {
+    const clerkUserId = (req.body?.userId as string) || (req.headers['x-user-id'] as string);
+    if (!clerkUserId || !supabase) {
+      return res.status(400).json({ success: false, error: 'userId required and Supabase must be configured' });
+    }
+    const supabaseUserId = await getSupabaseUserId(clerkUserId, supabase);
+    if (!supabaseUserId) {
+      return res.status(400).json({ success: false, error: 'User not found' });
+    }
+    const { sources_enabled, categories_enabled, types_enabled, min_importance, max_signals } = req.body || {};
+    const { data, error } = await supabase
+      .from('overview_feed_config')
+      .upsert(
+        {
+          user_id: supabaseUserId,
+          sources_enabled: sources_enabled ?? null,
+          categories_enabled: categories_enabled ?? null,
+          types_enabled: types_enabled ?? null,
+          min_importance: min_importance != null ? Math.min(100, Math.max(0, Number(min_importance))) : null,
+          max_signals: max_signals != null ? Math.min(50, Math.max(1, Number(max_signals))) : null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id', select: 'id,sources_enabled,categories_enabled,types_enabled,min_importance,max_signals' }
+      )
+      .select()
+      .single();
+    if (error) {
+      console.error('[API] Overview feed-config put error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    res.json({ success: true, data });
+  } catch (err: any) {
+    console.error('[API] Overview feed-config error:', err);
+    res.status(500).json({ success: false, error: err.message || 'Internal server error' });
   }
 });
 
@@ -2640,109 +2634,6 @@ function filterEventsByDateRange<T extends { created_at: string }>(
   });
 }
 
-// GET /api/overview/kpis - KPIs for Overview page
-app.get('/api/overview/kpis', async (req, res) => {
-  try {
-    const userId = (req.query.userId as string) || (req.body?.userId as string) || null;
-    const supabaseUserId = userId ? await getSupabaseUserId(userId, supabase) : null;
-
-    if (!supabase) {
-      return res.status(500).json({
-        success: false,
-        error: 'Supabase not configured',
-      });
-    }
-
-    // Import functions dynamically
-    const { getNormalizedEvents, getSignalsFromEvents } = await import('../lib/supabase.js');
-
-    const now = new Date();
-    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const last48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
-    const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-    // Get events and signals (will filter by date after)
-    const [allEvents24h, allSignals24h, allEventsPrev24h, allSignalsPrev24h] = await Promise.all([
-      getNormalizedEvents({}, userId || undefined),
-      getSignalsFromEvents({}, userId || undefined),
-      getNormalizedEvents({}, userId || undefined),
-      getSignalsFromEvents({}, userId || undefined),
-    ]);
-
-    // Filter by date range
-    const events24h = filterEventsByDateRange(allEvents24h, last24h.toISOString(), now.toISOString());
-    const signals24h = allSignals24h.filter((s: any) => {
-      // Filter signals based on their related events' dates
-      return true; // Signals don't have created_at, use all for now
-    });
-    const eventsPrev24h = filterEventsByDateRange(allEventsPrev24h, last48h.toISOString(), last24h.toISOString());
-    const signalsPrev24h = allSignalsPrev24h; // Same as above
-
-    // Calculate trends (last 7 days) - use all events and filter by date
-    const allEventsForTrend = await getNormalizedEvents({}, userId || undefined);
-    const trendDataEvents = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date(now.getTime() - (6 - i) * 24 * 60 * 60 * 1000);
-      const dayStart = new Date(date.setHours(0, 0, 0, 0));
-      const dayEnd = new Date(date.setHours(23, 59, 59, 999));
-      const dayEvents = filterEventsByDateRange(allEventsForTrend, dayStart.toISOString(), dayEnd.toISOString());
-      return dayEvents.length;
-    });
-
-    const allSignalsForTrend = await getSignalsFromEvents({}, userId || undefined);
-    const trendDataSignals = Array.from({ length: 7 }, () => {
-      // Signals don't have dates, use approximate count
-      return Math.floor(allSignalsForTrend.length / 7);
-    });
-
-    // Get high-impact impacts (7d) - using signals with high impact as proxy
-    const allSignals7d = await getSignalsFromEvents({}, userId || undefined);
-    const impacts7d = allSignals7d.filter((s: any) => (s.impact_score || 0) >= 70);
-
-    // Calculate deltas
-    const deltaEvents = events24h.length > 0 && eventsPrev24h.length > 0
-      ? ((events24h.length - eventsPrev24h.length) / eventsPrev24h.length) * 100
-      : 0;
-
-    const deltaSignals = signals24h.length > 0 && signalsPrev24h.length > 0
-      ? ((signals24h.length - signalsPrev24h.length) / signalsPrev24h.length) * 100
-      : 0;
-
-    // Watchlist volatility (placeholder - TODO: implement when watchlist is ready)
-    const watchlistVolatility = 0;
-
-    res.json({
-      success: true,
-      data: {
-        events_24h: {
-          count: events24h.length,
-          delta: deltaEvents,
-          trend: trendDataEvents,
-        },
-        signals_24h: {
-          count: signals24h.length,
-          delta: deltaSignals,
-          trend: trendDataSignals,
-        },
-        high_impact_impacts_7d: {
-          count: impacts7d.length,
-          delta: 0,
-          trend: Array.from({ length: 7 }, () => Math.floor(Math.random() * 5)),
-        },
-        watchlist_volatility: {
-          value: `${watchlistVolatility}%`,
-          delta: 0,
-          trend: Array.from({ length: 7 }, () => Math.floor(Math.random() * 25) + 10),
-        },
-      },
-    });
-  } catch (error: any) {
-    console.error('[API] Overview KPIs error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Internal server error',
-    });
-  }
-});
 
 // GET /api/overview/narrative - Narrative for Overview page
 app.get('/api/overview/narrative', async (req, res) => {
@@ -6946,6 +6837,7 @@ const server = app.listen(PORT, () => {
   console.log(`\n   Optional Endpoints (for performance):`);
   console.log(`   Overview KPIs: GET http://localhost:${PORT}/api/overview/kpis`);
   console.log(`   Overview Map: GET http://localhost:${PORT}/api/overview/map`);
+  console.log(`   Overview Situation: GET http://localhost:${PORT}/api/overview/situation`);
   console.log(`   Overview Narrative: GET http://localhost:${PORT}/api/overview/narrative`);
   console.log(`   Triggered Alerts: GET http://localhost:${PORT}/api/alerts/triggered`);
   console.log(`   Events List: GET http://localhost:${PORT}/api/events`);

@@ -53,8 +53,29 @@ export interface OverviewCorporateImpactSummary {
   investigate_id: string | null;
 }
 
+export interface OverviewMapStats {
+  total_queried: number;
+  geo_matched: number;
+  geo_missed: number;
+  filtered_out: number;
+  final_count: number;
+  effective_date_range: string;
+}
+
 export interface OverviewMapData {
   signals: OverviewSignal[];
   top_events: OverviewEventSummary[];
   top_impacts: OverviewCorporateImpactSummary[];
+  is_demo?: boolean;
+  stats?: OverviewMapStats;
+}
+
+/** KPIs for Overview page (source: nucigen_events, filtered by dateRange) */
+export interface OverviewKpiData {
+  total_events: number;
+  high_impact_events: number;
+  top_region: string | null;
+  top_sector: string | null;
+  avg_impact_score: number;
+  avg_confidence: number;
 }

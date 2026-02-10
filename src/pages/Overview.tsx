@@ -5,9 +5,12 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useUser } from '@clerk/clerk-react';
 import { ChevronDown, ChevronRight, BarChart3 } from 'lucide-react';
 import AppShell from '../components/layout/AppShell';
 import HeaderBar from '../components/overview/HeaderBar';
+import KPIGrid from '../components/overview/KPIGrid';
+import OverviewSituationBlock from '../components/overview/OverviewSituationBlock';
 import MarketSummaryBlock from '../components/overview/MarketSummaryBlock';
 import GlobalSituationMap from '../components/overview/GlobalSituationMap';
 import OverviewMapSidePanel from '../components/overview/OverviewMapSidePanel';
@@ -19,11 +22,15 @@ import type { GlobalSituationMapHandle } from '../components/overview/GlobalSitu
 
 /** Hauteur TopNav (h-16) pour positionner le globe en dessous */
 const TOP_NAV_HEIGHT = '4rem';
-/** Hauteur barre Overview (compacte) */
-const OVERVIEW_HEADER_HEIGHT = '3rem';
+/** Barre Overview — sobre, une ligne */
+const OVERVIEW_HEADER_HEIGHT = '2.75rem';
+/** Largeur rails gauche / droite */
+const RAIL_LEFT_WIDTH = '18rem';
+const RAIL_RIGHT_WIDTH = '20rem';
 
 function OverviewContent() {
   const navigate = useNavigate();
+  const { user } = useUser();
   const mapRef = useRef<GlobalSituationMapHandle>(null);
   const [loading, setLoading] = useState(true);
   const [mapData, setMapData] = useState<OverviewMapData | null>(null);
@@ -32,29 +39,57 @@ function OverviewContent() {
   const [scopeMode, setScopeMode] = useState<'global' | 'watchlist'>('global');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchSubmitted, setSearchSubmitted] = useState('');
+  const [country, setCountry] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const fetchData = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+      setNotice(null);
+    }
     try {
       const data = await getOverviewMapData({
         dateRange,
         scopeMode,
         q: searchSubmitted || undefined,
+        countries: country ? [country] : undefined,
+        userId: user?.id,
       });
       setMapData(data);
+      setLastUpdated(new Date());
+
+      if (!silent) {
+        if (data.is_demo) {
+          setNotice('Demo mode — no events found in any date range');
+        } else if (data.stats?.effective_date_range && data.stats.effective_date_range !== dateRange) {
+          setNotice(`Expanded to ${data.stats.effective_date_range} — no events in ${dateRange}`);
+        }
+      }
     } catch (e) {
-      setMapData(FALLBACK_DATA);
-      setError('Mode démo — API non disponible');
+      if (!silent) {
+        setMapData(FALLBACK_DATA);
+        setError('API unavailable — showing demo data');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [dateRange, scopeMode, searchSubmitted]);
+  }, [dateRange, scopeMode, searchSubmitted, country, user?.id]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Real-time refresh every 2 min when tab is visible (keeps Top events / Top impacts live)
+  useEffect(() => {
+    const REFRESH_MS = 2 * 60 * 1000;
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible' && mapData) fetchData(true);
+    }, REFRESH_MS);
+    return () => clearInterval(t);
+  }, [mapData, fetchData]);
 
   const handleEventClick = useCallback(
     (event: OverviewEventSummary) => {
@@ -108,53 +143,75 @@ function OverviewContent() {
           <GlobalSituationMap ref={mapRef} signals={signals} />
         </div>
 
-        {/* Partie d’or : barre Overview (type Google Earth) — juxtaposée sur le globe */}
+        {/* Header — une ligne, sobre, high-tech */}
         <div
-          className="fixed left-0 right-0 z-20 border-b border-white/[0.08] bg-black/40 backdrop-blur-xl"
-          style={{ top: TOP_NAV_HEIGHT }}
+          className="fixed left-0 right-0 z-20 flex items-center border-b border-white/[0.06] bg-[#0a0a0c]/90 backdrop-blur-md"
+          style={{ top: TOP_NAV_HEIGHT, height: OVERVIEW_HEADER_HEIGHT }}
         >
-          <HeaderBar
+          <div className="flex-1 min-w-0 flex items-center overflow-hidden">
+            <HeaderBar
             dateRange={dateRange}
             scopeMode={scopeMode}
             searchQuery={searchQuery}
+            country={country}
             onDateRangeChange={setDateRange}
             onScopeModeChange={setScopeMode}
             onSearchChange={setSearchQuery}
             onSearchSubmit={(v) => { setSearchQuery(v); setSearchSubmitted(v); }}
+            onCountryChange={setCountry}
+            onRefresh={() => fetchData()}
+            refreshing={loading}
           />
-        </div>
-        {error && (
-          <div
-            className="fixed left-2 right-2 sm:left-4 sm:right-4 z-30 flex items-center justify-center gap-2 rounded-lg bg-white/[0.08] border border-white/10 px-4 py-2 text-sm text-gray-300"
-            style={{ top: `calc(${TOP_NAV_HEIGHT} + ${OVERVIEW_HEADER_HEIGHT} + 0.5rem)` }}
-          >
-            <span>{error}</span>
-            <button type="button" onClick={fetchData} className="text-amber-400 hover:text-amber-300 underline hover:no-underline font-medium">
-              Réessayer
-            </button>
           </div>
-        )}
+          {(error || notice) && (
+            <div
+              className={`shrink-0 flex items-center gap-2 text-[10px] uppercase tracking-wider ${
+                error ? 'text-red-400/90' : 'text-zinc-500'
+              }`}
+            >
+              {error ? (
+                <>
+                  <span className="max-w-[12rem] truncate">{error}</span>
+                  <button type="button" onClick={() => fetchData()} className="text-cyan-400/90 hover:text-cyan-300 underline shrink-0">
+                    Retry
+                  </button>
+                </>
+              ) : (
+                <span className="max-w-[14rem] truncate">{notice}</span>
+              )}
+            </div>
+          )}
+        </div>
 
-        {/* Partie d’or : Market summary — gauche, sous la barre Overview, rétractable */}
+        {/* Rail gauche : KPIs + Market summary — panneaux épurés */}
         <div
-          className="fixed left-2 sm:left-4 z-20 w-full max-w-[calc(100vw-1rem)] sm:max-w-md max-h-[calc(100vh-7.5rem)] overflow-y-auto"
-          style={{ top: `calc(${TOP_NAV_HEIGHT} + ${OVERVIEW_HEADER_HEIGHT} + 0.5rem)` }}
+          className="fixed z-20 flex flex-col gap-3 overflow-y-auto"
+          style={{
+            top: `calc(${TOP_NAV_HEIGHT} + ${OVERVIEW_HEADER_HEIGHT} + 0.75rem)`,
+            left: '0.75rem',
+            width: RAIL_LEFT_WIDTH,
+            maxHeight: 'calc(100vh - 8rem)',
+          }}
         >
+          <div className="rounded-lg border border-white/[0.06] bg-black/50 backdrop-blur-sm overflow-hidden">
+            <KPIGrid dateRange={dateRange} />
+          </div>
+          <OverviewSituationBlock country={country || null} />
           {marketSummaryOpen ? (
-            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.06] backdrop-blur-xl overflow-hidden shadow-2xl shadow-black/30 ring-1 ring-white/[0.06]">
+            <div className="rounded-lg border border-white/[0.06] bg-black/50 backdrop-blur-sm overflow-hidden">
               <button
                 type="button"
                 onClick={() => setMarketSummaryOpen(false)}
-                className="w-full flex items-center justify-between gap-2 px-3 py-2 border-b border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.08] transition-colors text-left"
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 border-b border-white/[0.06] hover:bg-white/[0.03] transition-colors text-left"
                 aria-label="Rétracter Market summary"
               >
-                <span className="flex items-center gap-2 text-xs font-medium text-gray-300 uppercase tracking-wider">
-                  <BarChart3 className="w-4 h-4 text-[#E1463E]" aria-hidden />
+                <span className="flex items-center gap-2 text-[10px] font-medium text-zinc-400 uppercase tracking-widest">
+                  <BarChart3 className="w-3.5 h-3.5 text-cyan-500/80" aria-hidden />
                   Market summary
                 </span>
-                <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" aria-hidden />
+                <ChevronDown className="w-3.5 h-3.5 text-zinc-500 shrink-0" aria-hidden />
               </button>
-              <div className="max-h-[50vh] overflow-y-auto bg-white/[0.02]">
+              <div className="max-h-[40vh] overflow-y-auto">
                 <MarketSummaryBlock />
               </div>
             </div>
@@ -162,27 +219,33 @@ function OverviewContent() {
             <button
               type="button"
               onClick={() => setMarketSummaryOpen(true)}
-              className="flex items-center gap-2 px-3 py-2 rounded-2xl border border-white/[0.08] bg-white/[0.06] backdrop-blur-xl shadow-xl hover:bg-white/[0.1] transition-colors text-left ring-1 ring-white/[0.06]"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-white/[0.06] bg-black/50 backdrop-blur-sm hover:bg-white/[0.04] transition-colors text-left"
               aria-label="Afficher Market summary"
             >
-              <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" aria-hidden />
-              <BarChart3 className="w-4 h-4 text-[#E1463E]" aria-hidden />
-              <span className="text-xs font-medium text-gray-300 uppercase tracking-wider">Market summary</span>
+              <ChevronRight className="w-3.5 h-3.5 text-zinc-500 shrink-0" aria-hidden />
+              <BarChart3 className="w-3.5 h-3.5 text-cyan-500/80" aria-hidden />
+              <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest">Market summary</span>
             </button>
           )}
         </div>
 
-        {/* Partie d’or : Top events + Top corporate impacts — droite, sous la barre Overview */}
+        {/* Rail droit : Top events + Top impacts — un bloc sobre */}
         <div
-          className="fixed right-2 sm:right-4 z-20 w-[min(18rem,calc(100vw-1rem))] sm:w-80 max-h-[calc(100vh-7.5rem)] overflow-y-auto"
-          style={{ top: `calc(${TOP_NAV_HEIGHT} + ${OVERVIEW_HEADER_HEIGHT} + 0.5rem)` }}
+          className="fixed z-20 overflow-y-auto"
+          style={{
+            top: `calc(${TOP_NAV_HEIGHT} + ${OVERVIEW_HEADER_HEIGHT} + 0.75rem)`,
+            right: '0.75rem',
+            width: RAIL_RIGHT_WIDTH,
+            maxHeight: 'calc(100vh - 8rem)',
+          }}
         >
-          <div className="rounded-2xl border border-white/[0.08] bg-white/[0.06] backdrop-blur-xl overflow-hidden shadow-2xl shadow-black/30 ring-1 ring-white/[0.06]">
+          <div className="rounded-lg border border-white/[0.06] bg-black/50 backdrop-blur-sm overflow-hidden">
             <OverviewMapSidePanel
               top_events={top_events}
               top_impacts={top_impacts}
               onEventClick={handleEventClick}
               onImpactClick={handleImpactClick}
+              lastUpdated={lastUpdated}
             />
           </div>
         </div>

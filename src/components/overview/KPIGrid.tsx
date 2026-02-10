@@ -1,184 +1,90 @@
 /**
- * KPIGrid - 4 KPI cards
- * Cards: Events24h, Signals24h, HighProbImpacts7d, WatchlistVolatility
+ * KPIGrid - KPI cards from Overview API (nucigen_events)
+ * Cards: Total events, High impact, Top region, Top sector, Avg impact, Avg confidence
  */
 
 import { useState, useEffect } from 'react';
-import { useUser } from '@clerk/clerk-react';
-import KPIStatCard, { KPIData } from '../ui/KPIStatCard';
-import { getNormalizedEvents, getSignalsFromEvents, getOrCreateSupabaseUserId } from '../../lib/supabase';
+import type { KPIData } from '../ui/KPIStatCard';
+import { getOverviewKpis } from '../../lib/api/overview-kpi-api';
 
-export default function KPIGrid() {
-  const { user } = useUser();
+export interface KPIGridProps {
+  dateRange?: '24h' | '7d' | '30d';
+}
+
+export default function KPIGrid({ dateRange = '24h' }: KPIGridProps) {
   const [kpis, setKpis] = useState<KPIData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadKPIs = async () => {
-      try {
-        const userId = user ? await getOrCreateSupabaseUserId(user.id) : undefined;
-        
-        // Get events from last 24h
-        const events24h = await getNormalizedEvents(
-          {
-            dateFrom: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-            dateTo: new Date().toISOString(),
-          },
-          userId
-        );
-
-        // Get signals from last 24h
-        const signals24h = await getSignalsFromEvents(
-          {
-            dateFrom: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-            dateTo: new Date().toISOString(),
-          },
-          userId
-        );
-
-        // Get high-impact impacts (7d) - placeholder for now
-        const impacts7d = await getSignalsFromEvents(
-          {
-            dateFrom: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-            dateTo: new Date().toISOString(),
-            minImpact: 70,
-          },
-          userId
-        );
-
-        // Calculate trends (last 7 days)
-        const trendDataEvents = await Promise.all(
-          Array.from({ length: 7 }, async (_, i) => {
-            const date = new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000);
-            const dayEvents = await getNormalizedEvents(
-              {
-                dateFrom: new Date(date.setHours(0, 0, 0, 0)).toISOString(),
-                dateTo: new Date(date.setHours(23, 59, 59, 999)).toISOString(),
-              },
-              userId
-            );
-            return dayEvents.length;
-          })
-        );
-
-        const trendDataSignals = await Promise.all(
-          Array.from({ length: 7 }, async (_, i) => {
-            const date = new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000);
-            const daySignals = await getSignalsFromEvents(
-              {
-                dateFrom: new Date(date.setHours(0, 0, 0, 0)).toISOString(),
-                dateTo: new Date(date.setHours(23, 59, 59, 999)).toISOString(),
-              },
-              userId
-            );
-            return daySignals.length;
-          })
-        );
-
-        // Calculate deltas (vs previous period)
-        const eventsPrev24h = await getNormalizedEvents(
-          {
-            dateFrom: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-            dateTo: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          },
-          userId
-        );
-        const deltaEvents = events24h.length > 0 && eventsPrev24h.length > 0
-          ? ((events24h.length - eventsPrev24h.length) / eventsPrev24h.length) * 100
-          : 0;
-
-        const signalsPrev24h = await getSignalsFromEvents(
-          {
-            dateFrom: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
-            dateTo: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-          },
-          userId
-        );
-        const deltaSignals = signals24h.length > 0 && signalsPrev24h.length > 0
-          ? ((signals24h.length - signalsPrev24h.length) / signalsPrev24h.length) * 100
-          : 0;
-
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getOverviewKpis({ dateRange })
+      .then((data) => {
+        if (cancelled) return;
         setKpis([
-          {
-            label: 'Signals (24h)',
-            value: signals24h.length.toString(),
-            delta: deltaSignals,
-            trendData: trendDataSignals,
-          },
-          {
-            label: 'Events (24h)',
-            value: events24h.length.toString(),
-            delta: deltaEvents,
-            trendData: trendDataEvents,
-          },
-          {
-            label: 'High-severity (7d)',
-            value: impacts7d.length.toString(),
-            delta: 0,
-            trendData: Array.from({ length: 7 }, () => Math.floor(Math.random() * 5)),
-            subLabel: 'Données indicatives',
-          },
-          {
-            label: 'Watchlist Volatility',
-            value: '0%',
-            delta: 0,
-            trendData: Array.from({ length: 7 }, () => Math.floor(Math.random() * 25) + 10),
-            subLabel: 'Données indicatives',
-          },
+          { label: `Events (${dateRange})`, value: data.total_events },
+          { label: 'High impact (≥0.75)', value: data.high_impact_events },
+          { label: 'Top region', value: data.top_region ?? '—' },
+          { label: 'Top sector', value: data.top_sector ?? '—' },
+          { label: 'Avg impact score', value: data.avg_impact_score.toFixed(2) },
+          { label: 'Avg confidence', value: data.avg_confidence.toFixed(2) },
         ]);
-      } catch (error) {
-        console.error('Error loading KPIs:', error);
-        // Fallback to placeholder data
-        setKpis([
-          {
-            label: 'Signals (24h)',
-            value: '0',
-            delta: 0,
-            trendData: [5, 8, 6, 10, 12, 9, 7],
-          },
-          {
-            label: 'Events (24h)',
-            value: '0',
-            delta: 0,
-            trendData: [10, 15, 12, 18, 20, 16, 14],
-          },
-          {
-            label: 'High-severity (7d)',
-            value: '0',
-            delta: 0,
-            trendData: [2, 3, 2, 4, 5, 3, 2],
-            subLabel: 'Données indicatives',
-          },
-          {
-            label: 'Watchlist Volatility',
-            value: '0%',
-            delta: 0,
-            trendData: [15, 18, 16, 20, 22, 19, 17],
-            subLabel: 'Données indicatives',
-          },
-        ]);
-      } finally {
-        setLoading(false);
-      }
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : 'Failed to load KPIs');
+        setKpis([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
     };
-
-    loadKPIs();
-  }, [user]);
+  }, [dateRange]);
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-24 bg-background-glass-subtle rounded-xl animate-pulse" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className="h-16 rounded-lg bg-white/[0.03] animate-pulse" />
         ))}
       </div>
     );
   }
 
+  if (error) {
+    return (
+      <div className="p-3 text-[11px] text-zinc-500 uppercase tracking-wider">
+        {error}
+      </div>
+    );
+  }
+
+  if (kpis.length === 0) {
+    return (
+      <div className="p-3 text-[11px] text-zinc-500 uppercase tracking-wider">
+        No data
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3">
       {kpis.map((kpi, index) => (
-        <KPIStatCard key={index} data={kpi} />
+        <div
+          key={index}
+          className="rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-2"
+        >
+          <p className="text-[9px] font-medium text-zinc-500 uppercase tracking-widest truncate">
+            {kpi.label}
+          </p>
+          <p className="text-[13px] font-semibold text-zinc-200 mt-0.5 tabular-nums">
+            {kpi.value}
+          </p>
+        </div>
       ))}
     </div>
   );

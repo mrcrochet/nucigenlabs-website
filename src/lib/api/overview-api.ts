@@ -9,6 +9,10 @@ export interface OverviewMapParams {
   dateRange?: '24h' | '7d' | '30d';
   scopeMode?: 'global' | 'watchlist';
   q?: string;
+  /** Filter by country names (e.g. ['France', 'United States']). Omit or empty = all countries. */
+  countries?: string[];
+  /** Clerk user ID; used when scopeMode is 'watchlist' to filter by watchlist entities */
+  userId?: string;
 }
 
 const FALLBACK_DATA: OverviewMapData = {
@@ -37,6 +41,8 @@ export async function getOverviewMapData(params?: OverviewMapParams): Promise<Ov
   if (params?.dateRange) searchParams.set('dateRange', params.dateRange);
   if (params?.scopeMode) searchParams.set('scopeMode', params.scopeMode);
   if (params?.q?.trim()) searchParams.set('q', params.q.trim());
+  if (params?.countries?.length) searchParams.set('countries', params.countries.join(','));
+  if (params?.userId) searchParams.set('userId', params.userId);
   const query = searchParams.toString();
   const url = apiUrl('/api/overview/map') + (query ? `?${query}` : '');
   const res = await fetch(url);
@@ -48,3 +54,27 @@ export async function getOverviewMapData(params?: OverviewMapParams): Promise<Ov
 
 /** Fallback data when API fails (caller can use for degraded UX) */
 export { FALLBACK_DATA };
+
+/** Situation brief (Perplexity) for Overview — by country or global */
+export interface OverviewSituationParams {
+  country?: string | null;
+}
+
+export interface OverviewSituationData {
+  summary: string;
+  country: string | null;
+}
+
+export async function getOverviewSituation(
+  params?: OverviewSituationParams
+): Promise<OverviewSituationData> {
+  const searchParams = new URLSearchParams();
+  if (params?.country?.trim()) searchParams.set('country', params.country.trim());
+  const query = searchParams.toString();
+  const url = apiUrl('/api/overview/situation') + (query ? `?${query}` : '');
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Overview situation fetch failed');
+  const json = await res.json();
+  if (!json.success || json.data == null) throw new Error('Invalid overview situation response');
+  return json.data as OverviewSituationData;
+}

@@ -33,7 +33,9 @@ import {
   Download,
   Monitor,
   Building2,
+  Globe,
 } from 'lucide-react';
+import { apiUrl } from '../lib/api-base';
 
 // Available options (same as onboarding)
 const SECTOR_OPTIONS = [
@@ -139,6 +141,23 @@ function SettingsContent() {
 
   const [focusAreaInput, setFocusAreaInput] = useState('');
 
+  const [overviewFeedConfig, setOverviewFeedConfig] = useState<{
+    sources_enabled: string[] | null;
+    types_enabled: string[] | null;
+    min_importance: number | null;
+    max_signals: number | null;
+  }>({ sources_enabled: null, types_enabled: null, min_importance: null, max_signals: null });
+  const [overviewConfigSaving, setOverviewConfigSaving] = useState(false);
+  const [overviewConfigSaved, setOverviewConfigSaved] = useState(false);
+
+  const OVERVIEW_TYPES = [
+    { value: 'geopolitics', label: 'Geopolitics' },
+    { value: 'supply-chains', label: 'Supply Chains' },
+    { value: 'markets', label: 'Markets' },
+    { value: 'energy', label: 'Energy' },
+    { value: 'security', label: 'Security' },
+  ];
+
   // Load existing profile and preferences
   useEffect(() => {
     async function load() {
@@ -149,10 +168,20 @@ function SettingsContent() {
 
       try {
         setLoading(true);
-        const [profileData, prefsData] = await Promise.all([
+        const [profileData, prefsData, overviewRes] = await Promise.all([
           getProfileByClerkId(user.id),
           getUserPreferences(user.id),
+          fetch(apiUrl(`/api/overview/feed-config?userId=${encodeURIComponent(user.id)}`)).then((r) => r.json()).catch(() => ({ success: false, data: null })),
         ]);
+        if (overviewRes?.success && overviewRes?.data) {
+          const d = overviewRes.data as { sources_enabled?: string[]; types_enabled?: string[]; min_importance?: number; max_signals?: number };
+          setOverviewFeedConfig({
+            sources_enabled: d.sources_enabled ?? null,
+            types_enabled: d.types_enabled ?? null,
+            min_importance: d.min_importance ?? null,
+            max_signals: d.max_signals ?? null,
+          });
+        }
         if (profileData) {
           setProfile({
             company: profileData.company || '',
@@ -241,6 +270,34 @@ function SettingsContent() {
       ...preferences,
       focus_areas: preferences.focus_areas.filter(a => a !== area),
     });
+  };
+
+  const handleSaveOverviewConfig = async () => {
+    if (!user?.id) return;
+    try {
+      setOverviewConfigSaving(true);
+      setOverviewConfigSaved(false);
+      const res = await fetch(apiUrl('/api/overview/feed-config'), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          sources_enabled: overviewFeedConfig.sources_enabled?.length ? overviewFeedConfig.sources_enabled : null,
+          types_enabled: overviewFeedConfig.types_enabled?.length ? overviewFeedConfig.types_enabled : null,
+          min_importance: overviewFeedConfig.min_importance ?? null,
+          max_signals: overviewFeedConfig.max_signals ?? null,
+        }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to save');
+      setOverviewConfigSaved(true);
+      setTimeout(() => setOverviewConfigSaved(false), 3000);
+    } catch (err: any) {
+      console.error('Overview config save error:', err);
+      setError(err.message || 'Failed to save Overview feed config.');
+    } finally {
+      setOverviewConfigSaving(false);
+    }
   };
 
   if (loading) {
@@ -580,6 +637,74 @@ function SettingsContent() {
                   >
                     Change Password
                   </Link>
+                </div>
+              </div>
+            </Card>
+
+            {/* Overview map feed config */}
+            <Card className="p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <Globe className="w-5 h-5 text-[#E1463E]" />
+                <h3 className="text-lg font-light text-white">Overview Map Feed</h3>
+              </div>
+              <p className="text-sm text-slate-400 font-light mb-6">
+                Control which sources and signal types appear on the Overview globe. Leave empty to show all.
+              </p>
+              <div className="space-y-6">
+                <div>
+                  <MultiSelect
+                    label="Signal types to show"
+                    options={OVERVIEW_TYPES}
+                    selected={overviewFeedConfig.types_enabled || []}
+                    onChange={(selected) => setOverviewFeedConfig({ ...overviewFeedConfig, types_enabled: selected.length ? selected : null })}
+                    placeholder="All types if none selected"
+                    helperText="Filter globe markers by type (geopolitics, supply chains, markets, etc.)."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-light text-slate-300 mb-2">Max signals on globe</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={overviewFeedConfig.max_signals ?? 12}
+                    onChange={(e) => setOverviewFeedConfig({ ...overviewFeedConfig, max_signals: parseInt(e.target.value, 10) || null })}
+                    className="w-full px-4 py-2 bg-white/[0.02] border border-white/[0.05] rounded-lg text-white focus:outline-none focus:border-white/10 font-light text-sm"
+                  />
+                  <p className="text-xs text-slate-500 font-light mt-1">1–50. Default 12.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-light text-slate-300 mb-2">Min importance (0–100)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={overviewFeedConfig.min_importance ?? 0}
+                    onChange={(e) => setOverviewFeedConfig({ ...overviewFeedConfig, min_importance: parseInt(e.target.value, 10) || null })}
+                    className="w-full px-4 py-2 bg-white/[0.02] border border-white/[0.05] rounded-lg text-white focus:outline-none focus:border-white/10 font-light text-sm"
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleSaveOverviewConfig}
+                    disabled={overviewConfigSaving}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#E1463E]/20 border border-[#E1463E]/30 rounded-lg text-[#E1463E] hover:bg-[#E1463E]/30 transition-colors text-sm font-light disabled:opacity-50"
+                  >
+                    {overviewConfigSaving ? (
+                      <>Saving...</>
+                    ) : overviewConfigSaved ? (
+                      <>
+                        <CheckCircle className="w-4 h-4" />
+                        Saved
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        Save Overview config
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </Card>
