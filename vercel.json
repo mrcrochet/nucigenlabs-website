@@ -18,6 +18,10 @@
     {
       "path": "/api/cron/corporate-impact",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/refresh-prices",
+      "schedule": "0 14 * * *"
     }
   ]
 }

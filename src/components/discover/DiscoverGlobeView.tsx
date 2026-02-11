@@ -18,13 +18,47 @@ import {
   importanceToSizePx,
   type GlobeCategory,
 } from '../../constants/globe-semantics';
+import { getMarkerGlowShadow } from '../../utils/colorSystem';
+import type { OverviewSignalType } from '../../types/overview';
 import { buildGlobalSnapshot, buildTopSignals, buildDynamics } from '../../lib/globe-snapshot';
 import type { Event } from '../../types/intelligence';
-import { Loader2, ArrowUp, ArrowRight, ArrowDown, Search, Sparkles, RefreshCw, X, ExternalLink } from 'lucide-react';
+import { Loader2, ArrowUp, ArrowRight, ArrowDown, Search, Sparkles, RefreshCw, X, ExternalLink, ChevronDown, Eye } from 'lucide-react';
+import GlobeFiltersBar from './GlobeFiltersBar';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN as string | undefined;
+
+const IDLE_ROTATION_DELAY_MS = 2500;
+const IDLE_BEARING_SPEED = 0.05;
+
+const FOG_CONFIG = {
+  range: [0.5, 10],
+  color: 'rgb(10, 10, 15)',
+  'high-color': 'rgb(45, 35, 20)',
+  'horizon-blend': 0.4,
+  'space-color': 'rgb(8, 6, 12)',
+  'star-intensity': 0.15,
+};
+
+/** Map Discover globe categories to Overview signal types for glow */
+const globeCatToOverviewType: Record<GlobeCategory, OverviewSignalType> = {
+  security: 'security',
+  'supply-chain': 'supply-chains',
+  energy: 'energy',
+  markets: 'markets',
+  political: 'geopolitics',
+};
+
+interface EventFilters {
+  type: string;
+  country: string;
+  region: string;
+  sector: string;
+  source_type: string;
+  confidence: [number, number];
+  timeRange: '24h' | '7d' | '30d';
+}
 
 export interface DiscoverGlobeViewProps {
   events: Event[];
@@ -36,6 +70,11 @@ export interface DiscoverGlobeViewProps {
   /** Ouvre le panneau droit et déclenche la génération du contexte (contexte affiché à droite). */
   onFetchPageContext?: () => void;
   onOpenContextPanel?: () => void;
+  /** Bridge globe → discover feed: search related items by event title */
+  onViewRelatedItems?: (eventTitle: string) => void;
+  /** Event filters state & handler (region, sector, source_type, confidence) */
+  eventFilters?: EventFilters;
+  onEventFiltersChange?: (filters: EventFilters) => void;
 }
 
 const RECENT_EVENT_MS = 6 * 60 * 60 * 1000; // 6h
@@ -61,12 +100,21 @@ export default function DiscoverGlobeView({
   onEventClick,
   onFetchPageContext,
   onOpenContextPanel,
+  onViewRelatedItems,
+  eventFilters,
+  onEventFiltersChange,
 }: DiscoverGlobeViewProps) {
   const mapRef = useRef<any>(null);
+  const idleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rotationFrameRef = useRef<number | null>(null);
+  const isIdleRef = useRef(false);
   const [hoveredEvent, setHoveredEvent] = useState<PointWithMeta | null>(null);
   const [popupEvent, setPopupEvent] = useState<PointWithMeta | null>(null);
   const [highlightedSignalCoords, setHighlightedSignalCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [categoryFilters, setCategoryFilters] = useState<Set<GlobeCategory>>(() => new Set(GLOBE_CATEGORY_IDS));
+  const [legendCollapsed, setLegendCollapsed] = useState(false);
+  const [signalsCollapsed, setSignalsCollapsed] = useState(false);
+  const [snapshotExpanded, setSnapshotExpanded] = useState(true);
 
   const points = useMemo(() => {
     const out: PointWithMeta[] = [];
@@ -123,11 +171,52 @@ export default function DiscoverGlobeView({
   const topSignals = useMemo(() => buildTopSignals(events, 5), [events]);
   const dynamics = useMemo(() => buildDynamics(events), [events]);
 
-  const onMapLoad = useCallback((evt: { target: any }) => {
-    const map = evt.target?.getMap?.();
-    if (map && typeof map.setProjection === 'function') {
-      map.setProjection({ type: 'globe' });
-    }
+  const onMapLoad = useCallback(() => {
+    const map = mapRef.current?.getMap?.();
+    if (!map) return;
+
+    const startIdleRotation = () => {
+      isIdleRef.current = true;
+      const rotate = () => {
+        if (!isIdleRef.current || !mapRef.current) return;
+        const m = mapRef.current.getMap?.();
+        if (!m) return;
+        const c = m.getCenter();
+        m.easeTo({
+          center: [c.lng + IDLE_BEARING_SPEED, c.lat],
+          duration: 100,
+          essential: true,
+        });
+        rotationFrameRef.current = requestAnimationFrame(rotate);
+      };
+      rotationFrameRef.current = requestAnimationFrame(rotate);
+    };
+
+    const stopIdleRotation = () => {
+      isIdleRef.current = false;
+      if (rotationFrameRef.current != null) {
+        cancelAnimationFrame(rotationFrameRef.current);
+        rotationFrameRef.current = null;
+      }
+    };
+
+    const scheduleIdle = () => {
+      if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
+      stopIdleRotation();
+      idleTimeoutRef.current = setTimeout(startIdleRotation, IDLE_ROTATION_DELAY_MS);
+    };
+
+    map.on('movestart', stopIdleRotation);
+    map.on('moveend', scheduleIdle);
+    scheduleIdle();
+  }, []);
+
+  // Cleanup rotation timers
+  useEffect(() => {
+    return () => {
+      if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
+      if (rotationFrameRef.current != null) cancelAnimationFrame(rotationFrameRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -203,62 +292,91 @@ export default function DiscoverGlobeView({
         </div>
       </div>
 
-      {/* Global Snapshot — bande dédiée (dans le flux, ne recouvre pas la carte) */}
-      <div className="shrink-0 px-4 py-3 bg-black/70 border-b border-white/5">
-        <p className="text-center text-sm text-slate-300 font-light max-w-2xl mx-auto leading-relaxed">
-          {snapshot}
-        </p>
-        {/* Contexte IA — ouvre le panneau droit et génère le contexte */}
-        {onFetchPageContext && (
-          <div className="mt-3 pt-3 border-t border-white/5 max-w-2xl mx-auto">
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <span className="text-[10px] uppercase tracking-wider text-[#A1A1A1] font-medium inline-flex items-center gap-1">
-                <Sparkles className="w-3 h-3" aria-hidden /> Contexte IA
-              </span>
-              <button
-                type="button"
-                onClick={handleRequestContext}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-[#2A2A2A] text-slate-300 hover:bg-white/10 hover:text-white text-xs transition-colors"
-                aria-label="Générer le contexte et l'afficher à droite"
-              >
-                <RefreshCw className="w-3.5 h-3.5" aria-hidden />
-                Générer le contexte
-              </button>
-            </div>
-            <p className="text-center text-[10px] text-slate-500 mt-1.5">
-              Le contexte s&apos;affiche dans le panneau à droite. Fermez-le pour retrouver la carte en plein écran.
-            </p>
-          </div>
-        )}
-        {/* Filtres par catégorie (pills) */}
-        <div className="flex flex-wrap items-center justify-center gap-2 mt-2 pt-2 border-t border-white/5">
-          {GLOBE_CATEGORY_IDS.map((id) => {
-            const active = categoryFilters.has(id);
-            const { shortLabel, color } = GLOBE_CATEGORIES[id];
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => toggleCategory(id)}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
-                  active
-                    ? 'opacity-100 ring-1 ring-white/20'
-                    : 'opacity-40 hover:opacity-70'
-                }`}
-                style={{ backgroundColor: active ? `${color}22` : 'transparent', color: active ? color : '#A1A1A1' }}
-                aria-pressed={active}
-                aria-label={`Filtrer ${shortLabel}`}
-              >
-                <span
-                  className="w-1.5 h-1.5 rounded-full shrink-0"
-                  style={{ backgroundColor: color }}
-                  aria-hidden
-                />
-                {shortLabel}
-              </button>
-            );
-          })}
+      {/* Global Snapshot — compact band with collapsible details */}
+      <div className="shrink-0 px-4 py-2 bg-black/70 border-b border-white/5">
+        {/* Snapshot line + expand toggle */}
+        <div className="flex items-center justify-center gap-3 max-w-3xl mx-auto">
+          <p className="text-sm text-slate-300 font-light leading-tight text-center flex-1">
+            {snapshot}
+          </p>
+          <button
+            type="button"
+            onClick={() => setSnapshotExpanded(!snapshotExpanded)}
+            className="text-slate-500 hover:text-white shrink-0 p-1 rounded transition-colors"
+            aria-label={snapshotExpanded ? 'Réduire' : 'Développer'}
+          >
+            <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${snapshotExpanded ? 'rotate-180' : ''}`} />
+          </button>
         </div>
+
+        {snapshotExpanded && (
+          <>
+            {/* AI Context section */}
+            {onFetchPageContext && (
+              <div className="mt-2 pt-2 border-t border-white/5 max-w-2xl mx-auto">
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <span className="text-[10px] uppercase tracking-wider text-[#A1A1A1] font-medium inline-flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" aria-hidden /> Contexte IA
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRequestContext}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-[#2A2A2A] text-slate-300 hover:bg-white/10 hover:text-white text-xs transition-colors"
+                    aria-label="Générer le contexte et l'afficher à droite"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" aria-hidden />
+                    Générer le contexte
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Category filter pills */}
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-2 pt-2 border-t border-white/5">
+              {GLOBE_CATEGORY_IDS.map((id) => {
+                const active = categoryFilters.has(id);
+                const { shortLabel, color } = GLOBE_CATEGORIES[id];
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => toggleCategory(id)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all ${
+                      active
+                        ? 'opacity-100 ring-1 ring-white/20'
+                        : 'opacity-40 hover:opacity-70'
+                    }`}
+                    style={{ backgroundColor: active ? `${color}22` : 'transparent', color: active ? color : '#A1A1A1' }}
+                    aria-pressed={active}
+                    aria-label={`Filtrer ${shortLabel}`}
+                  >
+                    <span
+                      className="w-1.5 h-1.5 rounded-full shrink-0"
+                      style={{ backgroundColor: color }}
+                      aria-hidden
+                    />
+                    {shortLabel}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Event filters (region, sector, source, confidence) */}
+            {eventFilters && onEventFiltersChange && (
+              <div className="mt-2 pt-2 border-t border-white/5 flex justify-center">
+                <GlobeFiltersBar
+                  filters={eventFilters}
+                  onFiltersChange={onEventFiltersChange}
+                  onReset={() => onEventFiltersChange({
+                    type: '', country: '', region: '', sector: '',
+                    source_type: '', confidence: [0, 100],
+                    timeRange: eventFilters.timeRange,
+                  })}
+                />
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Map */}
@@ -292,12 +410,16 @@ export default function DiscoverGlobeView({
             zoom: 1.2,
           }}
           onLoad={onMapLoad}
+          projection="globe"
+          fog={FOG_CONFIG}
           style={{ width: '100%', height: '100%' }}
           mapStyle="mapbox://styles/mapbox/dark-v11"
           attributionControl={false}
         >
           {filteredPoints.map((p) => {
             const highlighted = isPointHighlighted(p.lat, p.lon);
+            const color = GLOBE_CATEGORIES[p.category].color;
+            const overviewType = globeCatToOverviewType[p.category];
             return (
               <Marker
                 key={p.event.id}
@@ -305,32 +427,36 @@ export default function DiscoverGlobeView({
                 latitude={p.lat}
                 anchor="center"
                 onClick={() => setPopupEvent(p)}
-                onMouseEnter={() => setHoveredEvent(p)}
-                onMouseLeave={() => setHoveredEvent(null)}
               >
                 <div
-                  className={`relative cursor-pointer transition-transform hover:scale-110 transition-shadow ${p.isRecent ? 'globe-marker-pulse' : ''}`}
+                  className={`relative cursor-pointer ${p.isRecent ? 'marker-recent' : ''}`}
+                  onMouseEnter={() => setHoveredEvent(p)}
+                  onMouseLeave={() => setHoveredEvent(null)}
                   style={{
                     width: p.haloPx * 2,
                     height: p.haloPx * 2,
                     marginLeft: -p.haloPx,
                     marginTop: -p.haloPx,
-                    boxShadow: highlighted ? `0 0 0 3px white, 0 0 12px ${GLOBE_CATEGORIES[p.category].color}` : undefined,
+                    filter: 'drop-shadow(0 0 12px rgba(0,0,0,0.3))',
+                    boxShadow: highlighted ? `0 0 0 3px white, 0 0 12px ${color}` : undefined,
                   }}
                   title={p.event.headline}
                 >
                   <div
-                    className="absolute inset-0 rounded-full opacity-35"
-                    style={{ backgroundColor: GLOBE_CATEGORIES[p.category].color }}
+                    className="overview-marker-halo absolute inset-0 rounded-full"
+                    style={{ backgroundColor: color }}
                   />
                   <div
-                    className={`absolute rounded-full border-2 border-white/90 shadow-lg ${p.isRecent ? 'globe-marker-pulse-dot' : ''}`}
+                    className="overview-marker-dot absolute rounded-full border-2 border-white/30"
                     style={{
                       width: p.sizePx,
                       height: p.sizePx,
                       left: p.haloPx - p.sizePx / 2,
                       top: p.haloPx - p.sizePx / 2,
-                      backgroundColor: GLOBE_CATEGORIES[p.category].color,
+                      backgroundColor: color,
+                      boxShadow: p.isRecent
+                        ? `${getMarkerGlowShadow(overviewType)}, 0 0 14px ${color}80`
+                        : getMarkerGlowShadow(overviewType),
                     }}
                   />
                 </div>
@@ -404,99 +530,160 @@ export default function DiscoverGlobeView({
                   </>
                 )}
               </div>
-              <Link
-                to={`/events/${popupEvent.event.id}`}
-                onClick={() => onEventClick?.(popupEvent.event.id)}
-                className="mt-3 inline-flex items-center gap-1.5 text-xs text-[#E1463E] hover:text-[#E1463E]/90 font-medium"
-              >
-                Voir le détail
-                <ExternalLink className="w-3.5 h-3.5" />
-              </Link>
+              <div className="flex items-center gap-3 mt-3">
+                <Link
+                  to={`/events/${popupEvent.event.id}`}
+                  onClick={() => onEventClick?.(popupEvent.event.id)}
+                  className="inline-flex items-center gap-1.5 text-xs text-[#E1463E] hover:text-[#E1463E]/90 font-medium"
+                >
+                  Voir le détail
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </Link>
+                {onViewRelatedItems && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onViewRelatedItems(popupEvent.event.headline || popupEvent.event.description || '');
+                      setPopupEvent(null);
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white font-medium transition-colors"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                    Voir les items liés
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Legend — What you're seeing (top-left on map to avoid overlapping time controls) */}
-      <div className="absolute top-4 left-4 z-20 w-52 rounded-lg border border-[#2A2A2A] bg-[#1A1A1A]/95 backdrop-blur-md p-3 text-left">
-        <p className="text-[10px] uppercase tracking-wider text-[#A1A1A1] font-medium mb-2">
-          What you&apos;re seeing
-        </p>
-        <ul className="space-y-1.5 text-xs text-slate-300">
-          {(Object.entries(GLOBE_CATEGORIES) as [GlobeCategory, typeof GLOBE_CATEGORIES[GlobeCategory]][]).map(([id, { label, color }]) => (
-            <li key={id} className="flex items-center gap-2">
-              <span
-                className="w-2 h-2 rounded-full shrink-0"
-                style={{ backgroundColor: color }}
-              />
-              <span>{label}</span>
-            </li>
-          ))}
-        </ul>
-        <p className="text-[10px] text-[#A1A1A1] mt-2 pt-2 border-t border-[#2A2A2A]">
-          Size = importance · Halo = scope (local → global)
-        </p>
-      </div>
-
-      {/* Right panel: Top signals + Dynamics */}
-      <div className="absolute bottom-4 right-4 top-auto z-20 w-64 flex flex-col gap-3">
-        {/* Top signals */}
-        {topSignals.length > 0 && (
-          <div className="rounded-lg border border-[#2A2A2A] bg-[#1A1A1A]/95 backdrop-blur-md p-3">
-            <p className="text-[10px] uppercase tracking-wider text-[#A1A1A1] font-medium mb-2">
-              Top signals (last {timeRange})
-            </p>
-            <ul className="space-y-1.5">
-              {topSignals.map((s) => (
-                <li
-                  key={s.id}
-                  onMouseEnter={() => setHighlightedSignalCoords({ lat: s.lat, lon: s.lon })}
-                  onMouseLeave={() => setHighlightedSignalCoords(null)}
-                >
-                  <Link
-                    to={s.investigateHref}
-                    className="flex items-start gap-2 text-xs text-slate-300 hover:text-white transition-colors group"
-                  >
-                    <span
-                      className="w-2 h-2 rounded-full shrink-0 mt-1.5"
-                      style={{ backgroundColor: GLOBE_CATEGORIES[s.categoryId].color }}
-                      aria-hidden
-                    />
-                    <Search className="w-3 h-3 mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <span className="line-clamp-2">
-                      <span className="text-slate-400">{s.location}</span>
-                      {' – '}
-                      {s.label}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        {/* Dynamics */}
-        {dynamics.length > 0 && (
-          <div className="rounded-lg border border-[#2A2A2A] bg-[#1A1A1A]/95 backdrop-blur-md p-3">
-            <p className="text-[10px] uppercase tracking-wider text-[#A1A1A1] font-medium mb-2">
-              Global dynamics ({timeRange})
-            </p>
-            <ul className="space-y-1 text-xs text-slate-300">
-              {dynamics.map((d) => (
-                <li key={d.category} className="flex items-center gap-2">
+      {/* Legend — collapsible (top-left on map) */}
+      <div className="absolute top-4 left-4 z-20">
+        {legendCollapsed ? (
+          <button
+            type="button"
+            onClick={() => setLegendCollapsed(false)}
+            className="w-10 h-10 rounded-lg border border-[#2A2A2A] bg-[#1A1A1A]/95 backdrop-blur-md flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+            aria-label="Show legend"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+        ) : (
+          <div className="w-52 rounded-lg border border-[#2A2A2A] bg-[#1A1A1A]/95 backdrop-blur-md p-3 text-left">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] uppercase tracking-wider text-[#A1A1A1] font-medium">
+                What you&apos;re seeing
+              </p>
+              <button
+                type="button"
+                onClick={() => setLegendCollapsed(true)}
+                className="text-slate-500 hover:text-white p-0.5 rounded transition-colors"
+                aria-label="Hide legend"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <ul className="space-y-1.5 text-xs text-slate-300">
+              {(Object.entries(GLOBE_CATEGORIES) as [GlobeCategory, typeof GLOBE_CATEGORIES[GlobeCategory]][]).map(([id, { label, color }]) => (
+                <li key={id} className="flex items-center gap-2">
                   <span
                     className="w-2 h-2 rounded-full shrink-0"
-                    style={{ backgroundColor: GLOBE_CATEGORIES[d.categoryId].color }}
-                    aria-hidden
+                    style={{ backgroundColor: color }}
                   />
-                  {d.trend === 'up' && <ArrowUp className="w-3 h-3 text-amber-400 shrink-0" />}
-                  {d.trend === 'stable' && <ArrowRight className="w-3 h-3 text-slate-500 shrink-0" />}
-                  {d.trend === 'down' && <ArrowDown className="w-3 h-3 text-slate-600 shrink-0" />}
-                  <span>{d.category}</span>
+                  <span>{label}</span>
                 </li>
               ))}
             </ul>
+            <p className="text-[10px] text-[#A1A1A1] mt-2 pt-2 border-t border-[#2A2A2A]">
+              Size = importance · Halo = scope (local → global)
+            </p>
           </div>
+        )}
+      </div>
+
+      {/* Right panel: Top signals + Dynamics — collapsible */}
+      <div className="absolute bottom-4 right-4 top-auto z-20 w-64 flex flex-col gap-3">
+        {signalsCollapsed ? (
+          <button
+            type="button"
+            onClick={() => setSignalsCollapsed(false)}
+            className="self-end w-10 h-10 rounded-lg border border-[#2A2A2A] bg-[#1A1A1A]/95 backdrop-blur-md flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+            aria-label="Show signals"
+          >
+            <ChevronDown className="w-4 h-4 rotate-180" />
+          </button>
+        ) : (
+          <>
+            {/* Collapse button */}
+            <button
+              type="button"
+              onClick={() => setSignalsCollapsed(true)}
+              className="self-end text-slate-500 hover:text-white p-1 rounded transition-colors"
+              aria-label="Hide signals"
+            >
+              <ChevronDown className="w-4 h-4" />
+            </button>
+
+            {/* Top signals */}
+            {topSignals.length > 0 && (
+              <div className="rounded-lg border border-[#2A2A2A] bg-[#1A1A1A]/95 backdrop-blur-md p-3">
+                <p className="text-[10px] uppercase tracking-wider text-[#A1A1A1] font-medium mb-2">
+                  Top signals (last {timeRange})
+                </p>
+                <ul className="space-y-1.5">
+                  {topSignals.map((s) => (
+                    <li
+                      key={s.id}
+                      onMouseEnter={() => setHighlightedSignalCoords({ lat: s.lat, lon: s.lon })}
+                      onMouseLeave={() => setHighlightedSignalCoords(null)}
+                    >
+                      <Link
+                        to={s.investigateHref}
+                        className="flex items-start gap-2 text-xs text-slate-300 hover:text-white transition-colors group"
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0 mt-1.5"
+                          style={{ backgroundColor: GLOBE_CATEGORIES[s.categoryId].color }}
+                          aria-hidden
+                        />
+                        <Search className="w-3 h-3 mt-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <span className="line-clamp-2">
+                          <span className="text-slate-400">{s.location}</span>
+                          {' – '}
+                          {s.label}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Dynamics */}
+            {dynamics.length > 0 && (
+              <div className="rounded-lg border border-[#2A2A2A] bg-[#1A1A1A]/95 backdrop-blur-md p-3">
+                <p className="text-[10px] uppercase tracking-wider text-[#A1A1A1] font-medium mb-2">
+                  Global dynamics ({timeRange})
+                </p>
+                <ul className="space-y-1 text-xs text-slate-300">
+                  {dynamics.map((d) => (
+                    <li key={d.category} className="flex items-center gap-2">
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: GLOBE_CATEGORIES[d.categoryId].color }}
+                        aria-hidden
+                      />
+                      {d.trend === 'up' && <ArrowUp className="w-3 h-3 text-amber-400 shrink-0" />}
+                      {d.trend === 'stable' && <ArrowRight className="w-3 h-3 text-slate-500 shrink-0" />}
+                      {d.trend === 'down' && <ArrowDown className="w-3 h-3 text-slate-600 shrink-0" />}
+                      <span>{d.category}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

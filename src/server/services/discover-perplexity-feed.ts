@@ -24,11 +24,19 @@ const PERPLEXITY_DISCOVER_LIMIT = 6;
  */
 export async function fetchDiscoverNewsFromPerplexity(
   category: string,
-  limit: number = PERPLEXITY_DISCOVER_LIMIT
+  limit: number = PERPLEXITY_DISCOVER_LIMIT,
+  searchTerm?: string
 ): Promise<DiscoverItem[]> {
   try {
     const categoryLabel = CATEGORY_PROMPTS[category] || CATEGORY_PROMPTS.all;
-    const prompt = `List the ${Math.min(limit, 8)} most important or trending news items today in ${categoryLabel}. For each item provide:
+    const prompt = searchTerm
+      ? `List the ${Math.min(limit, 6)} most recent and important news about "${searchTerm}" in the context of ${categoryLabel}. For each item provide:
+- title: short headline
+- summary: one sentence summary
+- source_url: best source URL for the story
+
+Return ONLY a valid JSON array of objects with exactly those keys. No markdown, no explanation. Example: [{"title":"...","summary":"...","source_url":"https://..."}]`
+      : `List the ${Math.min(limit, 8)} most important or trending news items today in ${categoryLabel}. For each item provide:
 - title: short headline
 - summary: one sentence summary
 - source_url: best source URL for the story

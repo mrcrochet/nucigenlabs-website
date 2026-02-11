@@ -25,6 +25,7 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import DiscoverCard, { type DiscoverItem } from '../components/discover/DiscoverCard';
 import DiscoverListCard from '../components/discover/DiscoverListCard';
 import DiscoverFilters from '../components/discover/DiscoverFilters';
+import DiscoverSearch from '../components/discover/DiscoverSearch';
 import DiscoverSidebar from '../components/discover/DiscoverSidebar';
 import DiscoverDetailModal from '../components/discover/DiscoverDetailModal';
 import PersonalizationModal from '../components/discover/PersonalizationModal';
@@ -35,10 +36,14 @@ import { DiscoverErrorBoundary } from '../components/discover/DiscoverErrorBound
 import SkeletonCard from '../components/ui/SkeletonCard';
 import ContextInspector from '../components/events/ContextInspector';
 import DiscoverGlobeView from '../components/discover/DiscoverGlobeView';
+import DiscoverMiniGlobe from '../components/discover/DiscoverMiniGlobe';
+import DiscoverHeroCard from '../components/discover/DiscoverHeroCard';
+import TrendingTopicsBar from '../components/discover/TrendingTopicsBar';
+import { Drawer } from 'vaul';
 import PageContextPanel from '../components/discover/PageContextPanel';
 import { GLOBE_CATEGORIES, eventToGlobeCategory } from '../constants/globe-semantics';
-import { Loader2, Filter, Sparkles, Newspaper, X } from 'lucide-react';
-import { getOrCreateSupabaseUserId, updateUserPreferences } from '../lib/supabase';
+import { Loader2, Filter, Sparkles, Newspaper, X, TrendingUp } from 'lucide-react';
+import { getOrCreateSupabaseUserId, updateUserPreferences, supabase, isSupabaseConfigured } from '../lib/supabase';
 import { apiUrl } from '../lib/api-base';
 import type { Event } from '../types/intelligence';
 import { trackPageView, trackItemView, trackItemSave, trackItemShare, trackFilterChange, trackViewModeChange, trackAdvancedFilterApply, trackSectorFilter, trackRegionFilter, trackEntityFilter, trackPredictionView, trackVirtualScrollEnabled } from '../lib/analytics';
@@ -104,14 +109,20 @@ function DiscoverContent() {
     return source === 'events' ? 'actualite' : 'discover';
   }, [searchParams]);
   const setSourceMode = useCallback((mode: SourceMode) => {
-    setSearchParams(mode === 'actualite' ? { source: 'events' } : {}, { replace: true });
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      if (mode === 'actualite') params.set('source', 'events');
+      else params.delete('source');
+      return params;
+    }, { replace: true });
   }, [setSearchParams]);
 
-  const [filters, setFilters] = useState({
-    timeRange: 'all' as 'now' | '24h' | '7d' | '30d' | 'structural' | 'all',
-    sortBy: 'relevance' as 'relevance' | 'recent' | 'trending',
-    category: 'all' as string,
-  });
+  const [filters, setFilters] = useState(() => ({
+    timeRange: (searchParams.get('timeRange') || 'all') as 'now' | '24h' | '7d' | '30d' | 'structural' | 'all',
+    sortBy: (searchParams.get('sortBy') || 'relevance') as 'relevance' | 'recent' | 'trending',
+    category: searchParams.get('category') || 'all',
+  }));
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [selectedItem, setSelectedItem] = useState<DiscoverItem | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPersonalizationModalOpen, setIsPersonalizationModalOpen] = useState(false);
@@ -121,7 +132,30 @@ function DiscoverContent() {
     const saved = localStorage.getItem('discover-view-mode');
     return (saved as ViewMode) || 'grid';
   });
-  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFiltersType>({});
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFiltersType>(() => {
+    const af: AdvancedFiltersType = {};
+    const tags = searchParams.get('tags');
+    if (tags) af.tags = tags.split(',');
+    const consensus = searchParams.get('consensus');
+    if (consensus) af.consensus = consensus.split(',') as AdvancedFiltersType['consensus'];
+    const tier = searchParams.get('tier');
+    if (tier) af.tier = tier.split(',') as AdvancedFiltersType['tier'];
+    const sectors = searchParams.get('sectors');
+    if (sectors) af.sectors = sectors.split(',');
+    const regions = searchParams.get('regions');
+    if (regions) af.regions = regions.split(',');
+    const entities = searchParams.get('entities');
+    if (entities) af.entities = entities.split(',');
+    const minSources = searchParams.get('minSources');
+    if (minSources) af.minSources = Number(minSources);
+    const maxSources = searchParams.get('maxSources');
+    if (maxSources) af.maxSources = Number(maxSources);
+    const minScore = searchParams.get('minScore');
+    if (minScore) af.minScore = Number(minScore);
+    const maxScore = searchParams.get('maxScore');
+    if (maxScore) af.maxScore = Number(maxScore);
+    return af;
+  });
   const [useVirtualScrolling, setUseVirtualScrolling] = useState(() => {
     // Enable virtual scrolling for large lists (100+ items)
     return localStorage.getItem('discover-virtual-scroll') === 'true';
@@ -132,6 +166,7 @@ function DiscoverContent() {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const itemsPerPage = 12;
 
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [eventFilters, setEventFilters] = useState(defaultEventFilters);
   const [events, setEvents] = useState<Event[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
@@ -173,6 +208,41 @@ function DiscoverContent() {
       trackFilterChange('category', filters.category);
     }
   }, [filters.category]);
+
+  // Sync all filters to URL (debounced to avoid history pollution)
+  const syncFiltersToUrl = useCallback(() => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      // Basic filters
+      if (filters.category !== 'all') params.set('category', filters.category);
+      else params.delete('category');
+      if (filters.timeRange !== 'all') params.set('timeRange', filters.timeRange);
+      else params.delete('timeRange');
+      if (filters.sortBy !== 'relevance') params.set('sortBy', filters.sortBy);
+      else params.delete('sortBy');
+      if (searchQuery) params.set('q', searchQuery);
+      else params.delete('q');
+      // Advanced filters
+      const advKeys: (keyof AdvancedFiltersType)[] = ['tags', 'consensus', 'tier', 'sectors', 'regions', 'entities'];
+      for (const key of advKeys) {
+        const val = advancedFilters[key];
+        if (Array.isArray(val) && val.length > 0) params.set(key, val.join(','));
+        else params.delete(key);
+      }
+      const numKeys: (keyof AdvancedFiltersType)[] = ['minSources', 'maxSources', 'minScore', 'maxScore'];
+      for (const key of numKeys) {
+        const val = advancedFilters[key];
+        if (val !== undefined) params.set(key, String(val));
+        else params.delete(key);
+      }
+      return params;
+    }, { replace: true });
+  }, [filters, searchQuery, advancedFilters, setSearchParams]);
+
+  useEffect(() => {
+    const timer = setTimeout(syncFiltersToUrl, 300);
+    return () => clearTimeout(timer);
+  }, [syncFiltersToUrl]);
 
   // Show personalization modal on first visit
   useEffect(() => {
@@ -238,6 +308,36 @@ function DiscoverContent() {
     };
   }, [sourceMode, eventFilters, user?.id]);
 
+  // Supabase Realtime: subscribe to new events when in Actualité mode
+  useEffect(() => {
+    if (sourceMode !== 'actualite' || !isSupabaseConfigured()) return;
+
+    const channel = supabase
+      .channel('discover-events-realtime')
+      .on(
+        'postgres_changes' as any,
+        { event: 'INSERT', schema: 'public', table: 'events' },
+        (payload: any) => {
+          if (payload.new) {
+            setEvents((prev) => {
+              // Avoid duplicates
+              if (prev.some((e) => e.id === payload.new.id)) return prev;
+              return [payload.new as Event, ...prev];
+            });
+            toast.info('Nouvel événement détecté', {
+              description: (payload.new as any).headline?.slice(0, 80) || 'New event',
+              duration: 4000,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sourceMode]);
+
   const fetchPageContext = useCallback(async () => {
     setContextLoading(true);
     setPageContext(null);
@@ -273,6 +373,13 @@ function DiscoverContent() {
       setSelectedItem(null);
     }
   });
+
+  // Focus search bar with /
+  useHotkeys('/', (e) => {
+    if (isModalOpen) return;
+    e.preventDefault();
+    searchInputRef.current?.focus();
+  }, { enabled: !isModalOpen && sourceMode === 'discover' });
 
   // Keyboard shortcuts will be defined after items is available
 
@@ -321,7 +428,7 @@ function DiscoverContent() {
     const userId = user ? await getOrCreateSupabaseUserId(user.id) : undefined;
     const offset = pageParam * itemsPerPage;
 
-    const apiUrl = `/api/discover?category=${category}&offset=${offset}&limit=${itemsPerPage}&sortBy=${filters.sortBy}&timeRange=${filters.timeRange}${userId ? `&userId=${userId}` : ''}${advancedFiltersParams}`;
+    const apiUrl = `/api/discover?category=${category}&offset=${offset}&limit=${itemsPerPage}&sortBy=${filters.sortBy}&timeRange=${filters.timeRange}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}${userId ? `&userId=${userId}` : ''}${advancedFiltersParams}`;
     
     console.log('[Discover] Fetching from:', apiUrl);
     
@@ -376,7 +483,7 @@ function DiscoverContent() {
       hasMore: data.hasMore !== false,
       nextPage: data.hasMore ? pageParam + 1 : undefined,
     };
-  }, [category, filters.sortBy, filters.timeRange, advancedFiltersParams, user, itemsPerPage]);
+  }, [category, filters.sortBy, filters.timeRange, searchQuery, advancedFiltersParams, user, itemsPerPage]);
 
   // React Query infinite query
   const {
@@ -390,7 +497,7 @@ function DiscoverContent() {
     error,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ['discover', category, filters.sortBy, filters.timeRange, advancedFilters, user?.id],
+    queryKey: ['discover', category, filters.sortBy, filters.timeRange, searchQuery, advancedFilters, user?.id],
     queryFn: fetchDiscoverItems,
     getNextPageParam: (lastPage) => lastPage.nextPage,
     initialPageParam: 0,
@@ -674,7 +781,7 @@ function DiscoverContent() {
       rightInspectorContent={rightInspectorContent}
     >
       <SEO
-        title={sourceMode === 'actualite' ? 'Actualité — Nucigen' : 'Discover — Nucigen'}
+        title={sourceMode === 'actualite' ? 'Actualité — Nucigen' : searchQuery ? `${searchQuery} — Discover — Nucigen` : 'Discover — Nucigen'}
         description={sourceMode === 'actualite' ? 'Flux factuel : qui, quoi, où, quand et preuves' : 'Explore insights, trends, and analysis'}
       />
 
@@ -752,6 +859,12 @@ function DiscoverContent() {
             onEventClick={(eventId) => setSelectedEventId(eventId)}
             onFetchPageContext={fetchPageContext}
             onOpenContextPanel={() => setContextPanelOpen(true)}
+            onViewRelatedItems={(eventTitle) => {
+              setSearchQuery(eventTitle);
+              setSourceMode('discover');
+            }}
+            eventFilters={eventFilters}
+            onEventFiltersChange={setEventFilters}
           />
         </div>
       )}
@@ -791,15 +904,55 @@ function DiscoverContent() {
             </div>
           </div>
 
+          {/* Search bar */}
+          <div className="col-span-1 sm:col-span-12 mb-6">
+            <DiscoverSearch
+              ref={searchInputRef}
+              onSearch={setSearchQuery}
+              placeholder="Rechercher un sujet, une entreprise..."
+              initialQuery={searchQuery}
+            />
+          </div>
+
+          {/* Trending Topics Bar */}
+          <div className="col-span-1 sm:col-span-12 mb-4">
+            <TrendingTopicsBar onTopicClick={(topic) => setSearchQuery(topic)} />
+          </div>
+
+          {/* Mini Globe — visual anchor above the feed */}
+          {!searchQuery && (
+            <div className="col-span-1 sm:col-span-12 mb-6">
+              <div className="rounded-xl overflow-hidden border border-white/10">
+                <DiscoverMiniGlobe
+                  onSignalClick={(searchTerm) => setSearchQuery(searchTerm)}
+                  className="h-[200px] sm:h-[240px]"
+                />
+              </div>
+            </div>
+          )}
+
           {/* Main Content + Sidebar */}
           <div className="col-span-1 sm:col-span-12">
             <div className="flex gap-6">
               {/* Main Content */}
               <div className="flex-1 min-w-0">
+                {/* Search loading indicator */}
+                {searchQuery && isFetching && !isLoading && (
+                  <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-slate-400 font-light">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Recherche en cours pour « {searchQuery} »…
+                  </div>
+                )}
                 {/* Content */}
-                {items.length === 0 ? (
+                {items.length === 0 && isFetching ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" style={{ gap: '1.75rem' }}>
+                    {[1, 2, 3].map((i) => (
+                      <SkeletonCard key={i} tier={i === 1 ? 'strategic' : 'background'} />
+                    ))}
+                  </div>
+                ) : items.length === 0 ? (
               <EmptyState
-                searchQuery=""
+                searchQuery={searchQuery}
                 filters={filters}
                 onResetFilters={() => {
                   setFilters({
@@ -807,24 +960,61 @@ function DiscoverContent() {
                     sortBy: 'relevance',
                     category: 'all',
                   });
+                  setSearchQuery('');
                 }}
-                onClearSearch={() => {}}
+                onClearSearch={() => setSearchQuery('')}
                 onRetry={() => refetch()}
               />
             ) : (
               <>
+                {/* Hero Card for first critical item (grid mode only) */}
+                {viewMode === 'grid' && (() => {
+                  const heroIndex = items.findIndex(
+                    (it) => it.tier === 'critical' || (it.metadata.relevance_score >= 90 && it.sources.length >= 30)
+                  );
+                  if (heroIndex < 0) return null;
+                  const heroItem = items[heroIndex];
+                  return (
+                    <div className="mb-6" data-item-index={heroIndex}>
+                      <DiscoverHeroCard
+                        item={heroItem}
+                        onSave={handleSave}
+                        onView={handleView}
+                        onShare={async (itemId, platform) => {
+                          if (user) {
+                            try {
+                              const userId = await getOrCreateSupabaseUserId(user.id);
+                              await fetch(`/api/discover/${itemId}/engage`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ userId, type: 'share', metadata: { share_platform: platform } }),
+                              });
+                            } catch (err) {
+                              console.warn('[Discover] Failed to track share:', err);
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+                  );
+                })()}
+
                 {viewMode === 'grid' ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr" style={{ gap: '1.75rem' }}>
                     {items.map((item, index) => {
-                      // Determine if this is a critical tier item (full width)
-                      const isCritical = item.tier === 'critical' || 
+                      // Skip the hero item (already rendered above)
+                      const isCritical = item.tier === 'critical' ||
                         (item.metadata.relevance_score >= 90 && item.sources.length >= 30);
-                      
+                      const heroIndex = items.findIndex(
+                        (it) => it.tier === 'critical' || (it.metadata.relevance_score >= 90 && it.sources.length >= 30)
+                      );
+                      if (index === heroIndex) return null;
+
                       return (
                         <div
                           key={item.id}
                           data-item-index={index}
-                          className={`${isCritical ? 'md:col-span-2 lg:col-span-3' : ''} ${selectedItemIndex === index ? 'ring-2 ring-[#E1463E]/50 rounded-lg' : ''}`}
+                          className={`${selectedItemIndex === index ? 'ring-2 ring-[#E1463E]/50 rounded-lg' : ''}`}
                         >
                         <DiscoverCard
                           item={item}
@@ -837,8 +1027,8 @@ function DiscoverContent() {
                                 await fetch(`/api/discover/${itemId}/engage`, {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ 
-                                    userId, 
+                                  body: JSON.stringify({
+                                    userId,
                                     type: 'share',
                                     metadata: { share_platform: platform }
                                   }),
@@ -912,12 +1102,35 @@ function DiscoverContent() {
             )}
           </div>
 
-          {/* Right Sidebar */}
+          {/* Right Sidebar (desktop) */}
           <div className="hidden xl:block flex-shrink-0">
             <DiscoverSidebar />
           </div>
         </div>
       </div>
+
+          {/* Mobile Sidebar FAB + Bottom Sheet */}
+          <div className="xl:hidden fixed bottom-6 right-6 z-30">
+            <button
+              type="button"
+              onClick={() => setMobileSidebarOpen(true)}
+              className="w-12 h-12 rounded-full bg-[#E1463E] text-white shadow-lg shadow-[#E1463E]/30 flex items-center justify-center hover:bg-[#E1463E]/90 transition-colors"
+              aria-label="Market data"
+            >
+              <TrendingUp className="w-5 h-5" />
+            </button>
+          </div>
+          <Drawer.Root open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
+            <Drawer.Portal>
+              <Drawer.Overlay className="fixed inset-0 bg-black/60 z-40" />
+              <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 bg-[#0a0a0a] rounded-t-xl border-t border-white/10 max-h-[70vh] outline-none">
+                <div className="mx-auto mt-3 mb-2 h-1 w-12 rounded-full bg-white/20" />
+                <div className="p-4 overflow-y-auto max-h-[calc(70vh-2rem)]">
+                  <DiscoverSidebar />
+                </div>
+              </Drawer.Content>
+            </Drawer.Portal>
+          </Drawer.Root>
         </>
       )}
 

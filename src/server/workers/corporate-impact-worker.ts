@@ -736,5 +736,88 @@ export async function processCorporateImpactSignals(limit: number = 20): Promise
   }
 }
 
+/**
+ * Refresh Finnhub prices on all active signals (daily job).
+ * Deduplicates by ticker to minimize API calls, then batch-updates all matching signals.
+ */
+export async function refreshSignalPrices(): Promise<{ updated: number; tickers: number; errors: number }> {
+  console.log('[Corporate Impact] Starting daily price refresh...');
+
+  // Fetch all active signals with a valid ticker
+  const { data: signals, error } = await supabase
+    .from('market_signals')
+    .select('id, company_ticker, market_data')
+    .eq('is_active', true)
+    .not('company_ticker', 'is', null);
+
+  if (error || !signals || signals.length === 0) {
+    console.warn('[Corporate Impact] No signals to refresh:', error?.message);
+    return { updated: 0, tickers: 0, errors: 0 };
+  }
+
+  // Group signal IDs by ticker
+  const tickerMap = new Map<string, string[]>();
+  for (const s of signals) {
+    const ticker = (s.company_ticker || '').trim();
+    if (!ticker || ticker.toLowerCase().includes('not available')) continue;
+    if (!tickerMap.has(ticker)) tickerMap.set(ticker, []);
+    tickerMap.get(ticker)!.push(s.id);
+  }
+
+  console.log(`[Corporate Impact] Refreshing prices for ${tickerMap.size} unique tickers (${signals.length} signals)`);
+
+  let updated = 0;
+  let errors = 0;
+
+  for (const [ticker, ids] of tickerMap) {
+    try {
+      const quote = await getQuote(ticker);
+      if (!quote || quote.c <= 0) continue;
+
+      const newPrice = `$${quote.c.toFixed(2)}`;
+      const newMarketData = {
+        current_price: quote.c,
+        previous_close: quote.pc,
+        change: quote.d,
+        change_percent: quote.dp,
+        day_high: quote.h,
+        day_low: quote.l,
+        refreshed_at: new Date().toISOString(),
+      };
+
+      // Update all signals with this ticker
+      for (const id of ids) {
+        const existing = signals.find(s => s.id === id);
+        const mergedMarketData = {
+          ...(typeof existing?.market_data === 'object' ? existing.market_data : {}),
+          ...newMarketData,
+        };
+
+        const { error: updateError } = await supabase
+          .from('market_signals')
+          .update({
+            company_current_price: newPrice,
+            market_data: mergedMarketData,
+          })
+          .eq('id', id);
+
+        if (updateError) {
+          errors++;
+        } else {
+          updated++;
+        }
+      }
+    } catch {
+      errors++;
+    }
+
+    // Rate limit: 60 calls/min
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  console.log(`[Corporate Impact] Price refresh complete: ${updated} signals updated, ${tickerMap.size} tickers, ${errors} errors`);
+  return { updated, tickers: tickerMap.size, errors };
+}
+
 // Export for use in pipeline
 export default processCorporateImpactSignals;

@@ -3197,14 +3197,19 @@ const discoverHandler = async (req: any, res: any) => {
     const { fetchDiscoverItems, calculatePersonalizationScore } = await import('./services/discover-service.js');
     
             // First page: enrich with Perplexity-sourced news (parallel with DB fetch)
-            const isFirstPage = offset === 0 && !searchQuery && process.env.PERPLEXITY_API_KEY;
+            const shouldEnrichPerplexity = offset === 0 && process.env.PERPLEXITY_API_KEY;
             let perplexityItems: any[] = [];
-            if (isFirstPage) {
+            if (shouldEnrichPerplexity) {
               try {
                 const { fetchDiscoverNewsFromPerplexity } = await import('./services/discover-perplexity-feed.js');
-                perplexityItems = await fetchDiscoverNewsFromPerplexity(category, Math.min(6, limit));
+                if (searchQuery) {
+                  // Focused Perplexity search for the user's query
+                  perplexityItems = await fetchDiscoverNewsFromPerplexity(category, Math.min(4, limit), searchQuery);
+                } else {
+                  perplexityItems = await fetchDiscoverNewsFromPerplexity(category, Math.min(6, limit));
+                }
                 if (perplexityItems.length > 0) {
-                  console.log('[API] Discover Perplexity news:', perplexityItems.length);
+                  console.log('[API] Discover Perplexity news:', perplexityItems.length, searchQuery ? `(search: ${searchQuery})` : '');
                 }
               } catch (e: any) {
                 console.warn('[API] Discover Perplexity enrichment failed:', e?.message);
@@ -3291,6 +3296,52 @@ const discoverHandler = async (req: any, res: any) => {
       }
     }
 
+    // Inject high-confidence corporate impact signals into the feed (first page only)
+    if (offset === 0 && supabase) {
+      try {
+        const { data: impactSignals } = await supabase
+          .from('market_signals')
+          .select('id, company_name, company_ticker, type, prediction_summary, prediction_confidence, prediction_magnitude, prediction_direction, reasoning_summary, event_id, generated_at')
+          .eq('is_active', true)
+          .in('prediction_confidence', ['high', 'medium-high'])
+          .order('generated_at', { ascending: false })
+          .limit(3);
+
+        if (impactSignals && impactSignals.length > 0) {
+          const now = new Date().toISOString();
+          const impactItems = impactSignals.map((signal: any, i: number) => ({
+            id: `impact-${signal.id}`,
+            type: 'insight' as const,
+            title: `${signal.type === 'opportunity' ? 'Opportunity' : 'Risk'}: ${signal.company_name}${signal.company_ticker ? ` (${signal.company_ticker})` : ''}`,
+            summary: signal.reasoning_summary || signal.prediction_summary || '',
+            sources: [{ name: 'Nucigen Corporate Impact', url: '', date: signal.generated_at || now }],
+            category: 'finance',
+            tags: [signal.type, signal.prediction_confidence, signal.prediction_direction].filter(Boolean),
+            engagement: { views: 0, saves: 0, questions: 0 },
+            metadata: {
+              published_at: signal.generated_at || now,
+              updated_at: signal.generated_at || now,
+              relevance_score: signal.prediction_confidence === 'high' ? 88 : 78,
+            },
+            tier: 'strategic' as const,
+            impact: signal.prediction_summary
+              ? `${signal.prediction_direction === 'up' ? 'Bullish' : 'Bearish'} ${signal.prediction_magnitude || ''} — ${signal.prediction_summary}`.trim()
+              : undefined,
+            consensus: 'high' as const,
+          }));
+
+          // Intersperse impact items: insert after every 6th item
+          for (let idx = 0; idx < impactItems.length; idx++) {
+            const insertAt = Math.min((idx + 1) * 6, items.length);
+            items.splice(insertAt, 0, impactItems[idx]);
+          }
+          console.log('[API] Discover corporate impact signals injected:', impactItems.length);
+        }
+      } catch (err: any) {
+        console.warn('[API] Discover corporate impact fetch failed:', err?.message);
+      }
+    }
+
     // Get user preferences for personalization
     let userPreferences: any = null;
     if (userId && supabase) {
@@ -3360,11 +3411,116 @@ const discoverHandler = async (req: any, res: any) => {
 app.get('/api/discover', discoverHandler);
 app.get('/discover', discoverHandler);
 
+// GET /api/discover/trending-topics - Top trending tags from last 24h events
+const _trendingTopicsCache: { data: any; ts: number } = { data: null, ts: 0 };
+const TRENDING_TOPICS_CACHE_TTL_MS = 600_000; // 10 minutes
+
+app.get('/api/discover/trending-topics', async (req, res) => {
+  try {
+    if (_trendingTopicsCache.data && Date.now() - _trendingTopicsCache.ts < TRENDING_TOPICS_CACHE_TTL_MS) {
+      return res.json({ success: true, topics: _trendingTopicsCache.data });
+    }
+
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from('events')
+      .select('discover_tags, discover_category, headline')
+      .not('discover_score', 'is', null)
+      .gte('published_at', since)
+      .order('discover_score', { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.warn('[API] Trending topics query error:', error.message);
+      return res.json({ success: true, topics: [] });
+    }
+
+    // Aggregate tags by frequency
+    const tagCounts = new Map<string, number>();
+    for (const row of data || []) {
+      const tags: string[] = Array.isArray(row.discover_tags) ? row.discover_tags : [];
+      for (const tag of tags) {
+        if (tag && tag.length > 1 && tag.length < 50) {
+          tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+        }
+      }
+      // Also count categories as topics
+      if (row.discover_category) {
+        tagCounts.set(row.discover_category, (tagCounts.get(row.discover_category) || 0) + 1);
+      }
+    }
+
+    const topics = [...tagCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([name, count]) => ({ name, count }));
+
+    _trendingTopicsCache.data = topics;
+    _trendingTopicsCache.ts = Date.now();
+
+    res.json({ success: true, topics });
+  } catch (error: any) {
+    console.error('[API] Trending topics error:', error);
+    res.json({ success: true, topics: [] });
+  }
+});
+
+// GET /api/discover/suggestions - Search autocomplete suggestions
+app.get('/api/discover/suggestions', async (req, res) => {
+  try {
+    const q = (String(req.query.q || '')).trim();
+    if (q.length < 2) {
+      return res.json({ success: true, suggestions: [] });
+    }
+
+    const { data, error } = await supabase
+      .from('events')
+      .select('headline, discover_category')
+      .not('discover_score', 'is', null)
+      .ilike('headline', `%${q}%`)
+      .order('discover_score', { ascending: false })
+      .limit(8);
+
+    if (error) {
+      console.warn('[API] Suggestions query error:', error.message);
+      return res.json({ success: true, suggestions: [] });
+    }
+
+    const suggestions = (data || []).map(row => ({
+      text: (row.headline || '').slice(0, 100),
+      category: row.discover_category || null,
+    }));
+
+    res.json({ success: true, suggestions });
+  } catch (error: any) {
+    console.error('[API] Suggestions error:', error);
+    res.json({ success: true, suggestions: [] });
+  }
+});
+
+// In-memory cache for market data (avoids redundant Finnhub calls)
+const _marketCache: Record<string, { data: any; ts: number }> = {};
+const MARKET_CACHE_TTL_MS = 120_000; // 2 minutes
+
+function getMarketCache(key: string) {
+  const entry = _marketCache[key];
+  if (entry && Date.now() - entry.ts < MARKET_CACHE_TTL_MS) return entry.data;
+  return null;
+}
+
+function setMarketCache(key: string, data: any) {
+  _marketCache[key] = { data, ts: Date.now() };
+}
+
 // GET /api/market-outlook - Market outlook data (S&P, NASDAQ, Bitcoin, VIX)
 app.get('/api/market-outlook', async (req, res) => {
   try {
+    const cached = getMarketCache('market-outlook');
+    if (cached) return res.json({ success: true, data: cached });
+
     const { getMarketOutlook } = await import('./services/finnhub-service.js');
     const data = await getMarketOutlook();
+    setMarketCache('market-outlook', data);
     res.json({ success: true, data });
   } catch (error: any) {
     console.error('[API] Market outlook error:', error);
@@ -3375,8 +3531,12 @@ app.get('/api/market-outlook', async (req, res) => {
 // GET /api/trending-companies - Trending companies data
 app.get('/api/trending-companies', async (req, res) => {
   try {
+    const cached = getMarketCache('trending-companies');
+    if (cached) return res.json({ success: true, data: cached });
+
     const { getTrendingCompanies } = await import('./services/finnhub-service.js');
     const data = await getTrendingCompanies();
+    setMarketCache('trending-companies', data);
     res.json({ success: true, data });
   } catch (error: any) {
     console.error('[API] Trending companies error:', error);
@@ -3528,28 +3688,41 @@ app.post('/api/discover/page-context', async (req, res) => {
             .join('\n')
         : 'Aucun événement fourni pour cette période.';
 
-    const OpenAI = (await import('openai')).default;
-    const openai = new OpenAI({ apiKey: openaiApiKey });
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content:
-            'Tu es un analyste en veille stratégique. Tu synthétises en 2 à 4 phrases courtes le contexte géopolitique et économique de la période, sans inventer de faits. Réponds uniquement en français, ton professionnel et factuel.',
-        },
-        {
-          role: 'user',
-          content: `Période : ${timeRange}. Événements sur la carte :\n${summariesText}\n\nGénère un paragraphe de contexte stratégique pour cette vue (tendances, zones de tension, points d'attention).`,
-        },
-      ],
-      max_tokens: 400,
-      temperature: 0.4,
-    });
-    const context =
-      response.choices?.[0]?.message?.content?.trim() ||
-      'Impossible de générer le contexte pour le moment.';
-    res.json({ success: true, context });
+    const { withCache } = await import('./services/cache-service.js');
+    const result = await withCache<string>(
+      {
+        apiType: 'openai',
+        endpoint: 'discover-page-context',
+        ttlSeconds: 900, // 15 minutes
+      },
+      { timeRange, summariesCount: eventSummaries.length, summariesHash: summariesText.slice(0, 300) },
+      async () => {
+        const OpenAI = (await import('openai')).default;
+        const openai = new OpenAI({ apiKey: openaiApiKey });
+        const response = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content:
+                'Tu es un analyste en veille stratégique. Tu synthétises en 2 à 4 phrases courtes le contexte géopolitique et économique de la période, sans inventer de faits. Réponds uniquement en français, ton professionnel et factuel.',
+            },
+            {
+              role: 'user',
+              content: `Période : ${timeRange}. Événements sur la carte :\n${summariesText}\n\nGénère un paragraphe de contexte stratégique pour cette vue (tendances, zones de tension, points d'attention).`,
+            },
+          ],
+          max_tokens: 400,
+          temperature: 0.4,
+        });
+        const context =
+          response.choices?.[0]?.message?.content?.trim() ||
+          'Impossible de générer le contexte pour le moment.';
+        return { data: context };
+      }
+    );
+
+    res.json({ success: true, context: result.data });
   } catch (error: any) {
     console.error('[API] Discover page-context error:', error);
     res.status(500).json({
@@ -6821,6 +6994,44 @@ app.get('/api/cron/corporate-impact', async (req: express.Request, res: express.
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to generate Corporate Impact signals',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// GET /api/cron/refresh-prices - Daily Finnhub price refresh on active signals
+app.get('/api/cron/refresh-prices', async (req: express.Request, res: express.Response) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const cronSecret = process.env.CRON_SECRET || process.env.VERCEL_CRON_SECRET;
+
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      if (process.env.NODE_ENV === 'production' && !authHeader) {
+        return res.status(401).json({
+          success: false,
+          error: 'Unauthorized - cron secret required',
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+
+    console.log('[API Cron] Starting daily price refresh...');
+
+    const { refreshSignalPrices } = await import('./workers/corporate-impact-worker.js');
+    const result = await refreshSignalPrices();
+
+    console.log('[API Cron] Price refresh complete:', result);
+
+    res.json({
+      success: true,
+      result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('[API Cron] Error refreshing prices:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to refresh prices',
       timestamp: new Date().toISOString(),
     });
   }

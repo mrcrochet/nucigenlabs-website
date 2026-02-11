@@ -140,7 +140,7 @@ function OverviewContent() {
     return (
       <AppShell>
         <div
-          className="col-span-1 sm:col-span-12 w-screen min-h-screen ml-[calc(50%-50vw)] flex flex-col items-center justify-center bg-gradient-to-b from-[#0a0a0f] via-[#0c0c14] to-[#0a0a0f]"
+          className="col-span-1 sm:col-span-12 w-screen min-h-screen ml-[calc(50%-50vw)] flex flex-col items-center justify-center bg-[#0a0a0f]"
         >
           <div className="w-10 h-10 rounded-full border-2 border-white/20 border-t-[#E1463E]/80 animate-spin" />
           <p className="mt-4 text-sm text-gray-400">Chargement du globe…</p>
@@ -164,7 +164,7 @@ function OverviewContent() {
       <div className="col-span-1 sm:col-span-12 relative min-h-[100vh]" aria-hidden>
         {/* Globe fixe — occupe tout l’espace sous la TopNav, navigation optimale (drag, zoom, rotate) */}
         <div
-          className="fixed left-0 right-0 bottom-0 overflow-hidden bg-gradient-to-b from-[#0a0a0f] via-[#0b0b12] to-[#08080d]"
+          className="fixed left-0 right-0 bottom-0 overflow-hidden bg-[#0a0a0f]"
           style={{ top: TOP_NAV_HEIGHT }}
         >
           <GlobalSituationMap ref={mapRef} signals={signals} />

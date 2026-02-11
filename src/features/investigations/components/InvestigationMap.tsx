@@ -89,7 +89,6 @@ export default function InvestigationMap({
     <div className="w-full h-full min-h-[400px] rounded-xl overflow-hidden border border-borders-subtle bg-background-elevated">
       <GlobalSituationMap
         signals={signals}
-        defaultLayers={['geopolitics', 'supply-chains', 'markets', 'energy', 'security']}
         onSignalClick={handleSignalClick}
       />
     </div>
