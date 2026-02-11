@@ -37,7 +37,7 @@ interface CompanyData {
 /**
  * Get quote for a symbol
  */
-async function getQuote(symbol: string): Promise<FinnhubQuote | null> {
+export async function getQuote(symbol: string): Promise<FinnhubQuote | null> {
   try {
     // Don't clean symbol - use it as-is (Finnhub handles exchange prefixes like BINANCE:)
     const response = await fetch(

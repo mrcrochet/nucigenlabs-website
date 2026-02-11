@@ -7,6 +7,8 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { chatCompletions } from '../services/perplexity-service';
+import { getQuote } from '../services/finnhub-service';
+import { normalizeSector } from '../utils/sector-normalize';
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
@@ -556,11 +558,32 @@ export async function generateMarketSignalsFromEvent(eventId: string): Promise<n
           };
         }
 
+        // Enrich with real market data from Finnhub
+        if (company.ticker && !company.ticker.toLowerCase().includes('not available')) {
+          try {
+            const quote = await getQuote(company.ticker);
+            if (quote && quote.c > 0) {
+              company.current_price = `$${quote.c.toFixed(2)}`;
+              prediction.market_data = {
+                ...prediction.market_data,
+                current_price: quote.c,
+                previous_close: quote.pc,
+                change: quote.d,
+                change_percent: quote.dp,
+                day_high: quote.h,
+                day_low: quote.l,
+              };
+            }
+          } catch { /* silent — Finnhub rate limit or unknown ticker */ }
+          // Rate limit: Finnhub free tier = 60 calls/min
+          await new Promise(r => setTimeout(r, 200));
+        }
+
         const signal: MarketSignalData = {
           type: company.impact_type,
           company_name: company.company_name,
           company_ticker: company.ticker,
-          company_sector: company.sector,
+          company_sector: normalizeSector(company.sector || 'Other'),
           company_market_cap: company.market_cap,
           company_current_price: company.current_price,
           company_exchange: company.exchange,

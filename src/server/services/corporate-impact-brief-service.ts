@@ -128,8 +128,14 @@ function buildContextFromSignalsAndAnalyses(signals: any[], analyses: any[]): st
 
   const signalBlocks = signals.slice(0, 30).map((s) => {
     const a = s.event_id ? analysisByEvent[s.event_id] : null;
+    const price = s.company_current_price && !String(s.company_current_price).includes('Not available')
+      ? s.company_current_price : null;
+    const mktData = typeof s.market_data === 'object' && s.market_data?.current_price
+      ? s.market_data : null;
+
     return `
 [Signal] ${s.company_name} (${s.company_ticker || 'N/A'}) — ${s.type}
+  ${price ? `Price: ${price}` : ''}${mktData ? ` | Change: ${mktData.change_percent?.toFixed(2)}%` : ''}
   Event: ${s.catalyst_event_title || 'N/A'}
   Direction: ${s.prediction_direction} | Magnitude: ${s.prediction_magnitude || 'N/A'} | Timeframe: ${s.prediction_timeframe || 'N/A'}
   Confidence: ${s.prediction_confidence || 'N/A'}

@@ -13,6 +13,7 @@ import { predictRelevance } from './ml/relevance-predictor.js';
 import { getRealTimePrice, getTimeSeries } from './services/twelvedata-service.js';
 import { createClient } from '@supabase/supabase-js';
 import { getSupabaseUserId } from './utils/auth-helpers.js';
+import { normalizeSector } from './utils/sector-normalize.js';
 import { buildGraphFromSignals } from '../lib/investigation/build-graph.js';
 import { buildBriefingPayload, formatBriefingPayloadAsText } from '../lib/investigation/build-briefing.js';
 import dotenv from 'dotenv';
@@ -5448,8 +5449,8 @@ app.get('/api/corporate-impact/signals', async (req, res) => {
       };
     }
 
-    // Get unique sectors
-    const uniqueSectors = [...new Set((allSignals || []).map((s: any) => s.company_sector).filter(Boolean))];
+    // Get unique sectors (normalized to deduplicate variants)
+    const uniqueSectors = [...new Set((allSignals || []).map((s: any) => s.company_sector ? normalizeSector(s.company_sector) : null).filter(Boolean))];
 
     // Get unique categories from events
     const eventIds = [...new Set((allSignals || []).map((s: any) => s.event_id).filter(Boolean))];
@@ -5514,7 +5515,7 @@ app.get('/api/corporate-impact/signals', async (req, res) => {
         company: {
           name: signal.company_name,
           ticker: signal.company_ticker,
-          sector: signal.company_sector,
+          sector: signal.company_sector ? normalizeSector(signal.company_sector) : null,
           market_cap: signal.company_market_cap,
           current_price: signal.company_current_price,
           exchange: signal.company_exchange,
