@@ -1,6 +1,6 @@
 /**
  * Global Situation Map – Overview (Google Earth–style)
- * Globe 3D avec rotation idle, fog, marqueurs pulsants, presets layers, tooltips.
+ * Globe 3D avec rotation idle, fog, marqueurs pulsants, detail popup, tooltips.
  */
 
 import { useState, useCallback, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
@@ -8,8 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import Map, { Marker, Popup } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { OverviewSignal, OverviewSignalType } from '../../types/overview';
-import { Layers, ChevronDown, ChevronRight } from 'lucide-react';
-import { OVERVIEW_LAYER_SEMANTICS, OVERVIEW_MAP_MAX_SIGNALS } from '../../constants/overview-signals';
+import { OVERVIEW_LAYER_SEMANTICS } from '../../constants/overview-signals';
 import {
   getLayerColor,
   getMarkerGlowShadow,
@@ -30,16 +29,7 @@ const FOG_CONFIG = {
   'star-intensity': 0.15,
 };
 
-const VIEW_PRESETS: { id: string; label: string; layers: OverviewSignalType[] }[] = [
-  { id: 'geopolitics', label: 'Geopolitics', layers: ['geopolitics', 'security'] },
-  { id: 'supply', label: 'Supply Chain', layers: ['supply-chains', 'energy'] },
-  { id: 'markets', label: 'Markets', layers: ['markets'] },
-];
-
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN as string | undefined;
-
-const LAYER_OPTIONS = (Object.entries(OVERVIEW_LAYER_SEMANTICS) as [OverviewSignalType, typeof OVERVIEW_LAYER_SEMANTICS[OverviewSignalType]][])
-  .map(([id, { label, color }]) => ({ id, label, color }));
 
 function typeToColor(type: OverviewSignalType): string {
   return getLayerColor(type, 'main');
@@ -58,51 +48,50 @@ function importanceToDotPx(importance: number): number {
 
 export interface GlobalSituationMapProps {
   signals: OverviewSignal[];
-  /** Default: geopolitics, supply-chains */
-  defaultLayers?: OverviewSignalType[];
   /** When set, called on point click instead of navigating to investigate_id */
   onSignalClick?: (signal: OverviewSignal) => void;
 }
 
 export interface GlobalSituationMapHandle {
   flyTo: (lng: number, lat: number, zoom?: number) => void;
+  /** Select a signal programmatically (flyTo + open detail popup) */
+  selectSignal: (signal: OverviewSignal) => void;
 }
 
 const GlobalSituationMapInner = forwardRef<GlobalSituationMapHandle, GlobalSituationMapProps>(
   function GlobalSituationMapInner(
     {
       signals,
-      defaultLayers = ['geopolitics', 'supply-chains'],
       onSignalClick,
     },
     ref
   ) {
   const navigate = useNavigate();
   const mapRef = useRef<any>(null);
+  const [hoveredSignal, setHoveredSignal] = useState<OverviewSignal | null>(null);
+  const [selectedSignal, setSelectedSignal] = useState<OverviewSignal | null>(null);
+
+  const doFlyTo = useCallback((lng: number, lat: number, zoom = 4) => {
+    const map = mapRef.current?.getMap?.();
+    if (!map) return;
+    map.flyTo({ center: [lng, lat], zoom, duration: 1200, essential: true });
+  }, []);
 
   useImperativeHandle(ref, () => ({
-    flyTo: (lng: number, lat: number, zoom = 4) => {
-      const map = mapRef.current?.getMap?.();
-      if (!map) return;
-      map.flyTo({ center: [lng, lat], zoom, duration: 1200, essential: true });
+    flyTo: doFlyTo,
+    selectSignal: (signal: OverviewSignal) => {
+      setSelectedSignal(signal);
+      doFlyTo(signal.lon, signal.lat, 4);
     },
-  }), []);
-  const [selectedLayers, setSelectedLayers] = useState<OverviewSignalType[]>(defaultLayers);
-  const [hoveredSignal, setHoveredSignal] = useState<OverviewSignal | null>(null);
-  const [layersPanelOpen, setLayersPanelOpen] = useState(true);
+  }), [doFlyTo]);
   const idleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rotationFrameRef = useRef<number | null>(null);
   const isIdleRef = useRef(false);
 
-  const toggleLayer = useCallback((id: OverviewSignalType) => {
-    setSelectedLayers((prev) =>
-      prev.includes(id) ? prev.filter((l) => l !== id) : [...prev, id]
-    );
-  }, []);
-
-  const applyPreset = useCallback((layers: OverviewSignalType[]) => {
-    setSelectedLayers(layers);
-  }, []);
+  // Clear selectedSignal when signals prop changes (new data from server)
+  useEffect(() => {
+    setSelectedSignal(null);
+  }, [signals]);
 
   // Idle rotation when map is ready
   const onMapLoad = useCallback(() => {
@@ -152,10 +141,8 @@ const GlobalSituationMapInner = forwardRef<GlobalSituationMapHandle, GlobalSitua
     };
   }, []);
 
-  // V1 product rule: max 8–12 signals visible so the map answers "where to look" at a glance
-  const filteredSignals = signals
-    .filter((s) => selectedLayers.includes(s.type))
-    .slice(0, OVERVIEW_MAP_MAX_SIGNALS);
+  // Server already caps to 12; guard just in case
+  const visibleSignals = signals.slice(0, 12);
 
   const handleSignalClick = useCallback(
     (signal: OverviewSignal) => {
@@ -163,11 +150,15 @@ const GlobalSituationMapInner = forwardRef<GlobalSituationMapHandle, GlobalSitua
         onSignalClick(signal);
         return;
       }
-      const path = signal.investigate_id || '/search';
-      navigate(path);
+      setSelectedSignal(signal);
+      const map = mapRef.current?.getMap?.();
+      if (map) {
+        map.flyTo({ center: [signal.lon, signal.lat], zoom: 4, duration: 1200, essential: true });
+      }
     },
-    [navigate, onSignalClick]
+    [onSignalClick]
   );
+
 
   if (!MAPBOX_TOKEN) {
     return (
@@ -185,92 +176,10 @@ const GlobalSituationMapInner = forwardRef<GlobalSituationMapHandle, GlobalSitua
 
   return (
     <div className="relative w-full h-full min-h-[400px] overflow-hidden bg-[#0a0a0f]">
-      {/* Layer toggles – bottom left (so right panel doesn’t cover them) */}
-      <div className="absolute bottom-3 left-3 z-10">
-        {layersPanelOpen ? (
-          <div className="rounded-xl border border-white/[0.08] bg-white/[0.06] backdrop-blur-xl p-3 shadow-xl ring-1 ring-white/[0.06]">
-            <button
-              type="button"
-              onClick={() => setLayersPanelOpen(false)}
-              className="w-full flex items-center justify-between gap-2 mb-2 pb-2 border-b border-white/10"
-              aria-label="Rétracter Layers"
-            >
-              <span className="flex items-center gap-2">
-                <Layers className="w-3.5 h-3.5 text-gray-400" />
-                <span className="text-xs text-gray-300 uppercase tracking-wider font-medium">
-                  Layers
-                </span>
-              </span>
-              <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" aria-hidden />
-            </button>
-            <div className="flex flex-wrap gap-1.5 mb-2">
-          {VIEW_PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() => applyPreset(preset.layers)}
-              className="px-2.5 py-1 rounded-md text-xs font-medium transition-colors bg-white/10 text-gray-300 hover:bg-white/20"
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
-        <div className="space-y-2">
-          {LAYER_OPTIONS.map((layer) => {
-            const isOn = selectedLayers.includes(layer.id);
-            return (
-              <button
-                key={layer.id}
-                type="button"
-                onClick={() => toggleLayer(layer.id)}
-                className="flex items-center gap-2 w-full text-left group rounded-md py-1 pr-1 transition-colors hover:bg-white/[0.06]"
-                aria-pressed={isOn}
-                aria-label={`${layer.label} layer ${isOn ? 'on' : 'off'}`}
-              >
-                <span
-                  className="relative inline-flex h-5 w-9 shrink-0 rounded-full transition-[background-color] duration-200"
-                  style={{
-                    backgroundColor: isOn ? `${layer.color}40` : 'rgba(255,255,255,0.1)',
-                    boxShadow: isOn ? `0 0 12px ${layer.color}50` : 'none',
-                  }}
-                >
-                  <span
-                    className="inline-block h-4 w-4 rounded-full bg-white/90 shadow-sm transition-transform duration-200 mt-0.5 ml-0.5"
-                    style={{
-                      transform: isOn ? 'translateX(1rem)' : 'translateX(0)',
-                      backgroundColor: isOn ? layer.color : 'rgba(255,255,255,0.6)',
-                    }}
-                  />
-                </span>
-                <span
-                  className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: layer.color }}
-                />
-                <span className="text-xs text-gray-400 group-hover:text-gray-300">
-                  {layer.label}
-                </span>
-              </button>
-            );
-          })}
-            </div>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setLayersPanelOpen(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl border border-white/[0.08] bg-white/[0.06] backdrop-blur-xl shadow-xl hover:bg-white/[0.1] transition-colors text-left ring-1 ring-white/[0.06]"
-            aria-label="Afficher Layers"
-          >
-            <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" aria-hidden />
-            <Layers className="w-3.5 h-3.5 text-gray-400" aria-hidden />
-            <span className="text-xs font-medium text-gray-300 uppercase tracking-wider">Layers</span>
-          </button>
-        )}
-      </div>
-
       <Map
         ref={mapRef}
         onLoad={onMapLoad}
+        onClick={() => setSelectedSignal(null)}
         mapboxAccessToken={MAPBOX_TOKEN!}
         initialViewState={{
           longitude: 20,
@@ -283,7 +192,7 @@ const GlobalSituationMapInner = forwardRef<GlobalSituationMapHandle, GlobalSitua
         mapStyle="mapbox://styles/mapbox/dark-v11"
         attributionControl={false}
       >
-        {filteredSignals.map((signal) => {
+        {visibleSignals.map((signal) => {
           const color = typeToColor(signal.type);
           const halo = importanceToHaloRadiusPx(signal.importance);
           const dotPx = importanceToDotPx(signal.importance);
@@ -294,7 +203,7 @@ const GlobalSituationMapInner = forwardRef<GlobalSituationMapHandle, GlobalSitua
               longitude={signal.lon}
               latitude={signal.lat}
               anchor="center"
-              onClick={() => handleSignalClick(signal)}
+              onClick={(e) => { e.originalEvent.stopPropagation(); handleSignalClick(signal); }}
             >
               <div
                 className="relative cursor-pointer"
@@ -328,7 +237,8 @@ const GlobalSituationMapInner = forwardRef<GlobalSituationMapHandle, GlobalSitua
           );
         })}
 
-        {hoveredSignal && (
+        {/* Hover tooltip — suppress when same signal is selected */}
+        {hoveredSignal && hoveredSignal.id !== selectedSignal?.id && (
           <Popup
             longitude={hoveredSignal.lon}
             latitude={hoveredSignal.lat}
@@ -350,6 +260,57 @@ const GlobalSituationMapInner = forwardRef<GlobalSituationMapHandle, GlobalSitua
               <div className="mt-1 text-gray-500">
                 Confidence: <span className="font-mono text-gray-400">{hoveredSignal.confidence}%</span>
               </div>
+            </div>
+          </Popup>
+        )}
+
+        {/* Detail popup — persistent on marker click */}
+        {selectedSignal && (
+          <Popup
+            longitude={selectedSignal.lon}
+            latitude={selectedSignal.lat}
+            anchor="bottom"
+            closeButton
+            onClose={() => setSelectedSignal(null)}
+            className="global-situation-popup !bg-black/70 !backdrop-blur-xl !rounded-xl !shadow-2xl !p-0"
+            style={{
+              border: `1px solid ${getLayerColor(selectedSignal.type, 'main')}50`,
+            }}
+          >
+            <div className="text-left text-xs text-gray-200 min-w-[220px] p-3">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <span
+                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider"
+                  style={{
+                    backgroundColor: `${OVERVIEW_LAYER_SEMANTICS[selectedSignal.type].color}25`,
+                    color: OVERVIEW_LAYER_SEMANTICS[selectedSignal.type].color,
+                    border: `1px solid ${OVERVIEW_LAYER_SEMANTICS[selectedSignal.type].color}40`,
+                  }}
+                >
+                  <span
+                    className="w-1.5 h-1.5 rounded-full"
+                    style={{ backgroundColor: OVERVIEW_LAYER_SEMANTICS[selectedSignal.type].color }}
+                  />
+                  {OVERVIEW_LAYER_SEMANTICS[selectedSignal.type].label}
+                </span>
+                <span className="text-[10px] font-mono text-gray-400 shrink-0">
+                  {selectedSignal.confidence}%
+                </span>
+              </div>
+              <div className="font-medium text-gray-100 text-sm leading-tight">{selectedSignal.label_short}</div>
+              <div className="text-gray-400 mt-0.5">{selectedSignal.subtitle_short}</div>
+              <div className="mt-2 pt-2 border-t border-white/10">
+                <span className="text-gray-500">Impact:</span>{' '}
+                <span className="text-gray-300">{selectedSignal.impact_one_line}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate(selectedSignal.investigate_id || '/search')}
+                className="mt-3 w-full flex items-center justify-center gap-1.5 h-8 rounded-lg bg-cyan-500/15 text-cyan-300 text-xs font-medium border border-cyan-500/30 hover:bg-cyan-500/25 transition-colors"
+              >
+                Investigate
+                <span aria-hidden>&rarr;</span>
+              </button>
             </div>
           </Popup>
         )}

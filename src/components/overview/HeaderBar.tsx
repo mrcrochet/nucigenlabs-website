@@ -4,9 +4,17 @@
 
 import { Calendar, Globe, MapPin, RefreshCw, Search } from 'lucide-react';
 import { OVERVIEW_COUNTRIES } from '../../constants/overview-countries';
+import { OVERVIEW_LAYER_SEMANTICS } from '../../constants/overview-signals';
+import type { OverviewSignalType } from '../../types/overview';
 
 const DATE_RANGES = ['24h', '7d', '30d'] as const;
 const SCOPE_MODES = ['global', 'watchlist'] as const;
+const ALL_SIGNAL_TYPES: OverviewSignalType[] = ['geopolitics', 'supply-chains', 'markets', 'energy', 'security'];
+const IMPORTANCE_THRESHOLDS = [
+  { label: 'All', value: 0 },
+  { label: 'Med ≥40', value: 40 },
+  { label: 'High ≥70', value: 70 },
+] as const;
 
 export interface HeaderBarProps {
   dateRange?: '24h' | '7d' | '30d';
@@ -20,6 +28,10 @@ export interface HeaderBarProps {
   onCountryChange?: (v: string) => void;
   onRefresh?: () => void;
   refreshing?: boolean;
+  typesEnabled?: OverviewSignalType[];
+  minImportance?: number;
+  onTypesEnabledChange?: (types: OverviewSignalType[]) => void;
+  onMinImportanceChange?: (v: number) => void;
 }
 
 export default function HeaderBar({
@@ -34,9 +46,13 @@ export default function HeaderBar({
   onCountryChange,
   onRefresh,
   refreshing = false,
+  typesEnabled,
+  minImportance = 0,
+  onTypesEnabledChange,
+  onMinImportanceChange,
 }: HeaderBarProps) {
   return (
-    <div className="flex items-center gap-3 pl-4 pr-4 w-full min-w-0 h-full">
+    <div className="flex items-center gap-3 pl-4 pr-4 w-full min-w-0 h-full overflow-x-auto scrollbar-hide">
       <span className="text-[11px] font-medium text-zinc-400 uppercase tracking-widest shrink-0">Overview</span>
       <div className="h-6 w-px bg-white/[0.06] shrink-0" aria-hidden />
       <div className="relative flex-1 min-w-0 max-w-sm">
@@ -103,6 +119,59 @@ export default function HeaderBar({
                 </option>
               ))}
             </select>
+          </div>
+        </>
+      )}
+      {onTypesEnabledChange && typesEnabled && (
+        <>
+          <div className="h-6 w-px bg-white/[0.06] shrink-0" aria-hidden />
+          <div className="flex items-center gap-1 shrink-0">
+            {ALL_SIGNAL_TYPES.map((t) => {
+              const sem = OVERVIEW_LAYER_SEMANTICS[t];
+              const isOn = typesEnabled.includes(t);
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => {
+                    if (isOn && typesEnabled.length <= 1) return; // keep ≥1
+                    onTypesEnabledChange(
+                      isOn ? typesEnabled.filter((x) => x !== t) : [...typesEnabled, t]
+                    );
+                  }}
+                  className={`flex items-center gap-1 h-7 px-2 rounded text-[10px] tracking-wider transition-colors ${
+                    isOn
+                      ? 'bg-white/[0.08] text-zinc-200 border border-white/[0.12]'
+                      : 'bg-white/[0.02] text-zinc-500 border border-transparent hover:bg-white/[0.04] hover:text-zinc-400'
+                  }`}
+                  aria-pressed={isOn}
+                >
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: sem.color, opacity: isOn ? 1 : 0.4 }} />
+                  <span className="hidden lg:inline">{sem.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+      {onMinImportanceChange && (
+        <>
+          <div className="h-6 w-px bg-white/[0.06] shrink-0" aria-hidden />
+          <div className="flex items-center gap-1 shrink-0">
+            {IMPORTANCE_THRESHOLDS.map((th) => (
+              <button
+                key={th.value}
+                type="button"
+                onClick={() => onMinImportanceChange(th.value)}
+                className={`h-7 px-2 rounded text-[10px] uppercase tracking-wider transition-colors ${
+                  minImportance === th.value
+                    ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+                    : 'bg-white/[0.04] text-zinc-400 border border-transparent hover:bg-white/[0.06] hover:text-zinc-300'
+                }`}
+              >
+                {th.label}
+              </button>
+            ))}
           </div>
         </>
       )}

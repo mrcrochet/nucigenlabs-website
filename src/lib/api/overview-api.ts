@@ -13,6 +13,10 @@ export interface OverviewMapParams {
   countries?: string[];
   /** Clerk user ID; used when scopeMode is 'watchlist' to filter by watchlist entities */
   userId?: string;
+  /** Filter by signal types (e.g. ['geopolitics', 'markets']). Omit or all 5 = no filter. */
+  typesEnabled?: string[];
+  /** Minimum importance threshold (0-100). Omit or 0 = no filter. */
+  minImportance?: number;
 }
 
 const FALLBACK_DATA: OverviewMapData = {
@@ -43,6 +47,8 @@ export async function getOverviewMapData(params?: OverviewMapParams): Promise<Ov
   if (params?.q?.trim()) searchParams.set('q', params.q.trim());
   if (params?.countries?.length) searchParams.set('countries', params.countries.join(','));
   if (params?.userId) searchParams.set('userId', params.userId);
+  if (params?.typesEnabled?.length) searchParams.set('typesEnabled', params.typesEnabled.join(','));
+  if (params?.minImportance != null && params.minImportance > 0) searchParams.set('minImportance', String(params.minImportance));
   const query = searchParams.toString();
   const url = apiUrl('/api/overview/map') + (query ? `?${query}` : '');
   const res = await fetch(url);
@@ -63,6 +69,28 @@ export interface OverviewSituationParams {
 export interface OverviewSituationData {
   summary: string;
   country: string | null;
+}
+
+/** Feed config stored per user in Supabase */
+export interface OverviewFeedConfig {
+  types_enabled?: string[] | null;
+  min_importance?: number | null;
+}
+
+export async function getOverviewFeedConfig(userId: string): Promise<OverviewFeedConfig | null> {
+  const url = apiUrl(`/api/overview/feed-config?userId=${encodeURIComponent(userId)}`);
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json.success && json.data ? (json.data as OverviewFeedConfig) : null;
+}
+
+export async function saveOverviewFeedConfig(userId: string, config: OverviewFeedConfig): Promise<void> {
+  await fetch(apiUrl('/api/overview/feed-config'), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, ...config }),
+  });
 }
 
 export async function getOverviewSituation(

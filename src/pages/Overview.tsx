@@ -16,8 +16,8 @@ import GlobalSituationMap from '../components/overview/GlobalSituationMap';
 import OverviewMapSidePanel from '../components/overview/OverviewMapSidePanel';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
-import { getOverviewMapData, FALLBACK_DATA } from '../lib/api/overview-api';
-import type { OverviewMapData, OverviewEventSummary } from '../types/overview';
+import { getOverviewMapData, getOverviewFeedConfig, saveOverviewFeedConfig, FALLBACK_DATA } from '../lib/api/overview-api';
+import type { OverviewMapData, OverviewEventSummary, OverviewSignalType } from '../types/overview';
 import type { GlobalSituationMapHandle } from '../components/overview/GlobalSituationMap';
 
 /** Hauteur TopNav (h-16) pour positionner le globe en dessous */
@@ -43,6 +43,32 @@ function OverviewContent() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [typesEnabled, setTypesEnabled] = useState<OverviewSignalType[]>(['geopolitics', 'supply-chains', 'markets', 'energy', 'security']);
+  const [minImportance, setMinImportance] = useState(0);
+  const configLoadedRef = useRef(false);
+
+  // Load saved filter preferences on mount
+  useEffect(() => {
+    if (!user?.id) return;
+    getOverviewFeedConfig(user.id).then((cfg) => {
+      if (!cfg) return;
+      if (cfg.types_enabled?.length) setTypesEnabled(cfg.types_enabled as OverviewSignalType[]);
+      if (cfg.min_importance != null && cfg.min_importance > 0) setMinImportance(cfg.min_importance);
+      configLoadedRef.current = true;
+    }).catch(() => { /* silent */ });
+  }, [user?.id]);
+
+  // Debounced save when filters change (skip initial load)
+  useEffect(() => {
+    if (!user?.id || !configLoadedRef.current) return;
+    const t = setTimeout(() => {
+      saveOverviewFeedConfig(user.id, {
+        types_enabled: typesEnabled,
+        min_importance: minImportance > 0 ? minImportance : null,
+      }).catch(() => { /* silent */ });
+    }, 800);
+    return () => clearTimeout(t);
+  }, [user?.id, typesEnabled, minImportance]);
 
   const fetchData = useCallback(async (silent = false) => {
     if (!silent) {
@@ -57,6 +83,8 @@ function OverviewContent() {
         q: searchSubmitted || undefined,
         countries: country ? [country] : undefined,
         userId: user?.id,
+        typesEnabled: typesEnabled.length < 5 ? typesEnabled : undefined,
+        minImportance: minImportance > 0 ? minImportance : undefined,
       });
       setMapData(data);
       setLastUpdated(new Date());
@@ -76,7 +104,7 @@ function OverviewContent() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [dateRange, scopeMode, searchSubmitted, country, user?.id]);
+  }, [dateRange, scopeMode, searchSubmitted, country, user?.id, typesEnabled, minImportance]);
 
   useEffect(() => {
     fetchData();
@@ -95,11 +123,10 @@ function OverviewContent() {
     (event: OverviewEventSummary) => {
       const signal = mapData?.signals.find((s) => s.id === event.id);
       if (signal && mapRef.current) {
-        mapRef.current.flyTo(signal.lon, signal.lat, 4);
+        mapRef.current.selectSignal(signal);
       }
-      navigate(event.investigate_id || '/search');
     },
-    [mapData?.signals, navigate]
+    [mapData?.signals]
   );
 
   const handleImpactClick = useCallback(
@@ -161,6 +188,10 @@ function OverviewContent() {
             onCountryChange={setCountry}
             onRefresh={() => fetchData()}
             refreshing={loading}
+            typesEnabled={typesEnabled}
+            minImportance={minImportance}
+            onTypesEnabledChange={setTypesEnabled}
+            onMinImportanceChange={setMinImportance}
           />
           </div>
           {(error || notice) && (

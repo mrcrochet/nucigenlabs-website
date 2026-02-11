@@ -1847,6 +1847,12 @@ app.get('/api/overview/map', async (req, res) => {
     let typesEnabled: string[] | undefined;
     let minImportance: number | undefined;
 
+    // Read typesEnabled / minImportance from query params (take priority over DB config)
+    const typesEnabledParam = req.query.typesEnabled as string | undefined;
+    if (typesEnabledParam) typesEnabled = typesEnabledParam.split(',').map(t => t.trim()).filter(Boolean);
+    const minImportanceParam = req.query.minImportance as string | undefined;
+    if (minImportanceParam) { const p = parseInt(minImportanceParam, 10); if (!isNaN(p) && p >= 0) minImportance = p; }
+
     let supabaseUserId: string | null = null;
     if (clerkUserId && supabase) {
       supabaseUserId = await getSupabaseUserId(clerkUserId, supabase);
@@ -1855,8 +1861,8 @@ app.get('/api/overview/map', async (req, res) => {
         if (config) {
           const c = config as { sources_enabled?: string[]; types_enabled?: string[]; min_importance?: number; max_signals?: number };
           if (!sourcesEnabled && c.sources_enabled?.length) sourcesEnabled = c.sources_enabled;
-          if (c.types_enabled?.length) typesEnabled = c.types_enabled;
-          if (c.min_importance != null) minImportance = c.min_importance;
+          if (!typesEnabled && c.types_enabled?.length) typesEnabled = c.types_enabled;
+          if (minImportance == null && c.min_importance != null) minImportance = c.min_importance;
           if (c.max_signals != null) maxSignals = c.max_signals;
         }
       }
