@@ -100,7 +100,7 @@ async function getRelevantEvents(limit: number = 20): Promise<Event[]> {
 
     const { data, error } = await supabase
       .from('events')
-      .select('id, title, description, content, discover_tier, discover_category, published_at, region, sector')
+      .select('id, title, description, content, discover_tier, discover_category, published_at')
       .gte('published_at', since)
       .not('title', 'is', null)
       .order('published_at', { ascending: false })
@@ -170,8 +170,6 @@ async function getOrSyncEventsFromNucigenEvents(limit: number): Promise<Event[]>
         content: description || title,
         published_at: ne.created_at || new Date().toISOString(),
         status: 'pending',
-        region: ne.region || null,
-        sector: ne.sector || null,
       } as Record<string, unknown>);
 
       if (insertError) {
@@ -185,7 +183,7 @@ async function getOrSyncEventsFromNucigenEvents(limit: number): Promise<Event[]>
 
     const { data: events, error: selectError } = await supabase
       .from('events')
-      .select('id, title, description, content, discover_tier, discover_category, published_at, region, sector')
+      .select('id, title, description, content, discover_tier, discover_category, published_at')
       .eq('source', NUCIGEN_SYNC_SOURCE)
       .in('source_id', syncedIds)
       .order('published_at', { ascending: false })

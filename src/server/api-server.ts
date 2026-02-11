@@ -5645,7 +5645,7 @@ app.post('/api/corporate-impact/event-analysis', async (req, res) => {
     }
     const { data: event, error: eventError } = await supabase
       .from('events')
-      .select('id, title, published_at, description, content, region, sector, discover_category')
+      .select('id, title, published_at, description, content, discover_category')
       .eq('id', eventId)
       .single();
     if (eventError || !event) {
