@@ -3127,72 +3127,117 @@ app.get('/api/signals/:id', async (req, res) => {
   }
 });
 
-// GET /api/cron/collect-and-process - Main pipeline cron: collect events + process them
-app.get('/api/cron/collect-and-process', async (req: express.Request, res: express.Response) => {
+// ─── CRON HELPER ───
+function verifyCronAuth(req: express.Request, res: express.Response): boolean {
+  const authHeader = req.headers['authorization'];
+  const cronSecret = process.env.CRON_SECRET || process.env.VERCEL_CRON_SECRET;
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    if (process.env.NODE_ENV === 'production' && !authHeader) {
+      res.status(401).json({ success: false, error: 'Unauthorized' });
+      return false;
+    }
+  }
+  return true;
+}
+
+// GET /api/cron/collect - Collect events (Tavily + RSS)
+app.get('/api/cron/collect', async (req: express.Request, res: express.Response) => {
+  if (!verifyCronAuth(req, res)) return;
+  const start = Date.now();
   try {
-    const authHeader = req.headers['authorization'];
-    const cronSecret = process.env.CRON_SECRET || process.env.VERCEL_CRON_SECRET;
+    console.log('[Cron:collect] Starting...');
+    const { runDataCollector } = await import('./workers/data-collector.js');
+    const result = await runDataCollector();
+    console.log(`[Cron:collect] Done in ${Date.now() - start}ms`, result);
+    res.json({ success: true, ...result, durationMs: Date.now() - start, timestamp: new Date().toISOString() });
+  } catch (error: any) {
+    console.error('[Cron:collect] Error:', error.message);
+    res.status(500).json({ success: false, error: error.message, timestamp: new Date().toISOString() });
+  }
+});
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-      if (process.env.NODE_ENV === 'production' && !authHeader) {
-        return res.status(401).json({ success: false, error: 'Unauthorized' });
-      }
+// GET /api/cron/process - Process pending events (OpenAI extraction + causal chains)
+app.get('/api/cron/process', async (req: express.Request, res: express.Response) => {
+  if (!verifyCronAuth(req, res)) return;
+  const start = Date.now();
+  try {
+    console.log('[Cron:process] Starting...');
+    const { processPendingEvents } = await import('./workers/event-processor.js');
+    const result = await processPendingEvents(20);
+    endpointCache.invalidateAll();
+    console.log(`[Cron:process] Done in ${Date.now() - start}ms`, result);
+    res.json({ success: true, ...result, durationMs: Date.now() - start, timestamp: new Date().toISOString() });
+  } catch (error: any) {
+    console.error('[Cron:process] Error:', error.message);
+    res.status(500).json({ success: false, error: error.message, timestamp: new Date().toISOString() });
+  }
+});
+
+// GET /api/cron/discover - Collect EventRegistry discover items
+app.get('/api/cron/discover', async (req: express.Request, res: express.Response) => {
+  if (!verifyCronAuth(req, res)) return;
+  const start = Date.now();
+  try {
+    console.log('[Cron:discover] Starting...');
+    const { collectDiscoverItems } = await import('./workers/discover-collector.js');
+    const result = await collectDiscoverItems();
+    console.log(`[Cron:discover] Done in ${Date.now() - start}ms`, result);
+    res.json({ success: true, ...result, durationMs: Date.now() - start, timestamp: new Date().toISOString() });
+  } catch (error: any) {
+    console.error('[Cron:discover] Error:', error.message);
+    res.status(500).json({ success: false, error: error.message, timestamp: new Date().toISOString() });
+  }
+});
+
+// GET /api/cron/enrich - Enrich events with Firecrawl + Discover enrichment
+app.get('/api/cron/enrich', async (req: express.Request, res: express.Response) => {
+  if (!verifyCronAuth(req, res)) return;
+  const start = Date.now();
+  const results: Record<string, any> = {};
+  try {
+    console.log('[Cron:enrich] Starting...');
+
+    // Firecrawl enrichment
+    try {
+      const { enrichPendingEvents } = await import('./services/firecrawl-ecosystem.js');
+      results.firecrawl = await enrichPendingEvents(20);
+    } catch (e: any) {
+      console.error('[Cron:enrich] Firecrawl failed:', e.message);
+      results.firecrawl = { error: e.message };
     }
 
-    console.log('[Cron] collect-and-process: starting pipeline cycle...');
-    const startTime = Date.now();
-    const results: Record<string, any> = {};
-
-    // Step 1: Collect events (Tavily + RSS)
+    // Discover enrichment (critical + strategic)
     try {
-      const { runDataCollector } = await import('./workers/data-collector.js');
-      results.collection = await runDataCollector();
-      console.log('[Cron] Step 1 (collect):', results.collection);
+      const { enrichCriticalEvents, enrichStrategicEvents } = await import('./workers/discover-enricher.js');
+      results.critical = await enrichCriticalEvents();
+      results.strategic = await enrichStrategicEvents();
     } catch (e: any) {
-      console.error('[Cron] Step 1 (collect) failed:', e.message);
-      results.collection = { error: e.message };
-    }
-
-    // Step 2: Collect EventRegistry discover items
-    try {
-      const { collectDiscoverItems } = await import('./workers/discover-collector.js');
-      results.discover = await collectDiscoverItems();
-      console.log('[Cron] Step 2 (discover):', results.discover);
-    } catch (e: any) {
-      console.error('[Cron] Step 2 (discover) failed:', e.message);
+      console.error('[Cron:enrich] Discover enrichment failed:', e.message);
       results.discover = { error: e.message };
     }
 
-    // Step 3: Process pending events (OpenAI extraction + causal chains)
-    try {
-      const { processPendingEvents } = await import('./workers/event-processor.js');
-      results.processing = await processPendingEvents(20);
-      console.log('[Cron] Step 3 (process):', results.processing);
-    } catch (e: any) {
-      console.error('[Cron] Step 3 (process) failed:', e.message);
-      results.processing = { error: e.message };
-    }
-
-    // Invalidate caches so fresh data is served
     endpointCache.invalidateAll();
-    console.log('[Cron] Cache invalidated after pipeline cycle');
-
-    const durationMs = Date.now() - startTime;
-    console.log(`[Cron] collect-and-process: done in ${durationMs}ms`);
-
-    res.json({
-      success: true,
-      results,
-      durationMs,
-      timestamp: new Date().toISOString(),
-    });
+    console.log(`[Cron:enrich] Done in ${Date.now() - start}ms`, results);
+    res.json({ success: true, results, durationMs: Date.now() - start, timestamp: new Date().toISOString() });
   } catch (error: any) {
-    console.error('[Cron] collect-and-process fatal error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Pipeline cycle failed',
-      timestamp: new Date().toISOString(),
-    });
+    console.error('[Cron:enrich] Error:', error.message);
+    res.status(500).json({ success: false, error: error.message, timestamp: new Date().toISOString() });
+  }
+});
+
+// GET /api/cron/alerts - Generate alerts for users
+app.get('/api/cron/alerts', async (req: express.Request, res: express.Response) => {
+  if (!verifyCronAuth(req, res)) return;
+  const start = Date.now();
+  try {
+    console.log('[Cron:alerts] Starting...');
+    const { runAlertsGenerator } = await import('./workers/alerts-generator.js');
+    const result = await runAlertsGenerator(50);
+    console.log(`[Cron:alerts] Done in ${Date.now() - start}ms`, result);
+    res.json({ success: true, ...result, durationMs: Date.now() - start, timestamp: new Date().toISOString() });
+  } catch (error: any) {
+    console.error('[Cron:alerts] Error:', error.message);
+    res.status(500).json({ success: false, error: error.message, timestamp: new Date().toISOString() });
   }
 });
 

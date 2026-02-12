@@ -12,8 +12,20 @@
   ],
   "crons": [
     {
-      "path": "/api/cron/collect-and-process",
-      "schedule": "*/30 * * * *"
+      "path": "/api/cron/collect",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/process",
+      "schedule": "5,20,35,50 * * * *"
+    },
+    {
+      "path": "/api/cron/discover",
+      "schedule": "10 */2 * * *"
+    },
+    {
+      "path": "/api/cron/enrich",
+      "schedule": "20 */2 * * *"
     },
     {
       "path": "/api/cron/track-perplexity",
@@ -21,19 +33,23 @@
     },
     {
       "path": "/api/cron/corporate-impact",
-      "schedule": "0 * * * *"
+      "schedule": "0 */3 * * *"
     },
     {
-      "path": "/api/cron/refresh-prices",
-      "schedule": "0 14 * * *"
+      "path": "/api/cron/alerts",
+      "schedule": "30 * * * *"
     },
     {
       "path": "/api/cron/decision-points",
-      "schedule": "0 */3 * * *"
+      "schedule": "0 */6 * * *"
     },
     {
       "path": "/api/cron/watchlist-notifications",
       "schedule": "0 */4 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-prices",
+      "schedule": "0 14 * * *"
     }
   ]
 }
