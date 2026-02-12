@@ -208,6 +208,42 @@ export interface Metric extends IntelligenceObject {
 }
 
 // ============================================
+// 8. PRESSURE (Pressure Detection Layer)
+// ============================================
+
+export type PressureSystem = 'Security' | 'Maritime' | 'Energy' | 'Industrial' | 'Monetary';
+
+export interface PressureFeatures {
+  system: PressureSystem;
+  pressure_vector: string;           // e.g. "freight_rate_shock"
+  impact_order: 1 | 2 | 3;
+  time_horizon_days: number;
+  evidence_strength: number;         // 0-1 (LLM-extracted)
+  novelty: number;                   // 0-1 (LLM-extracted)
+  transmission_channels: string[];
+  exposed_entities: string[];
+  uncertainties: string[];
+  citations: string[];
+}
+
+export interface PressureScores {
+  probability_estimate: number;      // 0-1 (deterministic)
+  magnitude_estimate: number;        // 0-100 (deterministic)
+  confidence_score: number;          // 0-1 (deterministic)
+}
+
+export interface PressureSignal extends Signal {
+  pressure: PressureFeatures & PressureScores;
+}
+
+export interface PressureCluster {
+  system: PressureSystem;
+  signal_count: number;
+  avg_magnitude: number;
+  trend: 'rising' | 'stable' | 'falling';
+}
+
+// ============================================
 // API RESPONSE TYPES
 // ============================================
 
@@ -216,6 +252,11 @@ export interface SignalsResponse {
   total: number;
   page: number;
   limit: number;
+}
+
+export interface PressureSignalsResponse {
+  signals: PressureSignal[];
+  total: number;
 }
 
 export interface EventsResponse {

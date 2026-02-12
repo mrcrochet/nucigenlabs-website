@@ -12,6 +12,10 @@
   ],
   "crons": [
     {
+      "path": "/api/cron/collect-and-process",
+      "schedule": "*/30 * * * *"
+    },
+    {
       "path": "/api/cron/track-perplexity",
       "schedule": "0 */2 * * *"
     },
@@ -22,6 +26,14 @@
     {
       "path": "/api/cron/refresh-prices",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/decision-points",
+      "schedule": "0 */3 * * *"
+    },
+    {
+      "path": "/api/cron/watchlist-notifications",
+      "schedule": "0 */4 * * *"
     }
   ]
 }

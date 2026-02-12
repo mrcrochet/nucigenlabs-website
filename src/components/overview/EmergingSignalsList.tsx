@@ -21,11 +21,7 @@ interface EmergingSignalsListProps {
   limit?: number;
 }
 
-const MOCK_EMERGING: EmergingSignal[] = [
-  { id: 'es-1', label: 'Supply fragmentation (Red Sea)', oneLine: 'Early signs of route diversification', investigateId: '/search' },
-  { id: 'es-2', label: 'Rare earth stockpiling (Asia)', oneLine: 'Quiet increase in strategic reserves', investigateId: '/search' },
-  { id: 'es-3', label: 'Gas storage levels (EU)', oneLine: 'Below seasonal norms – watch refill pace', investigateId: '/search' },
-];
+// No mock data — show empty state when API unavailable
 
 export default function EmergingSignalsList({ limit = 3 }: EmergingSignalsListProps) {
   const [items, setItems] = useState<EmergingSignal[]>([]);
@@ -41,11 +37,11 @@ export default function EmergingSignalsList({ limit = 3 }: EmergingSignalsListPr
         if (json?.success && Array.isArray(json.data)) {
           setItems(json.data.slice(0, limit));
         } else {
-          setItems(MOCK_EMERGING.slice(0, limit));
+          setItems([]);
         }
       })
       .catch(() => {
-        if (!cancelled) setItems(MOCK_EMERGING.slice(0, limit));
+        if (!cancelled) setItems([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

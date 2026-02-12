@@ -20,6 +20,7 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
+import { MemoryCache } from './cache/memory-cache.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -52,6 +53,11 @@ if (supabaseUrl && supabaseServiceKey) {
 
 app.use(cors());
 app.use(express.json());
+
+// Server-side cache for expensive endpoints (signals, pressure, overview)
+const CACHE_TTL_15MIN = 15 * 60 * 1000;
+const CACHE_TTL_10MIN = 10 * 60 * 1000;
+const endpointCache = new MemoryCache();
 
 // Audit middleware (for compliance and auditability)
 import { auditMiddleware, logAuditEventManual } from './middleware/audit-middleware.js';
@@ -3117,6 +3123,75 @@ app.get('/api/signals/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/cron/collect-and-process - Main pipeline cron: collect events + process them
+app.get('/api/cron/collect-and-process', async (req: express.Request, res: express.Response) => {
+  try {
+    const authHeader = req.headers['authorization'];
+    const cronSecret = process.env.CRON_SECRET || process.env.VERCEL_CRON_SECRET;
+
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      if (process.env.NODE_ENV === 'production' && !authHeader) {
+        return res.status(401).json({ success: false, error: 'Unauthorized' });
+      }
+    }
+
+    console.log('[Cron] collect-and-process: starting pipeline cycle...');
+    const startTime = Date.now();
+    const results: Record<string, any> = {};
+
+    // Step 1: Collect events (Tavily + RSS)
+    try {
+      const { runDataCollector } = await import('./workers/data-collector.js');
+      results.collection = await runDataCollector();
+      console.log('[Cron] Step 1 (collect):', results.collection);
+    } catch (e: any) {
+      console.error('[Cron] Step 1 (collect) failed:', e.message);
+      results.collection = { error: e.message };
+    }
+
+    // Step 2: Collect EventRegistry discover items
+    try {
+      const { collectDiscoverItems } = await import('./workers/discover-collector.js');
+      results.discover = await collectDiscoverItems();
+      console.log('[Cron] Step 2 (discover):', results.discover);
+    } catch (e: any) {
+      console.error('[Cron] Step 2 (discover) failed:', e.message);
+      results.discover = { error: e.message };
+    }
+
+    // Step 3: Process pending events (OpenAI extraction + causal chains)
+    try {
+      const { processPendingEvents } = await import('./workers/event-processor.js');
+      results.processing = await processPendingEvents(20);
+      console.log('[Cron] Step 3 (process):', results.processing);
+    } catch (e: any) {
+      console.error('[Cron] Step 3 (process) failed:', e.message);
+      results.processing = { error: e.message };
+    }
+
+    // Invalidate caches so fresh data is served
+    endpointCache.invalidateAll();
+    console.log('[Cron] Cache invalidated after pipeline cycle');
+
+    const durationMs = Date.now() - startTime;
+    console.log(`[Cron] collect-and-process: done in ${durationMs}ms`);
+
+    res.json({
+      success: true,
+      results,
+      durationMs,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('[Cron] collect-and-process fatal error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Pipeline cycle failed',
+      timestamp: new Date().toISOString(),
     });
   }
 });
@@ -7033,6 +7108,246 @@ app.get('/api/cron/refresh-prices', async (req: express.Request, res: express.Re
       success: false,
       error: error.message || 'Failed to refresh prices',
       timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// ============================================
+// Pressure Signals Endpoints
+// ============================================
+
+// Helper: fetch recent events from Supabase using the server-side service-role client
+async function fetchRecentEventsServer(sb: NonNullable<typeof supabase>, days = 7, maxRows = 50) {
+  const dateFrom = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await sb
+    .from('nucigen_events')
+    .select('*')
+    .gte('created_at', dateFrom)
+    .order('created_at', { ascending: false })
+    .limit(maxRows);
+
+  if (error) {
+    console.error('[PressureSignals] Supabase query error:', error);
+    return [];
+  }
+
+  // Normalize rows into EventWithChain shape expected by SignalAgent
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    title: row.title || row.headline || '',
+    summary: row.summary || row.description || '',
+    sector: row.sector || null,
+    region: row.region || null,
+    event_type: row.event_type || null,
+    event_subtype: row.event_subtype || null,
+    impact_score: row.impact_score ?? null,
+    confidence: row.confidence ?? null,
+    why_it_matters: row.why_it_matters || null,
+    created_at: row.created_at,
+    sources: row.sources || [],
+    actors: row.actors || [],
+    nucigen_causal_chains: [],
+    // Optional fields
+    scope: row.scope || null,
+    horizon: row.horizon || null,
+    source_count: row.source_count ?? 1,
+    last_updated: row.updated_at || row.created_at,
+  }));
+}
+
+// GET /api/pressure-signals - List pressure-enriched signals with filters
+app.get('/api/pressure-signals', async (req, res) => {
+  try {
+    const {
+      system,
+      impact_order,
+      horizon_bucket,
+      min_magnitude,
+      min_confidence,
+      limit = '20',
+    } = req.query;
+
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    // Check cache for the base signal generation (most expensive part)
+    const cacheKey = 'pressure-signals-base';
+    let allPressureSignals: any[] | null = endpointCache.get(cacheKey) as any[] | null;
+
+    if (!allPressureSignals) {
+      const { IntelligenceSignalAgent } = await import('./agents/signal-agent.js');
+      const events = await fetchRecentEventsServer(supabase, 7, 15);
+
+      if (events.length === 0) {
+        return res.json({ success: true, signals: [], total: 0 });
+      }
+
+      const signalAgent = new IntelligenceSignalAgent();
+      const response = await signalAgent.generateSignals({ events });
+
+      allPressureSignals = (response.data || []).filter(
+        (s: any) => s.pressure !== undefined,
+      );
+
+      endpointCache.set(cacheKey, allPressureSignals, CACHE_TTL_15MIN);
+      console.log(`[Cache] pressure-signals: cached ${allPressureSignals.length} signals for 15min`);
+    } else {
+      console.log(`[Cache] pressure-signals: serving from cache (${allPressureSignals.length} signals)`);
+    }
+
+    let signals = [...allPressureSignals];
+
+    // Apply filters
+    if (system) {
+      signals = signals.filter(
+        (s: any) => s.pressure?.system === system,
+      );
+    }
+    if (impact_order) {
+      const order = parseInt(impact_order as string, 10);
+      signals = signals.filter(
+        (s: any) => s.pressure?.impact_order === order,
+      );
+    }
+    if (horizon_bucket) {
+      const bucketRanges: Record<string, [number, number]> = {
+        immediate: [1, 7],
+        short: [8, 30],
+        medium: [31, 90],
+        long: [91, 365],
+      };
+      const range = bucketRanges[horizon_bucket as string];
+      if (range) {
+        signals = signals.filter(
+          (s: any) =>
+            s.pressure?.time_horizon_days >= range[0] &&
+            s.pressure?.time_horizon_days <= range[1],
+        );
+      }
+    }
+    if (min_magnitude) {
+      const minMag = parseInt(min_magnitude as string, 10);
+      signals = signals.filter(
+        (s: any) => s.pressure?.magnitude_estimate >= minMag,
+      );
+    }
+    if (min_confidence) {
+      const minConf = parseFloat(min_confidence as string);
+      signals = signals.filter(
+        (s: any) => s.pressure?.confidence_score >= minConf,
+      );
+    }
+
+    // Sort by magnitude descending
+    signals.sort(
+      (a: any, b: any) =>
+        (b.pressure?.magnitude_estimate || 0) - (a.pressure?.magnitude_estimate || 0),
+    );
+
+    const limitNum = parseInt(limit as string, 10);
+    const sliced = signals.slice(0, limitNum);
+
+    res.json({
+      success: true,
+      signals: sliced,
+      total: signals.length,
+    });
+  } catch (error: any) {
+    console.error('[API] Pressure signals error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
+    });
+  }
+});
+
+// GET /api/pressure-signals/clusters - Aggregated pressure by system
+app.get('/api/pressure-signals/clusters', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({
+        success: false,
+        error: 'Supabase not configured',
+      });
+    }
+
+    // Check cache for clusters
+    const clustersCacheKey = 'pressure-clusters';
+    const cachedClusters = endpointCache.get(clustersCacheKey);
+    if (cachedClusters) {
+      console.log('[Cache] pressure-clusters: serving from cache');
+      return res.json({ success: true, clusters: cachedClusters });
+    }
+
+    // Reuse the base pressure-signals cache if available
+    const baseCacheKey = 'pressure-signals-base';
+    let pressureSignals: any[] | null = endpointCache.get(baseCacheKey) as any[] | null;
+
+    if (!pressureSignals) {
+      const { IntelligenceSignalAgent } = await import('./agents/signal-agent.js');
+      const events = await fetchRecentEventsServer(supabase, 7, 15);
+
+      if (events.length === 0) {
+        return res.json({ success: true, clusters: [] });
+      }
+
+      const signalAgent = new IntelligenceSignalAgent();
+      const response = await signalAgent.generateSignals({ events });
+
+      pressureSignals = (response.data || []).filter(
+        (s: any) => s.pressure !== undefined,
+      );
+
+      endpointCache.set(baseCacheKey, pressureSignals, CACHE_TTL_15MIN);
+    }
+
+    // Aggregate by system
+    const systemMap = new Map<string, { magnitudes: number[]; count: number }>();
+    const systems = ['Security', 'Maritime', 'Energy', 'Industrial', 'Monetary'];
+
+    for (const sys of systems) {
+      systemMap.set(sys, { magnitudes: [], count: 0 });
+    }
+
+    for (const s of pressureSignals) {
+      const sys = (s as any).pressure?.system;
+      if (sys && systemMap.has(sys)) {
+        const entry = systemMap.get(sys)!;
+        entry.count += 1;
+        entry.magnitudes.push((s as any).pressure.magnitude_estimate || 0);
+      }
+    }
+
+    const clusters = systems
+      .map(sys => {
+        const entry = systemMap.get(sys)!;
+        const avgMag =
+          entry.magnitudes.length > 0
+            ? Math.round(entry.magnitudes.reduce((a, b) => a + b, 0) / entry.magnitudes.length)
+            : 0;
+        return {
+          system: sys,
+          signal_count: entry.count,
+          avg_magnitude: avgMag,
+          trend: 'stable' as const,
+        };
+      })
+      .filter(c => c.signal_count > 0)
+      .sort((a, b) => b.avg_magnitude - a.avg_magnitude);
+
+    endpointCache.set(clustersCacheKey, clusters, CACHE_TTL_15MIN);
+
+    res.json({ success: true, clusters });
+  } catch (error: any) {
+    console.error('[API] Pressure clusters error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Internal server error',
     });
   }
 });

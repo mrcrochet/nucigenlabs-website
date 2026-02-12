@@ -228,7 +228,16 @@ export async function callOpenAI<T>(
         retryCount: 0,
       });
 
-      return cacheResult.data;
+      return {
+        data: cacheResult.data,
+        metadata: {
+          model: cacheResult.metadata?.model || selectedModel,
+          tokensUsed: cacheResult.metadata?.tokensUsed,
+          inputTokens: cacheResult.metadata?.inputTokens,
+          outputTokens: cacheResult.metadata?.outputTokens,
+          cached: cacheResult.cached,
+        },
+      };
     } catch (error: any) {
       const latencyMs = Date.now() - startTime;
 

@@ -18,10 +18,12 @@ import type {
   SignalAgentInput,
   AgentResponse,
 } from '../../lib/agents/agent-interfaces';
-import type { Signal, TimeHorizon, IntelligenceScope } from '../../types/intelligence';
+import type { Signal, TimeHorizon, IntelligenceScope, PressureSignal } from '../../types/intelligence';
 import type { EventWithChain } from '../../lib/supabase';
 import { callOpenAI } from '../services/openai-optimizer';
 import { chatCompletions } from '../services/perplexity-service';
+import { pressureExtractionAgent } from './pressure-extraction-agent';
+import { computePressureScores } from '../scoring/pressure-score';
 
 export class IntelligenceSignalAgent implements SignalAgent {
   /**
@@ -136,10 +138,13 @@ export class IntelligenceSignalAgent implements SignalAgent {
         }
       }
 
-      // Step 3: Apply user preferences filtering
-      const filteredSignals = this.applyPreferencesFilter(signals, input.user_preferences);
+      // Step 3: Enrich signals with pressure data
+      const enrichedSignals = await this.enrichWithPressure(signals, input.events);
 
-      // Step 4: Sort by priority (impact * confidence)
+      // Step 4: Apply user preferences filtering
+      const filteredSignals = this.applyPreferencesFilter(enrichedSignals, input.user_preferences);
+
+      // Step 5: Sort by priority (impact * confidence)
       filteredSignals.sort((a, b) => {
         const scoreA = a.impact_score * a.confidence_score;
         const scoreB = b.impact_score * b.confidence_score;
@@ -443,6 +448,56 @@ Output format (JSON only):
       related_event_ids: [event.id],
       why_it_matters: event.why_it_matters || `High-impact event in ${event.sector || 'this sector'}.`,
     };
+  }
+
+  /**
+   * Enrich signals with pressure features and scores
+   * Graceful degradation: if extraction fails, signal is returned without pressure data
+   */
+  private async enrichWithPressure(
+    signals: Signal[],
+    events: EventWithChain[],
+  ): Promise<Signal[]> {
+    // Run pressure extraction in parallel (batch of 5 to avoid rate limits)
+    const CONCURRENCY = 5;
+    const enriched: Signal[] = new Array(signals.length);
+
+    for (let i = 0; i < signals.length; i += CONCURRENCY) {
+      const batch = signals.slice(i, i + CONCURRENCY);
+
+      const results = await Promise.allSettled(
+        batch.map(async (signal) => {
+          const relatedEvents = events
+            .filter(e => signal.related_event_ids.includes(e.id))
+            .map(e => ({
+              summary: e.summary || e.title,
+              sources: e.sources?.map((s: any) => s.url).filter(Boolean) || [],
+            }));
+
+          const features = await pressureExtractionAgent.extract(signal, relatedEvents);
+
+          if (features) {
+            const scores = computePressureScores(features);
+            return { ...signal, pressure: { ...features, ...scores } } as PressureSignal;
+          }
+          return signal;
+        }),
+      );
+
+      results.forEach((result, idx) => {
+        if (result.status === 'fulfilled') {
+          enriched[i + idx] = result.value;
+        } else {
+          console.warn(
+            `[SignalAgent] Pressure extraction failed for signal ${batch[idx].id}:`,
+            result.reason?.message || result.reason,
+          );
+          enriched[i + idx] = batch[idx];
+        }
+      });
+    }
+
+    return enriched;
   }
 
   /**

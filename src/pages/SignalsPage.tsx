@@ -1,28 +1,26 @@
 /**
  * Signals Page - Unified Intelligence Hub
- * 
- * NEW ARCHITECTURE: Merges IntelligenceFeed + SignalsFeed + CorporateImpactPage
- * 
- * This is the core intelligence page that shows:
- * - General signals (from IntelligenceFeed) - Card view
- * - Company-specific signals (from CorporateImpactPage) - Company Impact view
- * - Table view (from SignalsFeed) - Table view
- * 
- * Users can toggle between these 3 views using a segmented control
+ *
+ * Three views:
+ * - Pressure: Pressure-enriched signals with system/impact filters
+ * - Company Impact: Company-specific signals
+ * - Table: Table view (coming soon)
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useUser, useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { getSignalsFromEvents, getOrCreateSupabaseUserId } from '../lib/supabase';
 import { safeFetchJson } from '../lib/safe-fetch-json';
-import type { Signal } from '../types/intelligence';
+import { getPressureSignals, getPressureClusters } from '../lib/api/signal-api';
+import type { Signal, PressureSignal, PressureSystem, PressureCluster } from '../types/intelligence';
 import type { MarketSignal, MarketSignalStats } from '../types/corporate-impact';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import AppShell from '../components/layout/AppShell';
 import SectionHeader from '../components/ui/SectionHeader';
-import { Sparkles, Building2, Table2, Loader2 } from 'lucide-react';
-import StockDigestView from '../components/stock-digest/StockDigestView';
+import { Activity, Building2, Table2, Loader2, Sparkles } from 'lucide-react';
+import PressureCard from '../components/signals/PressureCard';
+import PressureClusterBar from '../components/signals/PressureClusterBar';
 import SignalFilters from '../components/signals/SignalFilters';
 import SignalsTable from '../components/signals/SignalsTable';
 import CorporateImpactHeader from '../components/corporate-impact/CorporateImpactHeader';
@@ -32,14 +30,22 @@ import EmptyState from '../components/corporate-impact/EmptyState';
 import CorporateImpactReportCard from '../components/corporate-impact/CorporateImpactReportCard';
 import { AlertTriangle } from 'lucide-react';
 
-type ViewMode = 'general' | 'companies' | 'table';
+type ViewMode = 'pressure' | 'companies' | 'table';
 
 function SignalsPageContent() {
   const { user, isLoaded: userLoaded } = useUser();
   const { isLoaded: authLoaded } = useClerkAuth();
   const isFullyLoaded = userLoaded && authLoaded;
-  const [viewMode, setViewMode] = useState<ViewMode>('general');
-  
+  const [viewMode, setViewMode] = useState<ViewMode>('pressure');
+
+  // Pressure view state
+  const [pressureSignals, setPressureSignals] = useState<PressureSignal[]>([]);
+  const [pressureClusters, setPressureClusters] = useState<PressureCluster[]>([]);
+  const [systemFilter, setSystemFilter] = useState<PressureSystem | 'all'>('all');
+  const [orderFilter, setOrderFilter] = useState<1 | 2 | 3 | null>(null);
+  const [pressureLoading, setPressureLoading] = useState(true);
+  const [pressureError, setPressureError] = useState<string | null>(null);
+
   // Company impact signals state (CorporateImpactPage)
   const [companySignals, setCompanySignals] = useState<MarketSignal[]>([]);
   const [companyStats, setCompanyStats] = useState<MarketSignalStats>({
@@ -59,7 +65,7 @@ function SignalsPageContent() {
   const [companyLoading, setCompanyLoading] = useState(true);
   const [companyError, setCompanyError] = useState<string | null>(null);
   const [isTriggeringGeneration, setIsTriggeringGeneration] = useState(false);
-  
+
   // Table view state (SignalsFeed)
   const [tableSignals, setTableSignals] = useState<Signal[]>([]);
   const [tableFilters, setTableFilters] = useState({
@@ -72,6 +78,32 @@ function SignalsPageContent() {
   });
   const [tableLoading, setTableLoading] = useState(true);
   const [selectedSignalId, setSelectedSignalId] = useState<string | null>(null);
+
+  // Load pressure signals
+  const loadPressureSignals = useCallback(async () => {
+    try {
+      setPressureLoading(true);
+      setPressureError(null);
+
+      const filters: Parameters<typeof getPressureSignals>[0] = {};
+      if (systemFilter !== 'all') filters.system = systemFilter;
+      if (orderFilter) filters.impact_order = orderFilter;
+
+      const [signals, clusters] = await Promise.all([
+        getPressureSignals(filters),
+        getPressureClusters(),
+      ]);
+
+      setPressureSignals(signals);
+      setPressureClusters(clusters);
+    } catch (error: any) {
+      console.error('Error loading pressure signals:', error);
+      setPressureError(error.message || 'Failed to load pressure signals');
+      setPressureSignals([]);
+    } finally {
+      setPressureLoading(false);
+    }
+  }, [systemFilter, orderFilter]);
 
   // Load company impact signals
   const loadCompanySignals = async () => {
@@ -124,7 +156,7 @@ function SignalsPageContent() {
     try {
       setTableLoading(true);
       const userId = user ? await getOrCreateSupabaseUserId(user.id) : undefined;
-      
+
       const now = new Date();
       const daysAgo = tableFilters.timeWindow === '24h' ? 1 : tableFilters.timeWindow === '7d' ? 7 : 30;
       const dateFrom = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
@@ -159,12 +191,14 @@ function SignalsPageContent() {
 
   // Load signals based on view mode
   useEffect(() => {
-    if (viewMode === 'companies') {
+    if (viewMode === 'pressure') {
+      loadPressureSignals();
+    } else if (viewMode === 'companies') {
       loadCompanySignals();
     } else if (viewMode === 'table') {
       loadTableSignals();
     }
-  }, [viewMode, selectedFilter, selectedSector, selectedSectors, selectedCategory, companySearchQuery, tableFilters]);
+  }, [viewMode, systemFilter, orderFilter, selectedFilter, selectedSector, selectedSectors, selectedCategory, companySearchQuery, tableFilters]);
 
   if (!isFullyLoaded) {
     return (
@@ -181,9 +215,9 @@ function SignalsPageContent() {
 
   return (
     <AppShell>
-      <SEO 
-        title="Corporate Impact — Nucigen"
-        description="Corporate impact: what changed and what to do"
+      <SEO
+        title="Intelligence — Nucigen"
+        description="Pressure detection layer: what is building pressure inside the system"
       />
 
       <div className="col-span-1 sm:col-span-12">
@@ -191,23 +225,23 @@ function SignalsPageContent() {
         <header className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <SectionHeader
-              title="Corporate Impact"
-              subtitle="What changed and what to do"
+              title="Intelligence"
+              subtitle="What is building pressure inside the system"
             />
           </div>
 
           {/* View Mode Toggle */}
           <div className="flex flex-wrap items-center gap-2 p-1 bg-white/[0.02] border border-white/[0.05] rounded-xl w-full sm:w-fit overflow-x-auto">
             <button
-              onClick={() => setViewMode('general')}
+              onClick={() => setViewMode('pressure')}
               className={`px-3 sm:px-4 py-2 rounded-lg transition-all text-xs sm:text-sm font-light flex items-center gap-1.5 sm:gap-2 min-h-[44px] ${
-                viewMode === 'general'
+                viewMode === 'pressure'
                   ? 'bg-[#E1463E] text-white'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Sparkles className="w-4 h-4 flex-shrink-0" />
-              <span>General</span>
+              <Activity className="w-4 h-4 flex-shrink-0" />
+              <span>Pressure</span>
             </button>
             <button
               onClick={() => setViewMode('companies')}
@@ -234,8 +268,67 @@ function SignalsPageContent() {
           </div>
         </header>
 
-        {/* General — Stock Portfolio Researcher (Tavily + OpenAI) */}
-        {viewMode === 'general' && <StockDigestView />}
+        {/* Pressure View */}
+        {viewMode === 'pressure' && (
+          <>
+            {/* Pressure Cluster Bar */}
+            <PressureClusterBar
+              clusters={pressureClusters}
+              activeSystem={systemFilter}
+              onSystemSelect={setSystemFilter}
+              loading={pressureLoading}
+            />
+
+            {/* Impact Order Filter */}
+            <div className="flex items-center gap-2 mb-6">
+              <span className="text-xs text-slate-500 uppercase tracking-wider mr-1">Impact:</span>
+              {([null, 1, 2, 3] as const).map((order) => (
+                <button
+                  key={order ?? 'all'}
+                  type="button"
+                  onClick={() => setOrderFilter(order)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-light transition-all border ${
+                    orderFilter === order
+                      ? 'bg-[#E1463E] text-white border-[#E1463E]'
+                      : 'bg-white/[0.03] text-slate-400 border-white/[0.06] hover:text-white hover:bg-white/[0.06]'
+                  }`}
+                >
+                  {order === null ? 'All' : `${order}${order === 1 ? 'st' : order === 2 ? 'nd' : 'rd'}`}
+                </button>
+              ))}
+            </div>
+
+            {/* Signals */}
+            {pressureLoading ? (
+              <div className="text-center py-12">
+                <div className="w-12 h-12 border-2 border-white/20 border-t-[#E1463E] rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-slate-400 text-sm font-light">Detecting pressure signals...</p>
+              </div>
+            ) : pressureError ? (
+              <div className="text-center py-12">
+                <div className="backdrop-blur-xl bg-gradient-to-br from-[#E1463E]/10 to-[#E1463E]/5 border border-[#E1463E]/30 rounded-2xl p-8 max-w-2xl mx-auto">
+                  <AlertTriangle className="w-12 h-12 text-[#E1463E] mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-white mb-2">Error Loading Signals</h3>
+                  <p className="text-slate-400 mb-4">{pressureError}</p>
+                </div>
+              </div>
+            ) : pressureSignals.length === 0 ? (
+              <div className="text-center py-16">
+                <Activity className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-white mb-2">No Pressure Signals</h3>
+                <p className="text-slate-400 text-sm font-light max-w-md mx-auto">
+                  No pressure signals detected for the current filters. Try changing the system or impact order filter.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {pressureSignals.map((signal) => (
+                  <PressureCard key={signal.id} signal={signal} />
+                ))}
+              </div>
+            )}
+          </>
+        )}
 
         {/* Company Impact View */}
         {viewMode === 'companies' && (
@@ -339,7 +432,7 @@ function SignalsPageContent() {
           </>
         )}
 
-        {/* Table View — Blur esthétique de toute la zone + Coming soon */}
+        {/* Table View — Blur + Coming soon */}
         {viewMode === 'table' && (
           <div className="relative rounded-2xl overflow-hidden min-h-[50vh] border border-white/[0.06]">
             <div

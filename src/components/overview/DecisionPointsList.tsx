@@ -22,11 +22,7 @@ interface DecisionPointsListProps {
   limit?: number;
 }
 
-const MOCK_DECISION_POINTS: DecisionPoint[] = [
-  { id: 'dp-1', label: 'Energy routing shift', oneLine: 'Europe → Asia reconfiguration', investigateId: '/search' },
-  { id: 'dp-2', label: 'Gold supply risk', oneLine: 'DRC North Kivu – sourcing decisions', investigateId: '/search' },
-  { id: 'dp-3', label: 'Sanctions compliance', oneLine: 'London – financial compliance pressure', investigateId: '/search' },
-];
+// No mock data — show empty state when API unavailable
 
 export default function DecisionPointsList({ limit = 5 }: DecisionPointsListProps) {
   const [items, setItems] = useState<DecisionPoint[]>([]);
@@ -42,11 +38,11 @@ export default function DecisionPointsList({ limit = 5 }: DecisionPointsListProp
         if (json?.success && Array.isArray(json.data)) {
           setItems(json.data.slice(0, limit));
         } else {
-          setItems(MOCK_DECISION_POINTS.slice(0, limit));
+          setItems([]);
         }
       })
       .catch(() => {
-        if (!cancelled) setItems(MOCK_DECISION_POINTS.slice(0, limit));
+        if (!cancelled) setItems([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

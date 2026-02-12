@@ -19,25 +19,11 @@ export interface OverviewMapParams {
   minImportance?: number;
 }
 
-const FALLBACK_DATA: OverviewMapData = {
-  signals: [
-    { id: '1', lat: -2.5, lon: 28.8, type: 'security', impact: 'regional', importance: 85, confidence: 82, occurred_at: new Date().toISOString(), label_short: 'DRC – North Kivu', subtitle_short: 'ADF activity escalation', impact_one_line: 'Gold supply risk', investigate_id: '/search' },
-    { id: '2', lat: 25.2, lon: 55.3, type: 'supply-chains', impact: 'global', importance: 78, confidence: 76, occurred_at: new Date().toISOString(), label_short: 'UAE – Dubai', subtitle_short: 'Gold trade hub disruption', impact_one_line: 'Precious metals flow', investigate_id: '/search' },
-    { id: '3', lat: 51.5, lon: -0.1, type: 'geopolitics', impact: 'global', importance: 90, confidence: 94, occurred_at: new Date().toISOString(), label_short: 'UK – London', subtitle_short: 'Sanctions policy update', impact_one_line: 'Financial compliance', investigate_id: '/search' },
-    { id: '4', lat: 55.7, lon: 37.6, type: 'energy', impact: 'regional', importance: 72, confidence: 88, occurred_at: new Date().toISOString(), label_short: 'Russia – Moscow', subtitle_short: 'Energy export reconfiguration', impact_one_line: 'Gas supply routes', investigate_id: '/search' },
-    { id: '5', lat: 39.9, lon: 116.4, type: 'supply-chains', impact: 'global', importance: 80, confidence: 79, occurred_at: new Date().toISOString(), label_short: 'China – Beijing', subtitle_short: 'Strategic minerals stockpiling', impact_one_line: 'Rare earth dominance', investigate_id: '/search' },
-    { id: '6', lat: 40.7, lon: -74.0, type: 'markets', impact: 'global', importance: 88, confidence: 91, occurred_at: new Date().toISOString(), label_short: 'USA – New York', subtitle_short: 'Financial markets volatility', impact_one_line: 'Commodity futures', investigate_id: '/search' },
-  ],
-  top_events: [
-    { id: '1', label_short: 'DRC – North Kivu', impact_one_line: 'Gold supply risk', investigate_id: '/search' },
-    { id: '2', label_short: 'UAE – Dubai', impact_one_line: 'Precious metals flow', investigate_id: '/search' },
-    { id: '3', label_short: 'UK – London', impact_one_line: 'Financial compliance', investigate_id: '/search' },
-  ],
-  top_impacts: [
-    { name: 'Barrick Gold', impact_one_line: 'Production disruption', investigate_id: '/search' },
-    { name: 'Gazprom', impact_one_line: 'Route reconfiguration', investigate_id: '/search' },
-    { name: 'HSBC', impact_one_line: 'Compliance costs', investigate_id: '/search' },
-  ],
+/** Empty data returned when no real events are available */
+const EMPTY_DATA: OverviewMapData = {
+  signals: [],
+  top_events: [],
+  top_impacts: [],
 };
 
 export async function getOverviewMapData(params?: OverviewMapParams): Promise<OverviewMapData> {
@@ -58,8 +44,8 @@ export async function getOverviewMapData(params?: OverviewMapParams): Promise<Ov
   return json.data as OverviewMapData;
 }
 
-/** Fallback data when API fails (caller can use for degraded UX) */
-export { FALLBACK_DATA };
+/** Empty data when API fails — no more fake signals */
+export { EMPTY_DATA as FALLBACK_DATA };
 
 /** Situation brief (Perplexity) for Overview — by country or global */
 export interface OverviewSituationParams {

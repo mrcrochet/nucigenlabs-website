@@ -5,8 +5,9 @@
  * This is what the Intelligence page should call
  */
 
-import type { Signal } from '../../types/intelligence';
+import type { Signal, PressureSignal, PressureSystem, PressureCluster } from '../../types/intelligence';
 import type { EventWithChain } from '../supabase';
+import { safeFetchJson } from '../safe-fetch-json';
 
 export interface SignalApiOptions {
   searchQuery?: string;
@@ -78,14 +79,53 @@ export async function getSignalsViaAgent(
 
     return signals;
   } catch (error: any) {
-    // Fallback: use client-side adapter if API is not available
-    console.warn('API endpoint not available, using client-side adapter:', error.message);
-    
-    // Import adapter as fallback
-    const { eventsToSignals, filterSignalsByPreferences } = await import('../adapters/intelligence-adapters');
-    const allSignals = eventsToSignals(events);
-    const filteredSignals = filterSignalsByPreferences(allSignals, options.user_preferences);
-    
-    return filteredSignals;
+    console.error('[signal-api] Failed to fetch signals:', error.message);
+    return [];
   }
+}
+
+/**
+ * Get pressure-enriched signals with optional filters
+ */
+export async function getPressureSignals(filters?: {
+  system?: PressureSystem;
+  impact_order?: 1 | 2 | 3;
+  min_magnitude?: number;
+  min_confidence?: number;
+}): Promise<PressureSignal[]> {
+  const params = new URLSearchParams();
+  if (filters?.system) params.set('system', filters.system);
+  if (filters?.impact_order) params.set('impact_order', String(filters.impact_order));
+  if (filters?.min_magnitude) params.set('min_magnitude', String(filters.min_magnitude));
+  if (filters?.min_confidence) params.set('min_confidence', String(filters.min_confidence));
+
+  const data = await safeFetchJson<{
+    success: boolean;
+    signals: PressureSignal[];
+    total: number;
+    error?: string;
+  }>(`/api/pressure-signals?${params.toString()}`, undefined, { timeoutMs: 90_000 });
+
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to fetch pressure signals');
+  }
+
+  return data.signals || [];
+}
+
+/**
+ * Get aggregated pressure clusters by system
+ */
+export async function getPressureClusters(): Promise<PressureCluster[]> {
+  const data = await safeFetchJson<{
+    success: boolean;
+    clusters: PressureCluster[];
+    error?: string;
+  }>('/api/pressure-signals/clusters', undefined, { timeoutMs: 90_000 });
+
+  if (!data.success) {
+    throw new Error(data.error || 'Failed to fetch pressure clusters');
+  }
+
+  return data.clusters || [];
 }
