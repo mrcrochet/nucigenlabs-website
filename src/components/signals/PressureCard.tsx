@@ -8,7 +8,7 @@
 import { useNavigate } from 'react-router-dom';
 import Card from '../ui/Card';
 import type { PressureSignal, PressureSystem } from '../../types/intelligence';
-import { Clock, ArrowRight, Zap } from 'lucide-react';
+import { Clock, ArrowRight, Zap, BarChart3, ExternalLink } from 'lucide-react';
 
 interface PressureCardProps {
   signal: PressureSignal;
@@ -40,6 +40,12 @@ function getMagnitudeColor(magnitude: number): string {
   if (magnitude >= 60) return 'bg-amber-500';
   if (magnitude >= 40) return 'bg-yellow-500';
   return 'bg-slate-500';
+}
+
+function getDivergenceStyle(absDiv: number): { color: string; label: string } {
+  if (absDiv >= 0.25) return { color: 'text-red-400', label: 'Strong' };
+  if (absDiv >= 0.10) return { color: 'text-amber-400', label: 'Moderate' };
+  return { color: 'text-emerald-400', label: 'Aligned' };
 }
 
 export default function PressureCard({ signal }: PressureCardProps) {
@@ -128,6 +134,53 @@ export default function PressureCard({ signal }: PressureCardProps) {
                 {ch}
               </span>
             ))}
+          </div>
+        )}
+
+        {/* Polymarket divergence */}
+        {signal.polymarket && (
+          <div className="rounded-lg bg-white/[0.03] border border-white/[0.06] p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-3.5 h-3.5 text-violet-400" />
+              <span className="text-[10px] uppercase tracking-wider text-slate-500">
+                Prediction Market
+              </span>
+              <span className={`text-[10px] font-medium ml-auto ${getDivergenceStyle(signal.polymarket.divergence_abs).color}`}>
+                {getDivergenceStyle(signal.polymarket.divergence_abs).label}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-500">Crowd</span>
+                <span className="text-xs font-medium text-white">
+                  {Math.round(signal.polymarket.crowd_probability * 100)}%
+                </span>
+              </div>
+              <span className="text-slate-600">vs</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-500">Model</span>
+                <span className="text-xs font-medium text-white">
+                  {Math.round(signal.polymarket.model_probability * 100)}%
+                </span>
+              </div>
+              <span className={`text-xs font-medium ml-auto ${getDivergenceStyle(signal.polymarket.divergence_abs).color}`}>
+                {signal.polymarket.divergence > 0 ? '+' : ''}{Math.round(signal.polymarket.divergence * 100)}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 leading-snug line-clamp-1">
+              {signal.polymarket.question}
+            </p>
+            {signal.polymarket.market_url && (
+              <a
+                href={signal.polymarket.market_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-[10px] text-violet-400 hover:text-violet-300 transition-colors"
+              >
+                Polymarket
+                <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+            )}
           </div>
         )}
 

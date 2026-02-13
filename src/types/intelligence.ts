@@ -232,8 +232,21 @@ export interface PressureScores {
   confidence_score: number;          // 0-1 (deterministic)
 }
 
+export interface PolymarketMatch {
+  market_id: string;
+  question: string;
+  crowd_probability: number;     // 0-1
+  model_probability: number;     // 0-1 (our probability_estimate)
+  divergence: number;            // crowd - model (positive = market more optimistic)
+  divergence_abs: number;        // |divergence|
+  market_volume: number;
+  market_url: string;
+  matched_at: string;            // ISO-8601
+}
+
 export interface PressureSignal extends Signal {
   pressure: PressureFeatures & PressureScores;
+  polymarket?: PolymarketMatch;
 }
 
 export interface PressureCluster {

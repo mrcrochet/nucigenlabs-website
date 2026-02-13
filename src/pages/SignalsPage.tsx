@@ -18,9 +18,10 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 import AppShell from '../components/layout/AppShell';
 import SectionHeader from '../components/ui/SectionHeader';
-import { Activity, Building2, Table2, Loader2, Sparkles } from 'lucide-react';
+import { Activity, Building2, Table2, Loader2, Sparkles, BarChart3 } from 'lucide-react';
 import PressureCard from '../components/signals/PressureCard';
 import PressureClusterBar from '../components/signals/PressureClusterBar';
+import DivergenceRadar from '../components/signals/DivergenceRadar';
 import SignalFilters from '../components/signals/SignalFilters';
 import SignalsTable from '../components/signals/SignalsTable';
 import CorporateImpactHeader from '../components/corporate-impact/CorporateImpactHeader';
@@ -45,6 +46,7 @@ function SignalsPageContent() {
   const [orderFilter, setOrderFilter] = useState<1 | 2 | 3 | null>(null);
   const [pressureLoading, setPressureLoading] = useState(true);
   const [pressureError, setPressureError] = useState<string | null>(null);
+  const [polymarketOnly, setPolymarketOnly] = useState(false);
 
   // Company impact signals state (CorporateImpactPage)
   const [companySignals, setCompanySignals] = useState<MarketSignal[]>([]);
@@ -298,6 +300,15 @@ function SignalsPageContent() {
               ))}
             </div>
 
+            {/* Divergence Radar */}
+            {!pressureLoading && !pressureError && pressureSignals.length > 0 && (
+              <DivergenceRadar
+                signals={pressureSignals}
+                filterActive={polymarketOnly}
+                onToggleFilter={() => setPolymarketOnly(prev => !prev)}
+              />
+            )}
+
             {/* Signals */}
             {pressureLoading ? (
               <div className="text-center py-12">
@@ -322,9 +333,16 @@ function SignalsPageContent() {
               </div>
             ) : (
               <div className="space-y-4">
-                {pressureSignals.map((signal) => (
+                {(polymarketOnly ? pressureSignals.filter(s => s.polymarket) : pressureSignals).map((signal) => (
                   <PressureCard key={signal.id} signal={signal} />
                 ))}
+                {polymarketOnly && pressureSignals.filter(s => s.polymarket).length === 0 && (
+                  <div className="text-center py-12">
+                    <BarChart3 className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+                    <p className="text-slate-400 text-sm">No signals with Polymarket matches yet.</p>
+                    <p className="text-slate-600 text-xs mt-1">Matches are generated every 4 hours.</p>
+                  </div>
+                )}
               </div>
             )}
           </>

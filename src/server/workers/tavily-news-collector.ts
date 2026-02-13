@@ -30,7 +30,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
  * Intelligent queries focused on geopolitical, economic, and regulatory events
  */
 const TAVILY_QUERIES = [
-  // Geopolitical & International
+  // ── Thematic (global) ──
   {
     query: 'recent geopolitical events economic impact 2025',
     category: 'general',
@@ -46,13 +46,6 @@ const TAVILY_QUERIES = [
     category: 'business',
     tags: ['regulation', 'finance', 'banking'],
   },
-  
-  // Business & Finance
-  {
-    query: 'major business developments mergers acquisitions 2025',
-    category: 'business',
-    tags: ['mergers', 'acquisitions', 'corporate'],
-  },
   {
     query: 'central bank policy changes interest rates monetary policy',
     category: 'business',
@@ -63,29 +56,128 @@ const TAVILY_QUERIES = [
     category: 'business',
     tags: ['commodities', 'supply-chain', 'energy'],
   },
-  
-  // Technology & Regulation
   {
     query: 'technology regulation policy changes AI cybersecurity',
     category: 'technology',
     tags: ['tech-regulation', 'AI', 'cybersecurity'],
   },
   {
-    query: 'cybersecurity incidents data breaches critical infrastructure',
-    category: 'technology',
-    tags: ['cybersecurity', 'data-breach', 'infrastructure'],
-  },
-  
-  // Sector-Specific
-  {
     query: 'energy sector policy changes oil gas renewable energy',
     category: 'business',
     tags: ['energy', 'oil', 'renewable'],
   },
+
+  // ── Africa ──
   {
-    query: 'environmental policy climate change carbon emissions',
+    query: 'Africa political economic news Nigeria South Africa Kenya Ethiopia DRC 2025',
     category: 'general',
-    tags: ['environment', 'climate', 'policy'],
+    tags: ['africa', 'geopolitical', 'economy'],
+  },
+  {
+    query: 'Africa mining minerals gold lithium cobalt export trade 2025',
+    category: 'business',
+    tags: ['africa', 'mining', 'commodities'],
+  },
+  {
+    query: 'North Africa Morocco Algeria Tunisia Egypt Libya economic policy 2025',
+    category: 'general',
+    tags: ['north-africa', 'geopolitical'],
+  },
+
+  // ── Middle East ──
+  {
+    query: 'Middle East geopolitics Saudi Arabia UAE Iran Iraq Israel conflict economy 2025',
+    category: 'general',
+    tags: ['middle-east', 'geopolitical', 'energy'],
+  },
+  {
+    query: 'Gulf states investment sovereign wealth fund OPEC oil production 2025',
+    category: 'business',
+    tags: ['middle-east', 'energy', 'investment'],
+  },
+
+  // ── Latin America ──
+  {
+    query: 'Latin America political economy Brazil Argentina Mexico Colombia Chile 2025',
+    category: 'general',
+    tags: ['latam', 'geopolitical', 'economy'],
+  },
+  {
+    query: 'South America trade commodities agriculture mining lithium copper 2025',
+    category: 'business',
+    tags: ['latam', 'commodities', 'trade'],
+  },
+
+  // ── Asia-Pacific ──
+  {
+    query: 'Southeast Asia ASEAN Vietnam Indonesia Philippines Thailand economy trade 2025',
+    category: 'business',
+    tags: ['southeast-asia', 'trade', 'economy'],
+  },
+  {
+    query: 'India economic policy infrastructure investment Modi government 2025',
+    category: 'business',
+    tags: ['india', 'economy', 'policy'],
+  },
+  {
+    query: 'Japan South Korea Taiwan semiconductor trade technology policy 2025',
+    category: 'technology',
+    tags: ['east-asia', 'semiconductors', 'trade'],
+  },
+  {
+    query: 'Australia New Zealand Pacific Islands trade security economy 2025',
+    category: 'general',
+    tags: ['oceania', 'trade', 'security'],
+  },
+
+  // ── Central & South Asia ──
+  {
+    query: 'Central Asia Kazakhstan Uzbekistan Pakistan Afghanistan geopolitics economy 2025',
+    category: 'general',
+    tags: ['central-asia', 'geopolitical'],
+  },
+
+  // ── Europe ──
+  {
+    query: 'European Union policy regulation energy defense France Germany Italy Spain 2025',
+    category: 'general',
+    tags: ['europe', 'policy', 'regulation'],
+  },
+  {
+    query: 'Eastern Europe Ukraine Poland Romania Turkey Balkans security economy 2025',
+    category: 'general',
+    tags: ['eastern-europe', 'security', 'geopolitical'],
+  },
+  {
+    query: 'Nordic Scandinavia UK Ireland Switzerland economic policy financial regulation 2025',
+    category: 'business',
+    tags: ['northern-europe', 'finance', 'policy'],
+  },
+
+  // ── Russia & CIS ──
+  {
+    query: 'Russia sanctions economy energy exports military geopolitical 2025',
+    category: 'general',
+    tags: ['russia', 'sanctions', 'energy'],
+  },
+
+  // ── China ──
+  {
+    query: 'China trade policy Belt Road economic slowdown technology export controls 2025',
+    category: 'business',
+    tags: ['china', 'trade', 'technology'],
+  },
+
+  // ── Supply chains & security (global) ──
+  {
+    query: 'global shipping routes maritime security Red Sea Suez Panama Canal disruption 2025',
+    category: 'general',
+    tags: ['maritime', 'supply-chain', 'security'],
+  },
+  {
+    query: 'critical infrastructure cyber attack power grid water pipeline 2025',
+    category: 'technology',
+    tags: ['cybersecurity', 'infrastructure'],
   },
 ];
 

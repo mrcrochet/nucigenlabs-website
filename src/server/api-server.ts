@@ -7157,6 +7157,51 @@ app.get('/api/cron/refresh-prices', async (req: express.Request, res: express.Re
   }
 });
 
+// GET /api/cron/polymarket - Collect prediction markets + match to signals
+app.get('/api/cron/polymarket', async (req: express.Request, res: express.Response) => {
+  if (!verifyCronAuth(req, res)) return;
+
+  try {
+    console.log('[API Cron] Starting Polymarket collection + matching...');
+    const start = Date.now();
+
+    // Step 1: Collect markets
+    const { collectPolymarketMarkets } = await import('./workers/polymarket-collector.js');
+    const collectResult = await collectPolymarketMarkets();
+
+    // Step 2: Match against cached pressure signals (if available)
+    let matchResult = { matched: 0, errors: 0 };
+    const cachedSignals = endpointCache.get('pressure-signals-base') as any[] | null;
+
+    if (cachedSignals && cachedSignals.length > 0) {
+      const { matchSignalsToMarkets } = await import('./workers/polymarket-matcher.js');
+      matchResult = await matchSignalsToMarkets(cachedSignals);
+    } else {
+      console.log('[API Cron] No cached pressure signals — skipping matching (will match on next pressure-signals request)');
+    }
+
+    const durationMs = Date.now() - start;
+    console.log(`[API Cron] Polymarket cron done in ${durationMs}ms`);
+
+    res.json({
+      success: true,
+      markets_collected: collectResult.collected,
+      markets_upserted: collectResult.upserted,
+      matches: matchResult.matched,
+      errors: collectResult.errors + matchResult.errors,
+      durationMs,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error('[API Cron] Polymarket error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Polymarket cron failed',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 // ============================================
 // Pressure Signals Endpoints
 // ============================================
@@ -7297,9 +7342,56 @@ app.get('/api/pressure-signals', async (req, res) => {
     const limitNum = parseInt(limit as string, 10);
     const sliced = signals.slice(0, limitNum);
 
+    // Enrich with Polymarket matches (best-effort, non-blocking)
+    let enriched = sliced;
+    try {
+      if (supabase) {
+        const signalIds = sliced.map((s: any) => s.id).filter(Boolean);
+        if (signalIds.length > 0) {
+          const { data: matches } = await supabase
+            .from('signal_market_matches')
+            .select('signal_id, match_score, model_probability, crowd_probability, divergence, matched_at, market_id, polymarket_markets(id, question, volume, url)')
+            .in('signal_id', signalIds)
+            .order('matched_at', { ascending: false });
+
+          if (matches && matches.length > 0) {
+            const matchMap = new Map<string, any>();
+            for (const m of matches) {
+              // Keep only the most recent match per signal
+              if (!matchMap.has(m.signal_id)) {
+                matchMap.set(m.signal_id, m);
+              }
+            }
+
+            enriched = sliced.map((s: any) => {
+              const m = matchMap.get(s.id);
+              if (!m) return s;
+              const pm = m.polymarket_markets as any;
+              return {
+                ...s,
+                polymarket: {
+                  market_id: pm?.id || m.market_id,
+                  question: pm?.question || '',
+                  crowd_probability: Number(m.crowd_probability),
+                  model_probability: Number(m.model_probability),
+                  divergence: Number(m.divergence),
+                  divergence_abs: Math.abs(Number(m.divergence)),
+                  market_volume: Number(pm?.volume) || 0,
+                  market_url: pm?.url || '',
+                  matched_at: m.matched_at,
+                },
+              };
+            });
+          }
+        }
+      }
+    } catch (polyErr: any) {
+      console.warn('[API] Polymarket enrichment skipped:', polyErr.message);
+    }
+
     res.json({
       success: true,
-      signals: sliced,
+      signals: enriched,
       total: signals.length,
     });
   } catch (error: any) {
