@@ -2,9 +2,10 @@ interface ScenarioEventSelectorProps {
   events: string[];
   selectedIndex: number;
   onSelect: (index: number) => void;
+  onCreateCustom?: () => void;
 }
 
-export default function ScenarioEventSelector({ events, selectedIndex, onSelect }: ScenarioEventSelectorProps) {
+export default function ScenarioEventSelector({ events, selectedIndex, onSelect, onCreateCustom }: ScenarioEventSelectorProps) {
   return (
     <div className="flex items-center justify-between py-4 px-6 bg-[#0a0a0a] border-b border-[#1a1a1a]">
       <div className="flex items-center gap-6">
@@ -19,6 +20,15 @@ export default function ScenarioEventSelector({ events, selectedIndex, onSelect 
             </option>
           ))}
         </select>
+
+        {onCreateCustom && (
+          <button
+            onClick={onCreateCustom}
+            className="bg-black border border-[#2a2a2a] text-[#666] py-2 px-4 font-mono text-[0.7rem] tracking-[1px] uppercase cursor-pointer transition-all duration-200 hover:border-white hover:text-white"
+          >
+            + CREATE CUSTOM SCENARIO
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-2">

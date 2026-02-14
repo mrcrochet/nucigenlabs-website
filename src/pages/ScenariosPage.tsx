@@ -22,6 +22,8 @@ import TransmissionGraph from '../components/scenario-v2/TransmissionGraph';
 import DecisionLeveragePanel from '../components/scenario-v2/DecisionLeveragePanel';
 import HistoricalAnalogPanel from '../components/scenario-v2/HistoricalAnalogPanel';
 import WarGamePanel from '../components/scenario-v2/WarGamePanel';
+import CustomScenarioModal from '../components/scenario-v2/CustomScenarioModal';
+import type { CustomScenarioFormData } from '../components/scenario-v2/CustomScenarioModal';
 
 import {
   MOCK_EVENT_OPTIONS,
@@ -44,6 +46,7 @@ function ScenariosPageContent() {
   const [warGameParams, setWarGameParams] = useState(MOCK_WAR_GAME_PARAMS);
   const [branches, setBranches] = useState(MOCK_BRANCHES);
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
 
   const handleRecalculate = useCallback(() => {
     setIsRecalculating(true);
@@ -56,6 +59,11 @@ function ScenariosPageContent() {
 
   const handleParamsChange = useCallback((params: ManipulationParameter[]) => {
     setWarGameParams(params);
+  }, []);
+
+  const handleCustomScenario = useCallback((data: CustomScenarioFormData) => {
+    // TODO: Connect to real API — for now log the custom scenario
+    console.log('[CustomScenario] Generated:', data);
   }, []);
 
   return (
@@ -71,6 +79,7 @@ function ScenariosPageContent() {
           events={MOCK_EVENT_OPTIONS}
           selectedIndex={selectedEventIndex}
           onSelect={setSelectedEventIndex}
+          onCreateCustom={() => setIsCustomModalOpen(true)}
         />
       </div>
 
@@ -119,6 +128,13 @@ function ScenariosPageContent() {
           </div>
         </div>
       </div>
+
+      {/* Custom Scenario Modal */}
+      <CustomScenarioModal
+        isOpen={isCustomModalOpen}
+        onClose={() => setIsCustomModalOpen(false)}
+        onGenerate={handleCustomScenario}
+      />
 
       <style>{`
         .scenario-v2-grid {
