@@ -1,214 +1,247 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import * as d3 from 'd3';
+import { useState, useEffect, useCallback } from 'react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import type { TransmissionGraphData, TransmissionNode } from '../../types/scenario-v2';
-import TransmissionNodeTooltip from './TransmissionNodeTooltip';
 
 interface TransmissionGraphProps {
   data: TransmissionGraphData;
   height?: number;
 }
 
-const NODE_COLORS: Record<string, string> = {
-  event: '#E1463E',
-  sector: '#3B82F6',
-  region: '#A855F7',
-  asset: '#F59E0B',
+// Fixed positions for the transmission chain layout (percentages)
+const NODE_POSITIONS: Record<string, { top: string; left: string; size: number }> = {
+  event:    { top: '45%', left: '8%',  size: 80 },
+  energy:   { top: '30%', left: '28%', size: 70 },
+  shipping: { top: '60%', left: '28%', size: 70 },
+  europe:   { top: '15%', left: '50%', size: 65 },
+  asia:     { top: '45%', left: '53%', size: 65 },
+  mena:     { top: '70%', left: '50%', size: 65 },
+  banks:    { top: '18%', left: '75%', size: 60 },
+  tech:     { top: '48%', left: '78%', size: 60 },
+  defense:  { top: '72%', left: '75%', size: 60 },
 };
 
-const NODE_SIZES: Record<string, number> = {
-  event: 22,
-  sector: 16,
-  region: 14,
-  asset: 12,
+// Fullscreen: bigger nodes, same relative positions
+const NODE_POSITIONS_FS: Record<string, { top: string; left: string; size: number }> = {
+  event:    { top: '45%', left: '10%',  size: 110 },
+  energy:   { top: '28%', left: '28%', size: 95 },
+  shipping: { top: '62%', left: '28%', size: 95 },
+  europe:   { top: '12%', left: '48%', size: 85 },
+  asia:     { top: '45%', left: '52%', size: 85 },
+  mena:     { top: '72%', left: '48%', size: 85 },
+  banks:    { top: '15%', left: '74%', size: 80 },
+  tech:     { top: '48%', left: '77%', size: 80 },
+  defense:  { top: '75%', left: '74%', size: 80 },
 };
 
-export default function TransmissionGraph({ data, height = 400 }: TransmissionGraphProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const cleanupRef = useRef<(() => void) | null>(null);
-  const [tooltipNode, setTooltipNode] = useState<TransmissionNode | null>(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+// Lines connecting nodes
+const CONNECTIONS = [
+  { top: '48%', left: '16%', width: 120, rotate: -20 },
+  { top: '52%', left: '16%', width: 120, rotate: 20 },
+  { top: '34%', left: '38%', width: 130, rotate: -20 },
+  { top: '36%', left: '38%', width: 130, rotate: 10 },
+  { top: '38%', left: '38%', width: 120, rotate: 35 },
+  { top: '64%', left: '38%', width: 100, rotate: -15 },
+  { top: '62%', left: '38%', width: 110, rotate: -40 },
+  { top: '20%', left: '60%', width: 110, rotate: 5 },
+  { top: '50%', left: '63%', width: 110, rotate: 0 },
+  { top: '72%', left: '60%', width: 100, rotate: 5 },
+  { top: '22%', left: '60%', width: 90, rotate: 30 },
+  { top: '68%', left: '58%', width: 90, rotate: -15 },
+];
 
-  const handleNodeClick = useCallback((node: TransmissionNode, event: MouseEvent) => {
-    setTooltipNode(node);
-    setTooltipPos({ x: event.clientX, y: event.clientY });
-  }, []);
+// Fullscreen: longer lines
+const CONNECTIONS_FS = [
+  { top: '48%', left: '18%', width: 160, rotate: -18 },
+  { top: '52%', left: '18%', width: 160, rotate: 18 },
+  { top: '32%', left: '38%', width: 170, rotate: -18 },
+  { top: '34%', left: '38%', width: 180, rotate: 10 },
+  { top: '36%', left: '38%', width: 160, rotate: 35 },
+  { top: '66%', left: '38%', width: 140, rotate: -15 },
+  { top: '64%', left: '38%', width: 150, rotate: -38 },
+  { top: '18%', left: '58%', width: 160, rotate: 3 },
+  { top: '50%', left: '62%', width: 150, rotate: 0 },
+  { top: '74%', left: '58%', width: 140, rotate: 3 },
+  { top: '20%', left: '58%', width: 130, rotate: 28 },
+  { top: '70%', left: '56%', width: 130, rotate: -12 },
+];
 
-  useEffect(() => {
-    const svgEl = svgRef.current;
-    const containerEl = containerRef.current;
-    if (!svgEl || !containerEl || data.nodes.length === 0) return;
-
-    cleanupRef.current?.();
-
-    const width = containerEl.clientWidth;
-    const graphHeight = height;
-
-    d3.select(svgEl).selectAll('*').remove();
-
-    const svg = d3.select(svgEl)
-      .attr('width', width)
-      .attr('height', graphHeight);
-
-    const g = svg.append('g');
-
-    // Zoom
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.3, 3])
-      .on('zoom', (event) => {
-        g.attr('transform', event.transform);
-      });
-
-    svg.call(zoom);
-
-    // Deep clone data for D3 mutation
-    const nodes = data.nodes.map(n => ({ ...n }));
-    const links = data.links.map(l => ({ ...l }));
-
-    // Force simulation
-    const simulation = d3.forceSimulation(nodes as any)
-      .force('link', d3.forceLink(links).id((d: any) => d.id).distance(90))
-      .force('charge', d3.forceManyBody().strength(-400))
-      .force('center', d3.forceCenter(width / 2, graphHeight / 2))
-      .force('collision', d3.forceCollide().radius((d: any) => (NODE_SIZES[d.type] || 12) + 8))
-      .alphaDecay(0.05);
-
-    // Links
-    const link = g.append('g')
-      .selectAll('line')
-      .data(links)
-      .enter()
-      .append('line')
-      .attr('stroke', 'rgba(255,255,255,0.08)')
-      .attr('stroke-width', (d: any) => Math.max(1, d.weight * 3));
-
-    // Node groups
-    const nodeGroup = g.append('g')
-      .selectAll('g')
-      .data(nodes)
-      .enter()
-      .append('g')
-      .attr('cursor', 'pointer')
-      .call(drag(simulation) as any);
-
-    // Node circles
-    nodeGroup
-      .append('circle')
-      .attr('r', (d: any) => NODE_SIZES[d.type] || 12)
-      .attr('fill', (d: any) => NODE_COLORS[d.type] || '#6B7280')
-      .attr('fill-opacity', 0.15)
-      .attr('stroke', (d: any) => NODE_COLORS[d.type] || '#6B7280')
-      .attr('stroke-width', 1.5);
-
-    // Node labels
-    nodeGroup
-      .append('text')
-      .text((d: any) => d.label)
-      .attr('text-anchor', 'middle')
-      .attr('dy', '0.35em')
-      .attr('font-size', '9px')
-      .attr('font-family', 'monospace')
-      .attr('letter-spacing', '1px')
-      .attr('fill', '#ffffff')
-      .attr('opacity', 0.9);
-
-    // Click handler
-    nodeGroup.on('click', (event: any, d: any) => {
-      event.stopPropagation();
-      const originalNode = data.nodes.find(n => n.id === d.id);
-      if (originalNode) handleNodeClick(originalNode, event.sourceEvent || event);
-    });
-
-    // Hover effect
-    nodeGroup
-      .on('mouseover', function () {
-        d3.select(this).select('circle')
-          .attr('fill-opacity', 0.3)
-          .attr('stroke-width', 2.5);
-      })
-      .on('mouseout', function () {
-        d3.select(this).select('circle')
-          .attr('fill-opacity', 0.15)
-          .attr('stroke-width', 1.5);
-      });
-
-    // Tick
-    simulation.on('tick', () => {
-      link
-        .attr('x1', (d: any) => d.source.x)
-        .attr('y1', (d: any) => d.source.y)
-        .attr('x2', (d: any) => d.target.x)
-        .attr('y2', (d: any) => d.target.y);
-
-      nodeGroup.attr('transform', (d: any) => `translate(${d.x},${d.y})`);
-    });
-
-    cleanupRef.current = () => {
-      simulation.stop();
-    };
-
-    return () => {
-      cleanupRef.current?.();
-      cleanupRef.current = null;
-    };
-  }, [data, height, handleNodeClick]);
-
+function GraphContent({
+  data,
+  hoveredNode,
+  setHoveredNode,
+  positions,
+  connections,
+  nodeFontSize,
+}: {
+  data: TransmissionGraphData;
+  hoveredNode: TransmissionNode | null;
+  setHoveredNode: (n: TransmissionNode | null) => void;
+  positions: Record<string, { top: string; left: string; size: number }>;
+  connections: typeof CONNECTIONS;
+  nodeFontSize: string;
+}) {
   return (
-    <div className="bg-white/[0.02] rounded-xl border border-white/[0.08] p-5 h-full">
-      <div className="text-[0.7rem] uppercase tracking-[2px] text-white font-light mb-1 pb-3 border-b border-white/[0.05] flex items-center gap-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
-        TRANSMISSION CHAIN
-      </div>
+    <>
+      {/* Hover metrics panel */}
       <div
-        ref={containerRef}
-        className="relative mt-4 bg-white/[0.01] rounded-lg border border-white/[0.04] overflow-hidden"
-        style={{ height: `${height}px` }}
+        className={`absolute top-4 right-4 bg-[#0a0a0a] border border-[#1a1a1a] p-3 text-[0.65rem] font-mono text-[#666] z-10 transition-opacity duration-200 ${
+          hoveredNode ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
       >
-        <svg ref={svgRef} className="w-full h-full" />
-
-        {/* Legend */}
-        <div className="absolute bottom-3 left-3 flex items-center gap-4 text-[0.6rem] font-mono text-zinc-600">
-          {Object.entries(NODE_COLORS).map(([type, color]) => (
-            <span key={type} className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-              {type.toUpperCase()}
-            </span>
-          ))}
-        </div>
+        {hoveredNode && (
+          <>
+            <div className="mb-2">IMPACT SCORE: <span className="text-white">{hoveredNode.impactScore}/10</span></div>
+            <div className="mb-2">SENSITIVITY: <span className={
+              hoveredNode.sensitivity === 'Critical' || hoveredNode.sensitivity === 'High'
+                ? 'text-[#ff0000]' : 'text-white'
+            }>{hoveredNode.sensitivity.toUpperCase()}</span></div>
+            <div className="mb-2">LAG TIME: <span className="text-white">{hoveredNode.lagTime}</span></div>
+            <div>CORRELATION: <span className="text-white">{hoveredNode.historicalCorrelation.toFixed(2)}</span></div>
+          </>
+        )}
       </div>
 
-      {tooltipNode && (
-        <TransmissionNodeTooltip
-          node={tooltipNode}
-          position={tooltipPos}
-          onClose={() => setTooltipNode(null)}
+      {/* Connection lines */}
+      {connections.map((conn, i) => (
+        <div
+          key={`line-${i}`}
+          className="absolute h-px bg-[#1a1a1a]"
+          style={{
+            top: conn.top,
+            left: conn.left,
+            width: `${conn.width}px`,
+            transformOrigin: 'left center',
+            transform: `rotate(${conn.rotate}deg)`,
+          }}
         />
-      )}
-    </div>
+      ))}
+
+      {/* Nodes */}
+      {data.nodes.map((node) => {
+        const pos = positions[node.id];
+        if (!pos) return null;
+
+        return (
+          <div
+            key={node.id}
+            onMouseEnter={() => setHoveredNode(node)}
+            onMouseLeave={() => setHoveredNode(null)}
+            className={`absolute bg-[#0a0a0a] border border-[#2a2a2a] flex items-center justify-center text-[#b4b4b4] font-mono font-normal tracking-[1px] cursor-pointer transition-all duration-200 hover:bg-[#1a1a1a] hover:border-white hover:text-white`}
+            style={{
+              top: pos.top,
+              left: pos.left,
+              width: `${pos.size}px`,
+              height: `${pos.size}px`,
+              fontSize: nodeFontSize,
+            }}
+          >
+            {node.label}
+          </div>
+        );
+      })}
+    </>
   );
 }
 
-// Drag behavior
-function drag(simulation: d3.Simulation<any, undefined>) {
-  function dragstarted(event: any) {
-    if (!event.active) simulation.alphaTarget(0.3).restart();
-    event.subject.fx = event.subject.x;
-    event.subject.fy = event.subject.y;
-  }
+export default function TransmissionGraph({ data, height = 400 }: TransmissionGraphProps) {
+  const [hoveredNode, setHoveredNode] = useState<TransmissionNode | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  function dragged(event: any) {
-    event.subject.fx = event.x;
-    event.subject.fy = event.y;
-  }
+  // ESC to close fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsFullscreen(false);
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [isFullscreen]);
 
-  function dragended(event: any) {
-    if (!event.active) simulation.alphaTarget(0);
-    event.subject.fx = null;
-    event.subject.fy = null;
-  }
+  // Lock body scroll when fullscreen
+  useEffect(() => {
+    if (isFullscreen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [isFullscreen]);
 
-  return d3.drag<SVGGElement, any>()
-    .on('start', dragstarted)
-    .on('drag', dragged)
-    .on('end', dragended);
+  return (
+    <>
+      {/* Normal view */}
+      <div className="bg-black border border-[#1a1a1a] p-6 h-full">
+        <div className="flex items-center justify-between text-[0.7rem] font-mono font-normal text-white tracking-[2px] uppercase mb-4 pb-2 border-b border-[#1a1a1a]">
+          <span>TRANSMISSION CHAIN</span>
+          <button
+            onClick={() => setIsFullscreen(true)}
+            className="p-1.5 border border-[#2a2a2a] bg-black text-[#666] hover:text-white hover:border-white transition-all duration-200 cursor-pointer"
+            title="Fullscreen"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div
+          className="relative bg-black border border-[#1a1a1a] overflow-hidden mt-4"
+          style={{ height: `${height}px` }}
+        >
+          <GraphContent
+            data={data}
+            hoveredNode={hoveredNode}
+            setHoveredNode={setHoveredNode}
+            positions={NODE_POSITIONS}
+            connections={CONNECTIONS}
+            nodeFontSize="0.65rem"
+          />
+        </div>
+      </div>
+
+      {/* Fullscreen overlay */}
+      {isFullscreen && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black flex flex-col"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Transmission Chain — Fullscreen"
+        >
+          {/* Fullscreen header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-[#1a1a1a] bg-[#0a0a0a] flex-shrink-0">
+            <div className="flex items-center gap-4">
+              <span className="text-[0.8rem] font-mono text-white tracking-[2px] uppercase">
+                TRANSMISSION CHAIN
+              </span>
+              <span className="text-[0.65rem] font-mono text-[#666] tracking-[1px]">
+                EVENT → SECTOR → REGION → ASSET CLASS
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[0.6rem] font-mono text-[#666] tracking-[1px]">
+                ESC TO CLOSE
+              </span>
+              <button
+                onClick={() => setIsFullscreen(false)}
+                className="p-2 border border-[#2a2a2a] bg-black text-[#666] hover:text-white hover:border-white transition-all duration-200 cursor-pointer"
+                title="Exit fullscreen"
+              >
+                <Minimize2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Fullscreen graph */}
+          <div className="flex-1 relative overflow-hidden">
+            <GraphContent
+              data={data}
+              hoveredNode={hoveredNode}
+              setHoveredNode={setHoveredNode}
+              positions={NODE_POSITIONS_FS}
+              connections={CONNECTIONS_FS}
+              nodeFontSize="0.8rem"
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
 }

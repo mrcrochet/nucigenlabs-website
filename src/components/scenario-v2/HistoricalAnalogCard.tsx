@@ -6,18 +6,16 @@ interface HistoricalAnalogCardProps {
 
 export default function HistoricalAnalogCard({ analog }: HistoricalAnalogCardProps) {
   return (
-    <div className="bg-white/[0.02] rounded-lg border border-white/[0.06] p-4 hover:bg-white/[0.04] transition-colors cursor-pointer">
-      <div className="flex items-start justify-between mb-1">
-        <span className="text-[0.8rem] font-mono tracking-[1px] text-white">
-          {analog.name}
-        </span>
+    <div className="bg-black border border-[#1a1a1a] p-4 cursor-pointer transition-all duration-200 hover:bg-[#0a0a0a]">
+      <div className="text-[0.8rem] font-mono font-normal tracking-[1px] text-white mb-1">
+        {analog.name}
       </div>
-      <div className="text-xs font-mono text-green-400 mb-2">
+      <div className="text-[0.7rem] font-mono text-[#00ff00]">
         SIMILARITY: {analog.similarityPercent}%
       </div>
-      <p className="text-[0.7rem] text-zinc-500 leading-relaxed">
+      <div className="mt-2 text-[0.7rem] font-mono text-[#666] leading-relaxed">
         {analog.description}
-      </p>
+      </div>
     </div>
   );
 }

@@ -1,33 +1,42 @@
-import type { DecisionLeverageItem } from '../../types/scenario-v2';
+import type { DecisionLeverageData } from '../../types/scenario-v2';
 
 interface DecisionLeveragePanelProps {
-  items: DecisionLeverageItem[];
+  data: DecisionLeverageData;
 }
 
 const SEVERITY_COLORS: Record<string, string> = {
-  low: 'text-green-400',
-  medium: 'text-amber-400',
-  high: 'text-red-400',
-  critical: 'text-red-500',
+  low: 'text-[#00ff00]',
+  medium: 'text-white',
+  high: 'text-[#ff0000]',
+  critical: 'text-[#ff0000]',
 };
 
-export default function DecisionLeveragePanel({ items }: DecisionLeveragePanelProps) {
+export default function DecisionLeveragePanel({ data }: DecisionLeveragePanelProps) {
   return (
-    <div className="bg-white/[0.02] rounded-xl border border-white/[0.08] p-5 h-full">
-      <div className="text-[0.7rem] uppercase tracking-[2px] text-white font-light mb-1 pb-3 border-b border-white/[0.05] flex items-center gap-2">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#E1463E]" />
+    <div className="bg-black border border-[#1a1a1a] p-6 h-full">
+      <div className="text-[0.7rem] font-mono font-normal text-white tracking-[2px] uppercase mb-4 pb-2 border-b border-[#1a1a1a]">
         DECISION LEVERAGE
       </div>
-      <div className="flex flex-col gap-px mt-4 bg-white/[0.04] rounded-lg overflow-hidden">
-        {items.map((item, i) => (
+
+      {/* Strategic Posture Score */}
+      <div className="flex items-center justify-between p-4 bg-[#0a0a0a] border border-[#1a1a1a] mb-4">
+        <span className="text-[0.7rem] font-mono text-[#666] tracking-[1px]">STRATEGIC POSTURE</span>
+        <span className="text-[1.5rem] font-mono font-normal text-[#ff0000]">
+          {data.strategicPosture} {data.postureScore}/100
+        </span>
+      </div>
+
+      {/* Decision Items */}
+      <div className="flex flex-col gap-px bg-[#1a1a1a]">
+        {data.items.map((item, i) => (
           <div
             key={i}
-            className="flex items-center justify-between bg-[#0a0a0a] p-3.5 border-b border-white/[0.04] last:border-b-0"
+            className="bg-black border border-[#1a1a1a] p-4 flex items-center justify-between"
           >
-            <span className="text-[0.7rem] uppercase tracking-[1px] text-zinc-500">
+            <span className="text-[0.7rem] font-mono text-[#666] tracking-[1px]">
               {item.label}
             </span>
-            <span className={`font-mono text-xs font-light ${SEVERITY_COLORS[item.severity] || 'text-white'}`}>
+            <span className={`font-mono text-[0.75rem] font-normal ${SEVERITY_COLORS[item.severity] || 'text-white'}`}>
               {item.value}
             </span>
           </div>

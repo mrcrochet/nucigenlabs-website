@@ -1,8 +1,9 @@
 /**
  * Scenarios Page v2 — Strategic Decision Engine
  *
- * Layout: CSS Grid 3 colonnes (desktop) → 2 col (tablet) → 1 col (mobile)
- * Grid areas: "overview overview divergence"
+ * Terminal aesthetic with CSS Grid 3 colonnes, 4 rows
+ * Grid areas: "regime regime regime"
+ *             "overview overview divergence"
  *             "timeline timeline transmission"
  *             "decision analogs manipulation"
  */
@@ -12,8 +13,8 @@ import AppShell from '../components/layout/AppShell';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 
-// Scenario v2 Components
 import ScenarioEventSelector from '../components/scenario-v2/ScenarioEventSelector';
+import GlobalRegimeDashboard from '../components/scenario-v2/GlobalRegimeDashboard';
 import EventStateModel from '../components/scenario-v2/EventStateModel';
 import DivergenceMonitor from '../components/scenario-v2/DivergenceMonitor';
 import ScenarioBranches from '../components/scenario-v2/ScenarioBranches';
@@ -22,7 +23,6 @@ import DecisionLeveragePanel from '../components/scenario-v2/DecisionLeveragePan
 import HistoricalAnalogPanel from '../components/scenario-v2/HistoricalAnalogPanel';
 import WarGamePanel from '../components/scenario-v2/WarGamePanel';
 
-// Mock Data
 import {
   MOCK_EVENT_OPTIONS,
   MOCK_EVENT,
@@ -32,6 +32,7 @@ import {
   MOCK_DECISION_LEVERAGE,
   MOCK_ANALOGS,
   MOCK_WAR_GAME_PARAMS,
+  MOCK_REGIME,
   recalculateBranches,
 } from '../data/scenario-v2-mock';
 
@@ -46,7 +47,6 @@ function ScenariosPageContent() {
 
   const handleRecalculate = useCallback(() => {
     setIsRecalculating(true);
-    // Simulate recalculation delay
     setTimeout(() => {
       const newBranches = recalculateBranches(MOCK_BRANCHES, warGameParams);
       setBranches(newBranches);
@@ -65,8 +65,8 @@ function ScenariosPageContent() {
         description="Strategic Decision Engine — Probabilistic scenario modeling with transmission chains and market divergence"
       />
 
-      {/* Event Selector — full width */}
-      <div className="col-span-1 sm:col-span-12 mb-2">
+      {/* Event Selector Header */}
+      <div className="col-span-1 sm:col-span-12">
         <ScenarioEventSelector
           events={MOCK_EVENT_OPTIONS}
           selectedIndex={selectedEventIndex}
@@ -74,20 +74,15 @@ function ScenariosPageContent() {
         />
       </div>
 
-      {/* Main Grid — 3 column layout */}
+      {/* Main Grid — terminal aesthetic, 4 rows */}
       <div className="col-span-1 sm:col-span-12">
-        <div
-          className="grid gap-3"
-          style={{
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gridTemplateAreas: `
-              "overview overview divergence"
-              "timeline timeline transmission"
-              "decision analogs manipulation"
-            `,
-          }}
-        >
-          {/* Row 1: Event State Model + Divergence Monitor */}
+        <div className="scenario-v2-grid bg-[#1a1a1a]">
+          {/* Row 0: Global Regime Dashboard */}
+          <div style={{ gridArea: 'regime' }}>
+            <GlobalRegimeDashboard data={MOCK_REGIME} />
+          </div>
+
+          {/* Row 1: Event State + Divergence */}
           <div style={{ gridArea: 'overview' }}>
             <EventStateModel event={MOCK_EVENT} />
           </div>
@@ -95,7 +90,7 @@ function ScenariosPageContent() {
             <DivergenceMonitor data={MOCK_DIVERGENCE} />
           </div>
 
-          {/* Row 2: Probability Branches + Transmission Graph */}
+          {/* Row 2: Probability Branches + Transmission */}
           <div style={{ gridArea: 'timeline' }}>
             <ScenarioBranches
               branches={branches}
@@ -107,9 +102,9 @@ function ScenariosPageContent() {
             <TransmissionGraph data={MOCK_TRANSMISSION} height={420} />
           </div>
 
-          {/* Row 3: Decision Leverage + Historical Analogs + War-Game */}
+          {/* Row 3: Decision + Analogs + War-Game */}
           <div style={{ gridArea: 'decision' }}>
-            <DecisionLeveragePanel items={MOCK_DECISION_LEVERAGE} />
+            <DecisionLeveragePanel data={MOCK_DECISION_LEVERAGE} />
           </div>
           <div style={{ gridArea: 'analogs' }}>
             <HistoricalAnalogPanel analogs={MOCK_ANALOGS} />
@@ -125,30 +120,51 @@ function ScenariosPageContent() {
         </div>
       </div>
 
-      {/* Responsive override for smaller screens */}
       <style>{`
-        @media (max-width: 1200px) {
-          .col-span-1.sm\\:col-span-12 > div[style*="gridTemplateAreas"] {
-            grid-template-columns: 1fr 1fr !important;
+        .scenario-v2-grid {
+          max-width: 1800px;
+          margin: 0 auto;
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr;
+          grid-template-rows: auto auto auto auto;
+          gap: 1px;
+          grid-template-areas:
+            "regime regime regime"
+            "overview overview divergence"
+            "timeline timeline transmission"
+            "decision analogs manipulation";
+        }
+
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 1400px) {
+          .scenario-v2-grid {
+            grid-template-columns: 1fr 1fr;
             grid-template-areas:
+              "regime regime"
               "overview divergence"
               "timeline timeline"
               "transmission transmission"
               "decision analogs"
-              "manipulation manipulation" !important;
+              "manipulation manipulation";
           }
         }
+
         @media (max-width: 768px) {
-          .col-span-1.sm\\:col-span-12 > div[style*="gridTemplateAreas"] {
-            grid-template-columns: 1fr !important;
+          .scenario-v2-grid {
+            grid-template-columns: 1fr;
             grid-template-areas:
+              "regime"
               "overview"
               "divergence"
               "timeline"
               "transmission"
               "decision"
               "analogs"
-              "manipulation" !important;
+              "manipulation";
           }
         }
       `}</style>

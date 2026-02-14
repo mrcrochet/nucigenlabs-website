@@ -3,9 +3,10 @@ import type {
   ScenarioBranch,
   DivergenceData,
   TransmissionGraphData,
-  DecisionLeverageItem,
+  DecisionLeverageData,
   HistoricalAnalog,
   ManipulationParameter,
+  GlobalRegimeData,
 } from '../types/scenario-v2';
 
 // ---- Available Events ----
@@ -86,6 +87,12 @@ export const MOCK_DIVERGENCE: DivergenceData = {
   confidenceAdjustment: 0.82,
   volumeWeighted: '$2.4M',
   crowdVolatility7d: 18.3,
+  signalInterpretation: 'MARKET PRICING AGGRESSIVE ESCALATION RISK',
+  keySignals: [
+    'OIL FUTURES +4.8% (24H)',
+    'NATO EMERGENCY MEETING SCHEDULED',
+    'RUSSIAN NAVAL MOVEMENT (BLACK SEA)',
+  ],
 };
 
 // ---- Transmission Graph ----
@@ -118,13 +125,17 @@ export const MOCK_TRANSMISSION: TransmissionGraphData = {
 };
 
 // ---- Decision Leverage ----
-export const MOCK_DECISION_LEVERAGE: DecisionLeverageItem[] = [
-  { label: 'STRATEGIC EXPOSURE RISK', value: 'HIGH', severity: 'high' },
-  { label: 'POSITION SIZING', value: 'REDUCE 15-20%', severity: 'medium' },
-  { label: 'HEDGING DIRECTION', value: 'LONG VIX / SHORT EM', severity: 'medium' },
-  { label: 'DEFENSIVE ALLOCATION', value: '+8% GOLD / +5% CHF', severity: 'low' },
-  { label: 'EARLY TRIGGER WATCH', value: 'OIL > $95', severity: 'critical' },
-];
+export const MOCK_DECISION_LEVERAGE: DecisionLeverageData = {
+  strategicPosture: 'DEFENSIVE',
+  postureScore: 72,
+  items: [
+    { label: 'STRATEGIC EXPOSURE RISK', value: 'HIGH', severity: 'high' },
+    { label: 'POSITION SIZING', value: 'REDUCE 15-20%', severity: 'medium' },
+    { label: 'HEDGING DIRECTION', value: 'LONG VIX / SHORT EM', severity: 'medium' },
+    { label: 'DEFENSIVE ALLOCATION', value: '+8% GOLD / +5% CHF', severity: 'low' },
+    { label: 'EARLY TRIGGER WATCH', value: 'OIL > $95', severity: 'critical' },
+  ],
+};
 
 // ---- Historical Analogs ----
 export const MOCK_ANALOGS: HistoricalAnalog[] = [
@@ -179,6 +190,25 @@ export const MOCK_WAR_GAME_PARAMS: ManipulationParameter[] = [
   },
 ];
 
+// ---- Global Regime Data ----
+export const MOCK_REGIME: GlobalRegimeData = {
+  regimeIndex: 74,
+  regimeName: 'HIGH VOLATILITY GEOPOLITICAL EXPANSION',
+  events: [
+    { name: 'UKRAINE CONFLICT', weight: 0.35, escalation: 'HIGH', transmission: 'STRONG', weightLevel: 'high' },
+    { name: 'IRAN SANCTIONS', weight: 0.25, escalation: 'MEDIUM', transmission: 'ENERGY DOMINANT', weightLevel: 'medium' },
+    { name: 'TAIWAN TENSIONS', weight: 0.20, escalation: 'RISING', transmission: 'TECH SUPPLY', weightLevel: 'medium' },
+    { name: 'US ELECTIONS', weight: 0.20, escalation: 'UNCERTAIN', transmission: 'FX / RATES', weightLevel: 'medium' },
+  ],
+  compositeIndices: [
+    { label: 'GEOPOLITICAL STRESS', value: 82, color: '#ff0000' },
+    { label: 'ENERGY PRESSURE', value: 68, color: '#ffaa00' },
+    { label: 'SUPPLY CHAIN RISK', value: 71, color: '#ffaa00' },
+    { label: 'MONETARY INSTABILITY', value: 45, color: '#00ff00' },
+    { label: 'MARKET DIVERGENCE', value: 88, color: '#ff0000' },
+  ],
+};
+
 // ---- Recalculation Logic ----
 export function recalculateBranches(
   baseBranches: ScenarioBranch[],
@@ -188,20 +218,17 @@ export function recalculateBranches(
   const sanctions = params.find(p => p.id === 'sanctions')?.value ?? 50;
   const supply = params.find(p => p.id === 'supply')?.value ?? 30;
 
-  // Higher tension/sanctions/supply → worst goes up, best goes down
-  const aggression = (tension + sanctions + supply) / 300; // 0-1
+  const aggression = (tension + sanctions + supply) / 300;
 
   const bestBase = baseBranches.find(b => b.type === 'best')!.probability;
-  const baseBase = baseBranches.find(b => b.type === 'base')!.probability;
   const worstBase = baseBranches.find(b => b.type === 'worst')!.probability;
 
-  const shift = (aggression - 0.47) * 30; // centered around default ~47%
+  const shift = (aggression - 0.47) * 30;
 
   const rawBest = Math.max(5, bestBase - shift * 1.2);
   const rawWorst = Math.max(5, worstBase + shift * 1.5);
   const rawBase = 100 - rawBest - rawWorst;
 
-  // Normalize to 100
   const total = rawBest + rawBase + rawWorst;
 
   return baseBranches.map(b => ({

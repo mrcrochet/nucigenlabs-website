@@ -44,6 +44,8 @@ export interface DivergenceData {
   confidenceAdjustment: number;
   volumeWeighted: string;
   crowdVolatility7d: number;
+  signalInterpretation: string;
+  keySignals: string[];
 }
 
 // ---- Transmission Graph ----
@@ -79,6 +81,12 @@ export interface DecisionLeverageItem {
   severity: 'low' | 'medium' | 'high' | 'critical';
 }
 
+export interface DecisionLeverageData {
+  strategicPosture: string;
+  postureScore: number;
+  items: DecisionLeverageItem[];
+}
+
 // ---- Historical Analogs ----
 export interface HistoricalAnalog {
   id: string;
@@ -96,4 +104,26 @@ export interface ManipulationParameter {
   max: number;
   value: number;
   formatValue: (val: number) => string;
+}
+
+// ---- Global Regime Dashboard ----
+export interface RegimeEvent {
+  name: string;
+  weight: number;
+  escalation: string;
+  transmission: string;
+  weightLevel: 'high' | 'medium' | 'low';
+}
+
+export interface CompositeIndex {
+  label: string;
+  value: number;
+  color: string;
+}
+
+export interface GlobalRegimeData {
+  regimeIndex: number;
+  regimeName: string;
+  events: RegimeEvent[];
+  compositeIndices: CompositeIndex[];
 }

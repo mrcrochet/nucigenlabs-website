@@ -7,10 +7,10 @@ interface WarGameSliderProps {
 
 export default function WarGameSlider({ param, onChange }: WarGameSliderProps) {
   return (
-    <div className="mb-4 last:mb-0">
-      <div className="flex justify-between mb-2 text-[0.7rem] tracking-[1px]">
-        <span className="text-zinc-500">{param.label}</span>
-        <span className="font-mono text-white">{param.formatValue(param.value)}</span>
+    <div className="mt-4 first:mt-0">
+      <div className="flex justify-between mb-2 text-[0.7rem] font-mono tracking-[1px]">
+        <span className="text-[#b4b4b4]">{param.label}</span>
+        <span className="text-white font-normal">{param.formatValue(param.value)}</span>
       </div>
       <input
         type="range"
@@ -18,7 +18,7 @@ export default function WarGameSlider({ param, onChange }: WarGameSliderProps) {
         max={param.max}
         value={param.value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-[2px] bg-white/[0.08] appearance-none cursor-pointer
+        className="w-full h-[2px] bg-[#1a1a1a] appearance-none outline-none cursor-pointer
           [&::-webkit-slider-thumb]:appearance-none
           [&::-webkit-slider-thumb]:w-3
           [&::-webkit-slider-thumb]:h-3
