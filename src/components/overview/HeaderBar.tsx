@@ -7,7 +7,11 @@ import { OVERVIEW_COUNTRIES } from '../../constants/overview-countries';
 import { OVERVIEW_LAYER_SEMANTICS } from '../../constants/overview-signals';
 import type { OverviewSignalType } from '../../types/overview';
 
-const DATE_RANGES = ['24h', '7d', '30d'] as const;
+const DATE_RANGES = [
+  { value: '24h' as const, label: '24h', subtitle: 'Nouvelles' },
+  { value: '7d' as const, label: '7d', subtitle: null },
+  { value: '30d' as const, label: '30d', subtitle: null },
+];
 const SCOPE_MODES = ['global', 'watchlist'] as const;
 const ALL_SIGNAL_TYPES: OverviewSignalType[] = ['geopolitics', 'supply-chains', 'markets', 'energy', 'security'];
 const IMPORTANCE_THRESHOLDS = [
@@ -69,17 +73,20 @@ export default function HeaderBar({
       <div className="flex items-center gap-1 shrink-0">
         {DATE_RANGES.map((r) => (
           <button
-            key={r}
+            key={r.value}
             type="button"
-            onClick={() => onDateRangeChange?.(r)}
-            className={`flex items-center gap-0.5 h-7 px-2 rounded text-[10px] uppercase tracking-wider transition-colors ${
-              dateRange === r
+            onClick={() => onDateRangeChange?.(r.value)}
+            className={`flex items-center gap-1 h-7 px-2 rounded text-[10px] uppercase tracking-wider transition-colors ${
+              dateRange === r.value
                 ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
                 : 'bg-white/[0.04] text-zinc-400 border border-transparent hover:bg-white/[0.06] hover:text-zinc-300'
             }`}
           >
-            {r === '24h' && <Calendar className="w-3 h-3 shrink-0" />}
-            {r}
+            {r.value === '24h' && <Calendar className="w-3 h-3 shrink-0" />}
+            <span>{r.label}</span>
+            {r.subtitle && (
+              <span className="normal-case text-[9px] text-cyan-400/80 hidden sm:inline">({r.subtitle})</span>
+            )}
           </button>
         ))}
       </div>

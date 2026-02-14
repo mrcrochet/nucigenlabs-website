@@ -16,7 +16,11 @@ import type {
 } from '../../types/overview';
 import { eventToGeoPoint } from '../../lib/geo-coordinates';
 import { OVERVIEW_MAP_MAX_SIGNALS } from '../../constants/overview-signals';
+import { OVERVIEW_COUNTRIES } from '../../constants/overview-countries';
 import type { SupabaseClient } from '@supabase/supabase-js';
+
+const SIGNAL_TYPES: OverviewSignalType[] = ['geopolitics', 'supply-chains', 'markets', 'energy', 'security'];
+const IMPACTS: OverviewSignalImpact[] = ['local', 'regional', 'global'];
 
 interface NucigenEventRow {
   id: string;
@@ -73,28 +77,57 @@ export interface OverviewMapServiceParams {
   supabaseUserId?: string | null;
 }
 
-/** Default fixture when no real data */
+/** Build fixture signals: one per country with geo, for quasi-global coverage when no real data. */
+function buildFixtureSignals(): OverviewSignal[] {
+  const now = new Date().toISOString();
+  const signals: OverviewSignal[] = [];
+  let i = 0;
+  for (const country of OVERVIEW_COUNTRIES) {
+    const geo = eventToGeoPoint({ country, region: null, location: null });
+    if (!geo) continue;
+    const type = SIGNAL_TYPES[i % SIGNAL_TYPES.length];
+    const impact = IMPACTS[i % IMPACTS.length];
+    const importance = 45 + (i % 50);
+    const confidence = 60 + (i % 35);
+    const jitter = (i % 5) * 0.15;
+    signals.push({
+      id: `fixture-${i + 1}`,
+      lat: geo.lat + (i % 2 === 0 ? jitter : -jitter),
+      lon: geo.lon + ((i % 3) - 1) * 0.2,
+      type,
+      impact,
+      importance,
+      confidence,
+      occurred_at: now,
+      label_short: `${country} – signal`,
+      subtitle_short: `${type.replace('-', ' ')} watch`,
+      impact_one_line: `Regional development – ${country}`,
+      investigate_id: '/search',
+    });
+    i++;
+  }
+  return signals;
+}
+
+const FIXTURE_SIGNALS = buildFixtureSignals();
+
+/** Default fixture when no real data (quasi every country). */
 const FIXTURE: OverviewMapData = {
-  signals: [
-    { id: '1', lat: -2.5, lon: 28.8, type: 'security', impact: 'regional', importance: 85, confidence: 82, occurred_at: new Date().toISOString(), label_short: 'DRC – North Kivu', subtitle_short: 'ADF activity escalation', impact_one_line: 'Gold supply risk', investigate_id: '/search' },
-    { id: '2', lat: 25.2, lon: 55.3, type: 'supply-chains', impact: 'global', importance: 78, confidence: 76, occurred_at: new Date().toISOString(), label_short: 'UAE – Dubai', subtitle_short: 'Gold trade hub disruption', impact_one_line: 'Precious metals flow', investigate_id: '/search' },
-    { id: '3', lat: 51.5, lon: -0.1, type: 'geopolitics', impact: 'global', importance: 90, confidence: 94, occurred_at: new Date().toISOString(), label_short: 'UK – London', subtitle_short: 'Sanctions policy update', impact_one_line: 'Financial compliance', investigate_id: '/search' },
-    { id: '4', lat: 55.7, lon: 37.6, type: 'energy', impact: 'regional', importance: 72, confidence: 88, occurred_at: new Date().toISOString(), label_short: 'Russia – Moscow', subtitle_short: 'Energy export reconfiguration', impact_one_line: 'Gas supply routes', investigate_id: '/search' },
-    { id: '5', lat: 39.9, lon: 116.4, type: 'supply-chains', impact: 'global', importance: 80, confidence: 79, occurred_at: new Date().toISOString(), label_short: 'China – Beijing', subtitle_short: 'Strategic minerals stockpiling', impact_one_line: 'Rare earth dominance', investigate_id: '/search' },
-    { id: '6', lat: 40.7, lon: -74.0, type: 'markets', impact: 'global', importance: 88, confidence: 91, occurred_at: new Date().toISOString(), label_short: 'USA – New York', subtitle_short: 'Financial markets volatility', impact_one_line: 'Commodity futures', investigate_id: '/search' },
-  ],
-  top_events: [
-    { id: '1', label_short: 'DRC – North Kivu', impact_one_line: 'Gold supply risk', investigate_id: '/search', type: 'security' },
-    { id: '2', label_short: 'UAE – Dubai', impact_one_line: 'Precious metals flow', investigate_id: '/search', type: 'supply-chains' },
-    { id: '3', label_short: 'UK – London', impact_one_line: 'Financial compliance', investigate_id: '/search', type: 'geopolitics' },
-  ],
+  signals: FIXTURE_SIGNALS,
+  top_events: FIXTURE_SIGNALS.slice(0, 5).map((s, idx) => ({
+    id: s.id,
+    label_short: s.label_short,
+    impact_one_line: s.impact_one_line,
+    investigate_id: s.investigate_id,
+    type: s.type,
+  })),
   top_impacts: [
     { name: 'Barrick Gold', impact_one_line: 'Production disruption', investigate_id: '/search' },
     { name: 'Gazprom', impact_one_line: 'Route reconfiguration', investigate_id: '/search' },
     { name: 'HSBC', impact_one_line: 'Compliance costs', investigate_id: '/search' },
   ],
   is_demo: true,
-  stats: { total_queried: 0, geo_matched: 0, geo_missed: 0, filtered_out: 0, final_count: 6, effective_date_range: 'demo' },
+  stats: { total_queried: 0, geo_matched: 0, geo_missed: 0, filtered_out: 0, final_count: FIXTURE_SIGNALS.length, effective_date_range: 'demo' },
 };
 
 /**
@@ -144,7 +177,7 @@ async function queryEvents(
     .gte('created_at', dateFrom)
     .order('impact_score', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
-    .limit(100);
+    .limit(200);
 
   if (error) {
     console.warn('[OverviewMapService] nucigen_events query failed:', error.message);

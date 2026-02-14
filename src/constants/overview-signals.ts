@@ -34,5 +34,5 @@ export const OVERVIEW_LAYER_SEMANTICS: Record<
     { label: 'Security', description: 'Risques armés, instabilité, coercition.', color: '#EF4444' },
 };
 
-/** Règle stricte : max signaux visibles sur la carte (répondre "où regarder" sans bruit). */
-export const OVERVIEW_MAP_MAX_SIGNALS = 12;
+/** Max signaux visibles sur la carte (couverture quasi mondiale par pays). */
+export const OVERVIEW_MAP_MAX_SIGNALS = 80;

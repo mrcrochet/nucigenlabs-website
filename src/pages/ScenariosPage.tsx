@@ -1,109 +1,157 @@
 /**
- * Scenarios Page (formerly Impacts)
- * 
- * NEW ARCHITECTURE: Renamed from "Impacts" to "Scenarios"
- * Purpose: Display future scenarios, probability, magnitude, timeframe
- * 
- * Layout:
- * - Filters top (12)
- * - Grid (12): ImpactCardGrid (2 colonnes desktop)
+ * Scenarios Page v2 — Strategic Decision Engine
+ *
+ * Layout: CSS Grid 3 colonnes (desktop) → 2 col (tablet) → 1 col (mobile)
+ * Grid areas: "overview overview divergence"
+ *             "timeline timeline transmission"
+ *             "decision analogs manipulation"
  */
 
-import { useState, useEffect } from 'react';
-import { useUser } from '@clerk/clerk-react';
-import { useSearchParams } from 'react-router-dom';
+import { useState, useCallback } from 'react';
 import AppShell from '../components/layout/AppShell';
-import ImpactFilters from '../components/impacts/ImpactFilters';
-import ImpactCardGrid from '../components/impacts/ImpactCardGrid';
-import ImpactMappingMatrix from '../components/impacts/ImpactMappingMatrix';
-import DecisionPointsCard from '../components/scenarios/DecisionPointsCard';
-import StatsBar from '../components/ui/StatsBar';
-import DescriptiveCTA from '../components/ui/DescriptiveCTA';
-import HowWeValidate from '../components/ui/HowWeValidate';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SEO from '../components/SEO';
 
-function ScenariosPageContent() {
-  const { user } = useUser();
-  const [searchParams] = useSearchParams();
-  const signalId = searchParams.get('signal_id');
-  
-  const [filters, setFilters] = useState({
-    probabilityMin: 0,
-    magnitudeMin: 0,
-    timeframe: '' as '' | 'immediate' | 'short' | 'medium' | 'long',
-    sector: '',
-    region: '',
-  });
-  const [scenarios, setScenarios] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+// Scenario v2 Components
+import ScenarioEventSelector from '../components/scenario-v2/ScenarioEventSelector';
+import EventStateModel from '../components/scenario-v2/EventStateModel';
+import DivergenceMonitor from '../components/scenario-v2/DivergenceMonitor';
+import ScenarioBranches from '../components/scenario-v2/ScenarioBranches';
+import TransmissionGraph from '../components/scenario-v2/TransmissionGraph';
+import DecisionLeveragePanel from '../components/scenario-v2/DecisionLeveragePanel';
+import HistoricalAnalogPanel from '../components/scenario-v2/HistoricalAnalogPanel';
+import WarGamePanel from '../components/scenario-v2/WarGamePanel';
 
-  useEffect(() => {
-    // Load scenarios (formerly impacts)
-    setLoading(false);
-  }, [filters, signalId, user]);
+// Mock Data
+import {
+  MOCK_EVENT_OPTIONS,
+  MOCK_EVENT,
+  MOCK_BRANCHES,
+  MOCK_DIVERGENCE,
+  MOCK_TRANSMISSION,
+  MOCK_DECISION_LEVERAGE,
+  MOCK_ANALOGS,
+  MOCK_WAR_GAME_PARAMS,
+  recalculateBranches,
+} from '../data/scenario-v2-mock';
+
+import type { ManipulationParameter } from '../types/scenario-v2';
+
+function ScenariosPageContent() {
+  const [selectedEventIndex, setSelectedEventIndex] = useState(0);
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  const [warGameParams, setWarGameParams] = useState(MOCK_WAR_GAME_PARAMS);
+  const [branches, setBranches] = useState(MOCK_BRANCHES);
+  const [isRecalculating, setIsRecalculating] = useState(false);
+
+  const handleRecalculate = useCallback(() => {
+    setIsRecalculating(true);
+    // Simulate recalculation delay
+    setTimeout(() => {
+      const newBranches = recalculateBranches(MOCK_BRANCHES, warGameParams);
+      setBranches(newBranches);
+      setIsRecalculating(false);
+    }, 400);
+  }, [warGameParams]);
+
+  const handleParamsChange = useCallback((params: ManipulationParameter[]) => {
+    setWarGameParams(params);
+  }, []);
 
   return (
     <AppShell>
-      <SEO 
-        title="Scenarios — Nucigen"
-        description="Future scenarios, probability, magnitude, and timeframe"
+      <SEO
+        title="Scenario Engine — Nucigen"
+        description="Strategic Decision Engine — Probabilistic scenario modeling with transmission chains and market divergence"
       />
 
-      {/* Filters */}
+      {/* Event Selector — full width */}
+      <div className="col-span-1 sm:col-span-12 mb-2">
+        <ScenarioEventSelector
+          events={MOCK_EVENT_OPTIONS}
+          selectedIndex={selectedEventIndex}
+          onSelect={setSelectedEventIndex}
+        />
+      </div>
+
+      {/* Main Grid — 3 column layout */}
       <div className="col-span-1 sm:col-span-12">
-        <ImpactFilters
-          filters={filters}
-          onFiltersChange={setFilters}
-        />
-      </div>
+        <div
+          className="grid gap-3"
+          style={{
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gridTemplateAreas: `
+              "overview overview divergence"
+              "timeline timeline transmission"
+              "decision analogs manipulation"
+            `,
+          }}
+        >
+          {/* Row 1: Event State Model + Divergence Monitor */}
+          <div style={{ gridArea: 'overview' }}>
+            <EventStateModel event={MOCK_EVENT} />
+          </div>
+          <div style={{ gridArea: 'divergence' }}>
+            <DivergenceMonitor data={MOCK_DIVERGENCE} />
+          </div>
 
-      {/* Stats bar — board-ready */}
-      <div className="col-span-1 sm:col-span-12 mb-4">
-        <StatsBar
-          items={[
-            { label: 'Scenarios', value: scenarios.length },
-            { label: 'High probability (≥70%)', value: scenarios.filter((s: any) => s.probability >= 70).length, variant: 'risk' },
-            { label: 'Opportunity scenarios', value: scenarios.filter((s: any) => s.opportunity).length, variant: 'opportunity' },
-            { label: 'Timeframe', value: filters.timeframe || 'All' },
-          ]}
-        />
-      </div>
+          {/* Row 2: Probability Branches + Transmission Graph */}
+          <div style={{ gridArea: 'timeline' }}>
+            <ScenarioBranches
+              branches={branches}
+              selectedBranchId={selectedBranchId}
+              onSelectBranch={setSelectedBranchId}
+            />
+          </div>
+          <div style={{ gridArea: 'transmission' }}>
+            <TransmissionGraph data={MOCK_TRANSMISSION} height={420} />
+          </div>
 
-      <div className="col-span-1 sm:col-span-12 mb-4">
-        <DescriptiveCTA
-          description="Scenario outcomes are derived from event-driven signals. Track & get notified when probability or magnitude changes."
-          actionLabel="Track & get notified on scenario changes"
-          actionTo="/alerts"
-        />
-      </div>
-
-      {/* How we validate — credibility */}
-      <div className="col-span-1 sm:col-span-12 mb-6">
-        <HowWeValidate variant="scenarios" />
-      </div>
-
-      {/* Decision Points - NEW ARCHITECTURE */}
-      <div className="col-span-1 sm:col-span-12 mb-6">
-        <DecisionPointsCard scenarioId={undefined} signalId={signalId || undefined} />
-      </div>
-
-      {/* Scenario Mapping Matrix */}
-      {scenarios.length > 0 && (
-        <div className="col-span-1 sm:col-span-12">
-          <ImpactMappingMatrix impacts={scenarios} />
+          {/* Row 3: Decision Leverage + Historical Analogs + War-Game */}
+          <div style={{ gridArea: 'decision' }}>
+            <DecisionLeveragePanel items={MOCK_DECISION_LEVERAGE} />
+          </div>
+          <div style={{ gridArea: 'analogs' }}>
+            <HistoricalAnalogPanel analogs={MOCK_ANALOGS} />
+          </div>
+          <div style={{ gridArea: 'manipulation' }}>
+            <WarGamePanel
+              params={warGameParams}
+              onParamsChange={handleParamsChange}
+              onRecalculate={handleRecalculate}
+              isRecalculating={isRecalculating}
+            />
+          </div>
         </div>
-      )}
-
-      {/* ScenarioCardGrid */}
-      <div className="col-span-1 sm:col-span-12">
-        <ImpactCardGrid
-          filters={filters}
-          signalId={signalId || undefined}
-          loading={loading}
-          onImpactsLoaded={setScenarios}
-        />
       </div>
+
+      {/* Responsive override for smaller screens */}
+      <style>{`
+        @media (max-width: 1200px) {
+          .col-span-1.sm\\:col-span-12 > div[style*="gridTemplateAreas"] {
+            grid-template-columns: 1fr 1fr !important;
+            grid-template-areas:
+              "overview divergence"
+              "timeline timeline"
+              "transmission transmission"
+              "decision analogs"
+              "manipulation manipulation" !important;
+          }
+        }
+        @media (max-width: 768px) {
+          .col-span-1.sm\\:col-span-12 > div[style*="gridTemplateAreas"] {
+            grid-template-columns: 1fr !important;
+            grid-template-areas:
+              "overview"
+              "divergence"
+              "timeline"
+              "transmission"
+              "decision"
+              "analogs"
+              "manipulation" !important;
+          }
+        }
+      `}</style>
     </AppShell>
   );
 }

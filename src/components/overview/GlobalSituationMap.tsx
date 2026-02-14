@@ -8,6 +8,7 @@ import { useState, useCallback, useRef, useEffect, useImperativeHandle, forwardR
 import Map, { Source, Layer } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import type { OverviewSignal } from '../../types/overview';
+import { OVERVIEW_MAP_MAX_SIGNALS } from '../../constants/overview-signals';
 import { useMapProjection } from '../../hooks/useMapProjection';
 import OverviewInfoPanel from './OverviewInfoPanel';
 
@@ -205,7 +206,7 @@ const GlobalSituationMapInner = forwardRef<GlobalSituationMapHandle, GlobalSitua
       };
     }, []);
 
-    const visibleSignals = signals.slice(0, 12);
+    const visibleSignals = signals.slice(0, OVERVIEW_MAP_MAX_SIGNALS);
     const geojson = signalsToGeoJSON(visibleSignals);
 
     if (!MAPBOX_TOKEN) {
