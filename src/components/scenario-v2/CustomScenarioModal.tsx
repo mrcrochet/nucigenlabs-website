@@ -16,120 +16,227 @@ export interface CustomScenarioFormData {
 }
 
 // ── Credibility Alignment Layer ─────────────────────────────────
-// Instead of rejecting unrealistic scenarios, we score plausibility
-// and suggest a reformulated version when confidence is low.
-// TODO: Replace mock logic with real AI validation endpoint.
+// Two layers working together:
+// 1. VISIBLE: Credibility Analysis panel with plausibility score + bar
+// 2. INVISIBLE: Quiet reformulation below textarea when needed
+// TODO: Replace heuristics with real AI endpoint.
 
-interface CredibilityResult {
+// ── Layer 1: Credibility Score ──────────────────────────────────
+
+interface CredibilityScore {
   plausibility: number; // 0-100
   label: 'HIGH' | 'MODERATE' | 'LOW' | 'IMPLAUSIBLE';
-  reasoning: string;
-  reformulation: string | null; // null if plausibility >= 60
 }
 
-// Keyword-based heuristic patterns (mock — will be replaced by AI)
-const IMPLAUSIBLE_PATTERNS: { pattern: RegExp; reason: string; reformulate: (input: string) => string }[] = [
-  {
-    pattern: /\b(invades?|invasion of)\s+(monaco|vatican|luxembourg|liechtenstein|andorra|san marino)\b/i,
-    reason: 'Military invasion of micro-states has no historical precedent or strategic logic.',
-    reformulate: (input: string) =>
-      input.replace(/invades?\s+(monaco|vatican|luxembourg|liechtenstein|andorra|san marino)/i,
-        'escalates diplomatic tensions with neighboring $1 over border disputes'),
-  },
-  {
-    pattern: /\b(aliens?|ufo|extraterrestrial|zombie|asteroid\s+hit|meteor\s+strike)\b/i,
-    reason: 'Scenario involves non-geopolitical / science-fiction elements outside model scope.',
-    reformulate: () =>
-      'Unidentified aerial phenomena trigger national security protocols. Pentagon confirms multiple incursions into restricted airspace. Congressional hearings scheduled. Defense contractors see increased activity.',
-  },
-  {
-    pattern: /\b(nukes?|nuclear\s+(bomb|strike|attack)\s+(on|against)\s+(new\s+york|london|paris|tokyo|washington))\b/i,
-    reason: 'Direct nuclear strike on major cities is an extreme tail-risk with near-zero baseline probability.',
-    reformulate: () =>
-      'Intelligence reports suggest elevated nuclear posture by state actor. DEFCON level raised. Emergency UN Security Council session convened. Markets enter risk-off mode. Gold and treasury yields spike.',
-  },
-  {
-    pattern: /\b(world\s+war\s+(3|iii|three)|ww3|global\s+war)\b/i,
-    reason: 'Full-scale global war is modeled as a convergence of regional escalations, not a single event.',
-    reformulate: () =>
-      'Simultaneous military escalations across multiple theaters — South China Sea, Eastern Europe, and Persian Gulf. NATO and allied forces on heightened alert. Global supply chains face unprecedented disruption risk.',
-  },
-  {
-    pattern: /\b(bitcoin\s+to\s+(zero|0|million)|market\s+crash\s+100%|stock\s+market\s+(disappears?|vanish))\b/i,
-    reason: 'Complete market collapse or infinite appreciation lacks historical basis for modeling.',
-    reformulate: () =>
-      'Major cryptocurrency exchange halts withdrawals citing liquidity crisis. Contagion fears spread to traditional markets. SEC announces emergency investigation. Crypto assets drop 40% in 48 hours.',
-  },
-  {
-    pattern: /\b(trump|biden|putin|xi)\s+(dies?|assassinat|killed)\b/i,
-    reason: 'Assassination of specific leaders is sensitive. Model frames as succession/power-vacuum scenario.',
-    reformulate: (input: string) => {
-      const leader = input.match(/(trump|biden|putin|xi)/i)?.[1] || 'head of state';
-      return `${leader.charAt(0).toUpperCase() + leader.slice(1)} announces unexpected medical leave. Power transition concerns emerge. Political uncertainty spikes. Markets react to succession ambiguity. Allied nations issue statements of concern.`;
-    },
-  },
-];
+const PLAUSIBILITY_COLORS: Record<string, string> = {
+  HIGH: '#00ff00',
+  MODERATE: '#ffaa00',
+  LOW: '#ff6600',
+  IMPLAUSIBLE: '#ff0000',
+};
 
-const LOW_EFFORT_PATTERN = /^.{0,15}$/; // Less than 15 chars
-const VAGUE_PATTERN = /^(war|crisis|crash|collapse|attack|boom|recession)$/i;
-
-function analyzeCredibility(input: string): CredibilityResult | null {
+function computeCredibilityScore(input: string): CredibilityScore | null {
   const trimmed = input.trim();
-  if (!trimmed || trimmed.length < 5) return null;
+  if (!trimmed || trimmed.length < 3) return null;
 
-  // Check for vague / low-effort
-  if (LOW_EFFORT_PATTERN.test(trimmed) || VAGUE_PATTERN.test(trimmed)) {
-    return {
-      plausibility: 25,
-      label: 'LOW',
-      reasoning: 'Scenario description is too vague. Add specific actors, actions, and context for meaningful analysis.',
-      reformulation: null,
-    };
+  // Implausible patterns
+  const implausiblePatterns = [
+    /\b(aliens?|ufo|extraterrestrial|zombie|asteroid\s+hit|meteor\s+strike)\b/i,
+    /\b(god|jesus|rapture|magic|supernatural|time\s+travel)\b/i,
+    /\b(nukes?|nuclear\s+(bomb|strike|attack))\s+(on|against)\s+(new\s+york|london|paris|tokyo|washington)\b/i,
+    /\b(bitcoin|crypto)\s+(to\s+)?(zero|0|million|billion|infinity)\b/i,
+    /\b(stock\s+)?market\s+(crash|crashes?)\s*(100%|completely|total)\b/i,
+  ];
+
+  for (const p of implausiblePatterns) {
+    if (p.test(trimmed)) return { plausibility: 12, label: 'IMPLAUSIBLE' };
   }
 
-  // Check implausible patterns
-  for (const { pattern, reason, reformulate } of IMPLAUSIBLE_PATTERNS) {
-    if (pattern.test(trimmed)) {
-      return {
-        plausibility: 12,
-        label: 'IMPLAUSIBLE',
-        reasoning: reason,
-        reformulation: reformulate(trimmed),
-      };
-    }
+  // Micro-state invasions
+  if (/\b(invades?|invasion of)\s+(monaco|vatican|luxembourg|liechtenstein|andorra|san marino)\b/i.test(trimmed)) {
+    return { plausibility: 15, label: 'IMPLAUSIBLE' };
   }
 
-  // Heuristic scoring based on detail level
+  // Leader death/assassination
+  if (/\b(trump|biden|putin|xi|macron|modi|zelensky)\s+(dies?|dead|assassinat|killed|murdered)\b/i.test(trimmed)) {
+    return { plausibility: 20, label: 'LOW' };
+  }
+
+  // WW3
+  if (/\b(world\s+war\s+(3|iii|three)|ww3|global\s+war)\b/i.test(trimmed)) {
+    return { plausibility: 18, label: 'IMPLAUSIBLE' };
+  }
+
+  // Vague single-word
+  if (/^(war|crisis|crash|collapse|attack|boom|recession|oil|energy|china|taiwan|russia|ukraine|iran|israel)$/i.test(trimmed)) {
+    return { plausibility: 30, label: 'LOW' };
+  }
+
+  // Heuristic scoring
   const wordCount = trimmed.split(/\s+/).length;
   const hasActors = /\b(us|usa|china|russia|eu|nato|opec|fed|ecb|un|iran|israel|saudi|japan|korea|india|ukraine|taiwan)\b/i.test(trimmed);
   const hasActions = /\b(announces?|sanctions?|deploys?|cuts?|raises?|blocks?|invades?|attacks?|negotiat|withdraw|escalat|de-escalat|signs?|breaks?|suspends?|bans?|tariffs?)\b/i.test(trimmed);
   const hasMarketContext = /\b(oil|gold|treasury|bonds?|stocks?|futures?|currencies|dollar|euro|yuan|markets?|prices?|rates?|yields?|inflation|gdp|trade)\b/i.test(trimmed);
 
-  let score = 40; // baseline
+  let score = 40;
   if (wordCount >= 10) score += 10;
   if (wordCount >= 20) score += 10;
   if (wordCount >= 35) score += 5;
   if (hasActors) score += 15;
   if (hasActions) score += 10;
   if (hasMarketContext) score += 10;
-
   score = Math.min(score, 95);
 
-  let label: CredibilityResult['label'] = 'HIGH';
+  let label: CredibilityScore['label'] = 'HIGH';
   if (score < 30) label = 'IMPLAUSIBLE';
   else if (score < 50) label = 'LOW';
   else if (score < 70) label = 'MODERATE';
 
-  return {
-    plausibility: score,
-    label,
-    reasoning: label === 'HIGH'
-      ? 'Scenario contains specific actors, actions, and context. Suitable for probabilistic modeling.'
-      : label === 'MODERATE'
-        ? 'Scenario is plausible but could benefit from more specificity — actors, reactions, or market context.'
-        : 'Scenario lacks sufficient detail or geopolitical grounding for reliable modeling.',
-    reformulation: null,
-  };
+  return { plausibility: score, label };
+}
+
+// ── Layer 2: Invisible Reformulation ────────────────────────────
+
+interface Reformulation {
+  text: string;
+  shouldReplace: boolean;
+}
+
+const REFORMULATION_RULES: { pattern: RegExp; reformulate: (input: string) => string }[] = [
+  {
+    pattern: /\b(invades?|invasion of)\s+(monaco|vatican|luxembourg|liechtenstein|andorra|san marino)\b/i,
+    reformulate: (input: string) => {
+      const country = input.match(/(monaco|vatican|luxembourg|liechtenstein|andorra|san marino)/i)?.[1] || 'Monaco';
+      const actor = input.match(/^(\w+)/)?.[1] || 'France';
+      return `${actor} escalates diplomatic tensions with ${country} over territorial and fiscal sovereignty disputes. EU mediators called in. Border controls temporarily reinforced. Markets monitor contagion risk to Eurozone stability.`;
+    },
+  },
+  {
+    pattern: /\b(aliens?|ufo|extraterrestrial)\b/i,
+    reformulate: () =>
+      'Pentagon confirms multiple unauthorized incursions into restricted airspace by unidentified aerial systems. Congressional hearings fast-tracked. Defense contractors surge. Intelligence agencies issue classified briefings to allied nations.',
+  },
+  {
+    pattern: /\bzombie\b/i,
+    reformulate: () =>
+      'Unknown pathogen triggers mass neurological incidents across multiple regions. WHO declares Public Health Emergency of International Concern. Travel restrictions imposed. Pharmaceutical and biotech sectors see extreme volatility.',
+  },
+  {
+    pattern: /\b(asteroid\s+hit|meteor\s+strike|comet)\b/i,
+    reformulate: () =>
+      'NASA confirms high-probability near-Earth object on collision trajectory. Global emergency protocols activated. Insurance and reinsurance markets in turmoil. Defense agencies coordinate planetary defense response.',
+  },
+  {
+    pattern: /\b(nukes?|nuclear\s+(bomb|strike|attack|war))\s*(on|against|hits?)?\s*(new\s+york|london|paris|tokyo|washington|moscow|beijing)?\b/i,
+    reformulate: (input: string) => {
+      const city = input.match(/(new\s+york|london|paris|tokyo|washington|moscow|beijing)/i)?.[1];
+      const locationContext = city ? ` near ${city}` : '';
+      return `Intelligence agencies report elevated nuclear posture by state actor${locationContext}. DEFCON level raised. Emergency UN Security Council session convened. Global markets enter risk-off mode. Gold surges, treasury yields spike. Diplomatic channels activated.`;
+    },
+  },
+  {
+    pattern: /\b(world\s+war\s+(3|iii|three)|ww3|global\s+war)\b/i,
+    reformulate: () =>
+      'Simultaneous military escalations across multiple theaters — South China Sea, Eastern Europe, and Persian Gulf. NATO and allied forces on heightened alert. Global supply chains face unprecedented disruption risk. Defense spending commitments accelerate across G7.',
+  },
+  {
+    pattern: /\b(bitcoin|crypto)\s+(to\s+)?(zero|0|million|billion|infinity)\b/i,
+    reformulate: () =>
+      'Major cryptocurrency exchange halts withdrawals citing liquidity crisis. Contagion fears spread to DeFi protocols and stablecoins. SEC announces emergency investigation. Traditional markets monitor spillover risk. Crypto assets drop 40% in 48 hours.',
+  },
+  {
+    pattern: /\b(stock\s+)?market\s+(crash|crashes?)\s*(100%|completely|total)\b/i,
+    reformulate: () =>
+      'Cascading liquidations trigger circuit breakers across major exchanges. S&P 500 drops 12% in single session — worst since 2020. Federal Reserve issues emergency statement. Global central banks coordinate liquidity injection.',
+  },
+  {
+    pattern: /\b(trump|biden|putin|xi|macron|modi|zelensky)\s+(dies?|dead|assassinat|killed|murdered)\b/i,
+    reformulate: (input: string) => {
+      const leader = input.match(/(trump|biden|putin|xi|macron|modi|zelensky)/i)?.[1] || 'head of state';
+      const name = leader.charAt(0).toUpperCase() + leader.slice(1).toLowerCase();
+      return `${name} unexpectedly withdraws from public duties citing undisclosed medical situation. Power transition concerns dominate headlines. Political uncertainty spikes across allied and adversarial nations. Markets react to succession ambiguity and policy continuity risk.`;
+    },
+  },
+  {
+    pattern: /\b(god|jesus|rapture|magic|supernatural|time\s+travel)\b/i,
+    reformulate: () =>
+      'Unprecedented social upheaval driven by mass ideological movement disrupts governance in multiple nations. Markets face uncertainty as institutional stability is questioned. Safe-haven assets surge.',
+  },
+];
+
+const VAGUE_ENRICHMENTS: { pattern: RegExp; enrichment: string }[] = [
+  {
+    pattern: /^war$/i,
+    enrichment: 'Military conflict escalates between regional powers. UN Security Council emergency session called. Energy markets spike on supply disruption fears. NATO allies assess collective defense obligations.',
+  },
+  {
+    pattern: /^(crisis|crash)$/i,
+    enrichment: 'Systemic financial crisis emerges as major institution fails stress tests. Interbank lending freezes. Central banks coordinate emergency liquidity measures. Sovereign credit default swaps widen sharply.',
+  },
+  {
+    pattern: /^recession$/i,
+    enrichment: 'Leading economic indicators confirm synchronized global recession. US GDP contracts for second consecutive quarter. Unemployment claims surge. Federal Reserve pivots to aggressive easing. Corporate earnings revisions cascade.',
+  },
+  {
+    pattern: /^(collapse|meltdown)$/i,
+    enrichment: 'Systemic failure cascades through interconnected financial markets. Multiple circuit breakers triggered. Emergency G7 summit convened. Central banks announce coordinated intervention. Safe-haven assets see historic inflows.',
+  },
+  {
+    pattern: /^(attack|terrorism|terror)$/i,
+    enrichment: 'Coordinated attack on critical infrastructure in major Western capital. Security forces respond. Government declares state of emergency. International allies offer intelligence support. Markets enter risk-off mode.',
+  },
+  {
+    pattern: /^(sanctions?|embargo)$/i,
+    enrichment: 'Sweeping sanctions package targeting major economy announced by Western coalition. Trade flows disrupted. Commodity prices surge on supply chain reconfiguration. Targeted nation announces retaliatory measures.',
+  },
+  {
+    pattern: /^(oil|energy)$/i,
+    enrichment: 'Major disruption to global energy supply — key chokepoint compromised. Oil futures surge past $110/bbl. OPEC+ convenes emergency meeting. Strategic petroleum reserves released. Industrial nations activate contingency plans.',
+  },
+  {
+    pattern: /^(china|taiwan)$/i,
+    enrichment: 'China escalates military posture around Taiwan Strait. Live-fire exercises announced in shipping lanes. US carrier group repositions. Semiconductor supply chain faces imminent disruption risk. Regional markets sell off sharply.',
+  },
+  {
+    pattern: /^(russia|ukraine)$/i,
+    enrichment: 'Russia-Ukraine conflict enters new escalation phase. Major offensive launched along eastern front. NATO reinforces eastern flank. European energy security concerns resurface. Grain futures spike on Black Sea disruption.',
+  },
+  {
+    pattern: /^(iran|israel)$/i,
+    enrichment: 'Iran-Israel tensions escalate to direct military exchange. Strait of Hormuz transit risk elevated. Oil prices surge. US deploys additional assets to region. UN calls for immediate ceasefire.',
+  },
+];
+
+function getReformulation(input: string): Reformulation | null {
+  const trimmed = input.trim();
+  if (!trimmed || trimmed.length < 2) return null;
+
+  for (const { pattern, enrichment } of VAGUE_ENRICHMENTS) {
+    if (pattern.test(trimmed)) {
+      return { text: enrichment, shouldReplace: true };
+    }
+  }
+
+  for (const { pattern, reformulate } of REFORMULATION_RULES) {
+    if (pattern.test(trimmed)) {
+      return { text: reformulate(trimmed), shouldReplace: true };
+    }
+  }
+
+  const wordCount = trimmed.split(/\s+/).length;
+  if (wordCount >= 2 && wordCount <= 4 && trimmed.length < 40) {
+    const hasActor = /\b(us|usa|china|russia|eu|nato|opec|fed|iran|israel|saudi|japan|korea|india|ukraine|taiwan|turkey|brazil|uk|france|germany)\b/i.test(trimmed);
+    const hasAction = /\b(war|attack|sanctions?|blockade|invasion|crash|crisis|collapse|strike|coup|revolt|default)\b/i.test(trimmed);
+
+    if (hasActor && hasAction) {
+      return {
+        text: `${trimmed.charAt(0).toUpperCase() + trimmed.slice(1)}. International community responds. Markets react to escalation risk. Regional allies assess strategic implications. Commodity and currency volatility spikes.`,
+        shouldReplace: false,
+      };
+    }
+  }
+
+  return null;
 }
 
 // ── End Credibility Layer ───────────────────────────────────────
@@ -146,13 +253,6 @@ const EXAMPLE_LABELS = [
   { key: '3', text: 'Fed announces emergency rate hike of 100bps citing inflation resurgence' },
 ];
 
-const PLAUSIBILITY_COLORS: Record<string, string> = {
-  HIGH: '#00ff00',
-  MODERATE: '#ffaa00',
-  LOW: '#ff6600',
-  IMPLAUSIBLE: '#ff0000',
-};
-
 export default function CustomScenarioModal({ isOpen, onClose, onGenerate }: CustomScenarioModalProps) {
   const [eventDescription, setEventDescription] = useState('');
   const [timeframe, setTimeframe] = useState<CustomScenarioFormData['timeframe']>('immediate');
@@ -162,9 +262,15 @@ export default function CustomScenarioModal({ isOpen, onClose, onGenerate }: Cus
   const [depth, setDepth] = useState<CustomScenarioFormData['depth']>('standard');
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Credibility state
-  const [credibility, setCredibility] = useState<CredibilityResult | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  // Layer 1: Credibility score
+  const [credibility, setCredibility] = useState<CredibilityScore | null>(null);
+
+  // Layer 2: Invisible reformulation
+  const [reformulation, setReformulation] = useState<Reformulation | null>(null);
+  const [showReformulation, setShowReformulation] = useState(false);
+
+  // Shared
+  const [isThinking, setIsThinking] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -197,28 +303,35 @@ export default function CustomScenarioModal({ isOpen, onClose, onGenerate }: Cus
     return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
-  // Debounced credibility analysis
+  // Debounced analysis — both layers run together
   const handleDescriptionChange = useCallback((value: string) => {
     setEventDescription(value);
+    setShowReformulation(false);
+    setReformulation(null);
+    setCredibility(null);
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
-    if (!value.trim() || value.trim().length < 5) {
-      setCredibility(null);
-      setIsAnalyzing(false);
+    if (!value.trim() || value.trim().length < 2) {
+      setIsThinking(false);
       return;
     }
 
-    setIsAnalyzing(true);
+    setIsThinking(true);
     debounceRef.current = setTimeout(() => {
-      // Simulate network delay for realistic feel
-      const result = analyzeCredibility(value);
-      setCredibility(result);
-      setIsAnalyzing(false);
-    }, 800);
+      // Layer 1: Score
+      const score = computeCredibilityScore(value);
+      setCredibility(score);
+
+      // Layer 2: Reformulation (only when needed)
+      const reform = getReformulation(value);
+      setReformulation(reform);
+      setShowReformulation(!!reform);
+
+      setIsThinking(false);
+    }, 1000);
   }, []);
 
-  // Clear debounce on unmount
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -229,38 +342,41 @@ export default function CustomScenarioModal({ isOpen, onClose, onGenerate }: Cus
     if (e.target === overlayRef.current) onClose();
   }, [onClose]);
 
-  const handleAcceptReformulation = useCallback(() => {
-    if (credibility?.reformulation) {
-      setEventDescription(credibility.reformulation);
-      // Re-analyze the reformulated text
-      setIsAnalyzing(true);
-      setTimeout(() => {
-        const result = analyzeCredibility(credibility.reformulation!);
-        setCredibility(result);
-        setIsAnalyzing(false);
-      }, 600);
+  const handleUseReformulation = useCallback(() => {
+    if (reformulation) {
+      setEventDescription(reformulation.text);
+      setReformulation(null);
+      setShowReformulation(false);
+      // Re-score the reformulated text
+      const score = computeCredibilityScore(reformulation.text);
+      setCredibility(score);
+      setTimeout(() => textareaRef.current?.focus(), 50);
     }
-  }, [credibility]);
+  }, [reformulation]);
 
   const handleGenerate = useCallback(() => {
-    if (!eventDescription.trim()) return;
+    // If the original is implausible and user didn't act on reformulation,
+    // silently use the reformulation instead
+    const finalEvent = (reformulation?.shouldReplace && reformulation.text)
+      ? reformulation.text
+      : eventDescription;
+
+    if (!finalEvent.trim()) return;
+
     setIsGenerating(true);
     setTimeout(() => {
-      onGenerate({ event: eventDescription, timeframe, severity, scope, sectors, depth });
+      onGenerate({ event: finalEvent, timeframe, severity, scope, sectors, depth });
       setIsGenerating(false);
       setEventDescription('');
       setSectors('');
+      setReformulation(null);
+      setShowReformulation(false);
       setCredibility(null);
       onClose();
     }, 2000);
-  }, [eventDescription, timeframe, severity, scope, sectors, depth, onGenerate, onClose]);
+  }, [eventDescription, reformulation, timeframe, severity, scope, sectors, depth, onGenerate, onClose]);
 
   if (!isOpen) return null;
-
-  const isBlocked = credibility?.label === 'IMPLAUSIBLE' && !credibility.reformulation;
-  const canGenerate = eventDescription.trim().length > 0
-    && !isGenerating
-    && credibility?.label !== 'IMPLAUSIBLE';
 
   return (
     <div
@@ -296,96 +412,75 @@ export default function CustomScenarioModal({ isOpen, onClose, onGenerate }: Cus
               placeholder={"Describe the hypothetical event in detail...\n\ne.g., China announces full naval blockade of Taiwan shipping lanes, citing security concerns. US 7th Fleet moves to international waters. Japan and South Korea issue joint statement."}
               className="w-full min-h-[120px] bg-[#0a0a0a] border border-[#2a2a2a] text-white p-3 font-mono text-[0.75rem] leading-relaxed resize-y focus:outline-none focus:border-white focus:bg-[#0f0f0f] transition-all"
             />
-            <div className="text-[0.65rem] font-mono text-[#666] mt-2 italic">
-              Be specific about actors, actions, and initial reactions
-            </div>
 
-            {/* ── Credibility Alignment Layer UI ── */}
-            {(isAnalyzing || credibility) && (
-              <div className="mt-4 border border-[#1a1a1a] bg-[#0a0a0a] overflow-hidden animate-[slideUp_0.2s_ease]">
-                {/* Header bar with score */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-[#1a1a1a]">
+            {/* Subtle thinking dots */}
+            {isThinking && (
+              <div className="flex items-center gap-2 mt-2 opacity-40">
+                <div className="w-1 h-1 bg-[#666] animate-pulse" />
+                <div className="w-1 h-1 bg-[#666] animate-pulse" style={{ animationDelay: '0.2s' }} />
+                <div className="w-1 h-1 bg-[#666] animate-pulse" style={{ animationDelay: '0.4s' }} />
+              </div>
+            )}
+
+            {/* ── Layer 1: CREDIBILITY ANALYSIS panel ── */}
+            {credibility && !isThinking && (
+              <div className="mt-3 border border-[#1a1a1a] bg-[#0a0a0a] animate-[fadeIn_0.3s_ease]">
+                <div className="flex items-center justify-between px-4 py-2.5">
+                  <span className="text-[0.6rem] font-mono text-[#444] tracking-[1px]">
+                    CREDIBILITY ANALYSIS
+                  </span>
                   <div className="flex items-center gap-3">
-                    <span className="text-[0.6rem] font-mono text-[#666] tracking-[1px]">
-                      CREDIBILITY ANALYSIS
+                    <span
+                      className="text-[0.6rem] font-mono tracking-[1px]"
+                      style={{ color: PLAUSIBILITY_COLORS[credibility.label] }}
+                    >
+                      {credibility.label}
                     </span>
-                    {isAnalyzing && (
-                      <div className="flex items-center gap-2">
-                        <div className="w-2.5 h-2.5 border border-[#1a1a1a] border-t-white rounded-full animate-spin" />
-                        <span className="text-[0.6rem] font-mono text-[#444]">ANALYZING...</span>
-                      </div>
-                    )}
+                    <span className="text-[0.85rem] font-mono text-white">
+                      {credibility.plausibility}
+                      <span className="text-[0.55rem] text-[#444]">/100</span>
+                    </span>
                   </div>
-                  {credibility && !isAnalyzing && (
-                    <div className="flex items-center gap-3">
-                      <span
-                        className="text-[0.65rem] font-mono tracking-[1px] font-normal"
-                        style={{ color: PLAUSIBILITY_COLORS[credibility.label] }}
-                      >
-                        {credibility.label}
-                      </span>
-                      <span className="text-[1rem] font-mono font-normal text-white">
-                        {credibility.plausibility}
-                        <span className="text-[0.6rem] text-[#666]">/100</span>
-                      </span>
-                    </div>
-                  )}
                 </div>
-
                 {/* Plausibility bar */}
-                {credibility && !isAnalyzing && (
-                  <div className="px-4 pt-3">
-                    <div className="w-full h-1 bg-[#1a1a1a]">
-                      <div
-                        className="h-full transition-all duration-500"
-                        style={{
-                          width: `${credibility.plausibility}%`,
-                          backgroundColor: PLAUSIBILITY_COLORS[credibility.label],
-                        }}
-                      />
-                    </div>
+                <div className="px-4 pb-3">
+                  <div className="w-full h-[2px] bg-[#1a1a1a]">
+                    <div
+                      className="h-full transition-all duration-700 ease-out"
+                      style={{
+                        width: `${credibility.plausibility}%`,
+                        backgroundColor: PLAUSIBILITY_COLORS[credibility.label],
+                      }}
+                    />
                   </div>
-                )}
+                </div>
+              </div>
+            )}
 
-                {/* Reasoning */}
-                {credibility && !isAnalyzing && (
-                  <div className="px-4 py-3">
-                    <div className="text-[0.7rem] font-mono text-[#888] leading-relaxed">
-                      {credibility.reasoning}
-                    </div>
+            {/* ── Layer 2: Invisible reformulation ── */}
+            {showReformulation && reformulation && !isThinking && (
+              <div className="mt-3 animate-[fadeIn_0.4s_ease]">
+                <div
+                  onClick={handleUseReformulation}
+                  className="group relative border-l border-[#333] pl-3 py-2 cursor-pointer transition-all duration-300 hover:border-l-white"
+                >
+                  <div className="text-[0.6rem] font-mono text-[#444] tracking-[1px] mb-1.5">
+                    ENGINE INTERPRETATION
                   </div>
-                )}
+                  <div className="text-[0.72rem] font-mono text-[#666] leading-relaxed group-hover:text-[#b4b4b4] transition-colors duration-300">
+                    {reformulation.text}
+                  </div>
+                  <div className="text-[0.55rem] font-mono text-[#333] mt-2 group-hover:text-[#555] transition-colors duration-300">
+                    CLICK TO USE THIS VERSION
+                  </div>
+                </div>
+              </div>
+            )}
 
-                {/* Reformulation suggestion */}
-                {credibility?.reformulation && !isAnalyzing && (
-                  <div className="mx-4 mb-4 border border-[#1a3a1a] bg-[#0a1a0a]">
-                    <div className="px-4 py-3 border-b border-[#1a3a1a]">
-                      <span className="text-[0.6rem] font-mono text-[#00ff00] tracking-[1px]">
-                        SUGGESTED REFORMULATION
-                      </span>
-                    </div>
-                    <div className="px-4 py-3">
-                      <div className="text-[0.7rem] font-mono text-[#b4b4b4] leading-relaxed mb-3">
-                        {credibility.reformulation}
-                      </div>
-                      <button
-                        onClick={handleAcceptReformulation}
-                        className="bg-[#0a1a0a] border border-[#00ff00] text-[#00ff00] py-2 px-4 font-mono text-[0.65rem] tracking-[1px] uppercase cursor-pointer transition-all duration-200 hover:bg-[#00ff00] hover:text-black"
-                      >
-                        ACCEPT REFORMULATION
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Blocked warning for implausible without reformulation */}
-                {isBlocked && !isAnalyzing && (
-                  <div className="mx-4 mb-4 px-4 py-3 border border-[rgba(255,0,0,0.3)] bg-[rgba(255,0,0,0.05)]">
-                    <div className="text-[0.65rem] font-mono text-[#ff0000] tracking-[1px]">
-                      SCENARIO BLOCKED — Add more detail and geopolitical context to proceed.
-                    </div>
-                  </div>
-                )}
+            {/* Helper text — only when nothing is showing */}
+            {!credibility && !showReformulation && !isThinking && (
+              <div className="text-[0.65rem] font-mono text-[#666] mt-2 italic">
+                Be specific about actors, actions, and initial reactions
               </div>
             )}
 
@@ -543,7 +638,7 @@ export default function CustomScenarioModal({ isOpen, onClose, onGenerate }: Cus
             </button>
             <button
               onClick={handleGenerate}
-              disabled={!canGenerate}
+              disabled={isGenerating || !eventDescription.trim()}
               className="bg-black border border-white text-white py-3 px-6 font-mono text-[0.7rem] tracking-[2px] uppercase cursor-pointer transition-all duration-200 hover:bg-white hover:text-black disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-black disabled:hover:text-white"
             >
               GENERATE SCENARIO
