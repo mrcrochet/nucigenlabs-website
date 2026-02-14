@@ -127,3 +127,28 @@ export interface GlobalRegimeData {
   events: RegimeEvent[];
   compositeIndices: CompositeIndex[];
 }
+
+// ---- Resonance (real events that match the scenario) ----
+export interface ResonanceEvent {
+  id: string;
+  title: string;
+  summary: string;
+  country?: string;
+  occurredAt?: string;
+  investigateId: string;
+}
+
+export interface ScenarioResonance {
+  events: ResonanceEvent[];
+  total: number;
+}
+
+// ---- Custom Scenario Form Data ----
+export interface CustomScenarioFormData {
+  event: string;
+  timeframe: 'immediate' | 'near' | 'long';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  scope: 'geopolitical' | 'economic' | 'markets' | 'technology';
+  sectors: string;
+  depth: 'standard' | 'deep';
+}

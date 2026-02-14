@@ -1,18 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import type { CustomScenarioFormData } from '../../types/scenario-v2';
+
+export type { CustomScenarioFormData };
 
 interface CustomScenarioModalProps {
   isOpen: boolean;
   onClose: () => void;
   onGenerate: (data: CustomScenarioFormData) => void;
-}
-
-export interface CustomScenarioFormData {
-  event: string;
-  timeframe: 'immediate' | 'near' | 'long';
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  scope: 'geopolitical' | 'economic' | 'markets' | 'technology';
-  sectors: string;
-  depth: 'standard' | 'deep';
+  isGenerating?: boolean;
 }
 
 // ── Credibility Alignment Layer ─────────────────────────────────
@@ -253,14 +248,14 @@ const EXAMPLE_LABELS = [
   { key: '3', text: 'Fed announces emergency rate hike of 100bps citing inflation resurgence' },
 ];
 
-export default function CustomScenarioModal({ isOpen, onClose, onGenerate }: CustomScenarioModalProps) {
+export default function CustomScenarioModal({ isOpen, onClose, onGenerate, isGenerating: externalIsGenerating }: CustomScenarioModalProps) {
   const [eventDescription, setEventDescription] = useState('');
   const [timeframe, setTimeframe] = useState<CustomScenarioFormData['timeframe']>('immediate');
   const [severity, setSeverity] = useState<CustomScenarioFormData['severity']>('high');
   const [scope, setScope] = useState<CustomScenarioFormData['scope']>('geopolitical');
   const [sectors, setSectors] = useState('');
   const [depth, setDepth] = useState<CustomScenarioFormData['depth']>('standard');
-  const [isGenerating, setIsGenerating] = useState(false);
+  const isGenerating = externalIsGenerating ?? false;
 
   // Layer 1: Credibility score
   const [credibility, setCredibility] = useState<CredibilityScore | null>(null);
@@ -283,15 +278,15 @@ export default function CustomScenarioModal({ isOpen, onClose, onGenerate }: Cus
     }
   }, [isOpen]);
 
-  // ESC to close
+  // ESC to close (disabled during generation)
   useEffect(() => {
     if (!isOpen) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !isGenerating) onClose();
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, isGenerating]);
 
   // Lock body scroll
   useEffect(() => {
@@ -339,8 +334,8 @@ export default function CustomScenarioModal({ isOpen, onClose, onGenerate }: Cus
   }, []);
 
   const handleOverlayClick = useCallback((e: React.MouseEvent) => {
-    if (e.target === overlayRef.current) onClose();
-  }, [onClose]);
+    if (e.target === overlayRef.current && !isGenerating) onClose();
+  }, [onClose, isGenerating]);
 
   const handleUseReformulation = useCallback(() => {
     if (reformulation) {
@@ -363,18 +358,8 @@ export default function CustomScenarioModal({ isOpen, onClose, onGenerate }: Cus
 
     if (!finalEvent.trim()) return;
 
-    setIsGenerating(true);
-    setTimeout(() => {
-      onGenerate({ event: finalEvent, timeframe, severity, scope, sectors, depth });
-      setIsGenerating(false);
-      setEventDescription('');
-      setSectors('');
-      setReformulation(null);
-      setShowReformulation(false);
-      setCredibility(null);
-      onClose();
-    }, 2000);
-  }, [eventDescription, reformulation, timeframe, severity, scope, sectors, depth, onGenerate, onClose]);
+    onGenerate({ event: finalEvent, timeframe, severity, scope, sectors, depth });
+  }, [eventDescription, reformulation, timeframe, severity, scope, sectors, depth, onGenerate]);
 
   if (!isOpen) return null;
 

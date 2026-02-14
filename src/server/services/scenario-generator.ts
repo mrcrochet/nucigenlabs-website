@@ -21,13 +21,12 @@ dotenv.config({ path: join(__dirname, '../../../.env') });
 
 const openaiApiKey = process.env.OPENAI_API_KEY;
 
-if (!openaiApiKey) {
-  throw new Error('OPENAI_API_KEY is required for scenario generation');
+let openai: OpenAI | null = null;
+if (openaiApiKey) {
+  openai = new OpenAI({ apiKey: openaiApiKey });
+} else {
+  console.warn('[ScenarioGenerator] OPENAI_API_KEY missing — scenario generation disabled');
 }
-
-const openai = new OpenAI({
-  apiKey: openaiApiKey,
-});
 
 export interface Scenario {
   id: string;
@@ -74,14 +73,22 @@ export async function generateScenarioOutlook(
     existingEvidence?: string[];
   }
 ): Promise<ScenarioOutlook> {
+  if (!openai) {
+    throw new Error('OpenAI API key not configured — cannot generate scenarios');
+  }
   // Limit text length
   const maxLength = 6000;
   const truncatedText = claimText.length > maxLength 
     ? claimText.substring(0, maxLength) + '...'
     : claimText;
 
+  const evidenceBlock =
+    context?.existingEvidence?.length
+      ? `\n\nRECENT REAL EVENTS (from our database — use these to ground your scenarios):\n${context.existingEvidence.slice(0, 20).map((e, i) => `${i + 1}. ${e}`).join('\n')}`
+      : '';
+
   const contextInfo = context
-    ? `\n\nContext:\nTitle: ${context.title || 'N/A'}\nSource: ${context.source || 'N/A'}\n${context.entities && context.entities.length > 0 ? `Entities: ${context.entities.join(', ')}` : ''}\n${context.sectors && context.sectors.length > 0 ? `Sectors: ${context.sectors.join(', ')}` : ''}\n${context.regions && context.regions.length > 0 ? `Regions: ${context.regions.join(', ')}` : ''}`
+    ? `\n\nContext:\nTitle: ${context.title || 'N/A'}\nSource: ${context.source || 'N/A'}\n${context.entities && context.entities.length > 0 ? `Entities: ${context.entities.join(', ')}` : ''}\n${context.sectors && context.sectors.length > 0 ? `Sectors: ${context.sectors.join(', ')}` : ''}\n${context.regions && context.regions.length > 0 ? `Regions: ${context.regions.join(', ')}` : ''}${evidenceBlock}`
     : '';
 
   // Use cache to avoid regenerating same scenarios
@@ -91,7 +98,7 @@ export async function generateScenarioOutlook(
     ttlSeconds: 12 * 60 * 60, // 12 hours - scenarios can evolve
   };
 
-  return await withCache(
+  const cacheResult = await withCache<ScenarioOutlook>(
     cacheOptions,
     { text: truncatedText, context },
     async () => {
@@ -227,13 +234,14 @@ Return ONLY a JSON object with:
           outlook.crossScenarioInsights = crossScenarioInsights;
         }
 
-        return outlook;
+        return { data: outlook, metadata: { scenarioCount: outlook.scenarios.length } };
       } catch (error: any) {
         console.error('[ScenarioGenerator] Error generating scenarios:', error.message);
         throw error;
       }
     }
   );
+  return cacheResult.data;
 }
 
 /**
@@ -249,7 +257,7 @@ async function enrichScenarioWithOpenAI(
   },
   sources?: Scenario['sources']
 ): Promise<void> {
-  if (!sources || sources.length === 0) return;
+  if (!openai || !sources || sources.length === 0) return;
 
   try {
     // Build context from sources
@@ -333,6 +341,7 @@ async function generateCrossScenarioInsights(
     regions?: string[];
   }
 ): Promise<ScenarioOutlook['crossScenarioInsights'] | null> {
+  if (!openai) return null;
   try {
     const scenariosSummary = outlook.scenarios
       .map((s, idx) => `${idx + 1}. ${s.title} (${(s.relativeProbability * 100).toFixed(0)}%): ${s.description}`)

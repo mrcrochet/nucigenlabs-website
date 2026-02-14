@@ -7489,6 +7489,221 @@ app.get('/api/pressure-signals/clusters', async (req, res) => {
   }
 });
 
+// ── Scenario Engine ─────────────────────────────────────────────
+import { generateScenarioOutlook } from './services/scenario-generator.js';
+import { generateCausalGraph } from './services/causal-graph-generator.js';
+import { mapScenarioDashboard } from './services/scenario-dashboard-mapper.js';
+import type { CustomScenarioFormData, ScenarioDashboardData } from './services/scenario-dashboard-mapper.js';
+import type { ResonanceEvent } from '../types/scenario-v2.js';
+
+// POST /api/scenarios/generate — generate a full scenario dashboard
+app.post('/api/scenarios/generate', async (req, res) => {
+  try {
+    const formData = req.body as CustomScenarioFormData;
+    if (!formData?.event?.trim()) {
+      return res.status(400).json({ success: false, error: 'Event description is required' });
+    }
+
+    const sectors = formData.sectors
+      ? formData.sectors.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+
+    // Fetch recent real events for evidence + resonance (one query, reuse for both)
+    type EventRow = { id: string; summary: string | null; country: string | null; created_at?: string };
+    let recentEvents: EventRow[] = [];
+    if (supabase) {
+      const dateFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { data } = await supabase
+        .from('nucigen_events')
+        .select('id, summary, country, created_at')
+        .gte('created_at', dateFrom)
+        .order('created_at', { ascending: false })
+        .limit(80);
+      recentEvents = (data || []) as EventRow[];
+    }
+    const existingEvidence = recentEvents
+      .slice(0, 20)
+      .map(e => `Country: ${e.country || 'N/A'} | Summary: ${(e.summary || '').slice(0, 200)}`)
+      .filter(Boolean);
+
+    // Run all three services in parallel (outlook anchored to real events)
+    const [outlookResult, graphResult, polyResult] = await Promise.allSettled([
+      generateScenarioOutlook(formData.event, {
+        title: formData.event,
+        sectors,
+        existingEvidence: existingEvidence.length ? existingEvidence : undefined,
+      }),
+      generateCausalGraph(
+        [{ title: formData.event, type: formData.scope, summary: formData.event }],
+        { depth: formData.depth === 'deep' ? 3 : 2, query: formData.event },
+      ),
+      supabase
+        ? supabase
+            .from('polymarket_markets')
+            .select('question, outcome_yes_price, volume')
+            .ilike('question', `%${formData.event.split(' ').slice(0, 3).join('%')}%`)
+            .limit(1)
+            .then(r => r.data?.[0] ? {
+              question: r.data[0].question,
+              outcomeYesPrice: r.data[0].outcome_yes_price,
+              volume: r.data[0].volume,
+            } : null)
+        : Promise.resolve(null),
+    ]);
+
+    const outlook = outlookResult.status === 'fulfilled' ? outlookResult.value : null;
+    const causalGraph = graphResult.status === 'fulfilled' ? graphResult.value : null;
+    const polymarket = polyResult.status === 'fulfilled' ? polyResult.value : null;
+
+    if (!outlook) {
+      const reason = outlookResult.status === 'rejected' ? outlookResult.reason?.message : 'Unknown';
+      return res.status(500).json({ success: false, error: `Scenario generation failed: ${reason}` });
+    }
+
+    // Provide a fallback graph if causal graph generation failed
+    const fallbackGraph = causalGraph || {
+      nodes: [],
+      edges: [],
+      metadata: { generated_at: new Date().toISOString(), depth: 2, total_nodes: 0, total_edges: 0, confidence_avg: 0 },
+    };
+
+    const scenario = mapScenarioDashboard({
+      outlook,
+      causalGraph: fallbackGraph,
+      polymarket: polymarket ?? null,
+      formData,
+    }) as ScenarioDashboardData;
+
+    // Resonance: real events that match the scenario (title + branch names)
+    const keywords = [
+      ...formData.event.split(/\s+/).filter(w => w.length >= 3),
+      ...scenario.branches.map(b => b.name).flatMap(n => n.split(/\s+/).filter(w => w.length >= 3)),
+    ].map(w => w.toLowerCase().replace(/[^a-z0-9]/g, ''));
+    const uniqueKeywords = [...new Set(keywords)].slice(0, 15);
+    const resonanceEvents: ResonanceEvent[] = recentEvents
+      .filter(row => {
+        const text = (row.summary || '').toLowerCase();
+        return uniqueKeywords.some(kw => kw.length >= 3 && text.includes(kw));
+      })
+      .slice(0, 10)
+      .map(row => ({
+        id: row.id,
+        title: (row.summary || '').slice(0, 120) || 'Event',
+        summary: row.summary || '',
+        country: row.country ?? undefined,
+        occurredAt: row.created_at,
+        investigateId: `/events/${row.id}`,
+      }));
+    scenario.resonance = { events: resonanceEvents, total: resonanceEvents.length };
+
+    // Compute plausibility from avg confidence
+    const plausibility = Math.round(
+      outlook.scenarios.reduce((s, sc) => s + sc.confidence, 0) / Math.max(outlook.scenarios.length, 1) * 100
+    );
+
+    // Save to DB
+    let savedId: string | undefined;
+    const clerkUserId = req.headers['x-clerk-user-id'] as string;
+    if (supabase && clerkUserId) {
+      const supabaseUserId = await getSupabaseUserId(clerkUserId, supabase);
+      const { data: inserted } = await supabase
+        .from('scenario_analyses')
+        .insert({
+          user_id: supabaseUserId,
+          title: formData.event.slice(0, 200),
+          scope: formData.scope.toUpperCase(),
+          severity: formData.severity.toUpperCase(),
+          timeframe: formData.timeframe.toUpperCase(),
+          status: 'completed',
+          plausibility,
+          form_data: formData,
+          result_json: scenario,
+        })
+        .select('id')
+        .single();
+      savedId = inserted?.id;
+    }
+
+    res.json({ success: true, scenario, id: savedId });
+  } catch (error: any) {
+    console.error('[API] Scenario generate error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+  }
+});
+
+// GET /api/scenarios/history — list scenario history for a user
+app.get('/api/scenarios/history', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Supabase not configured' });
+    }
+    const clerkUserId = req.headers['x-clerk-user-id'] as string || req.query.userId as string;
+    if (!clerkUserId) {
+      return res.status(400).json({ success: false, error: 'userId is required' });
+    }
+    const supabaseUserId = await getSupabaseUserId(clerkUserId, supabase);
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+
+    const { data, error } = await supabase
+      .from('scenario_analyses')
+      .select('id, title, scope, severity, timeframe, status, plausibility, created_at')
+      .eq('user_id', supabaseUserId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+
+    const scenarios = (data || []).map(row => ({
+      id: row.id,
+      title: row.title,
+      scope: row.scope,
+      severity: row.severity,
+      timeframe: row.timeframe,
+      createdAt: row.created_at,
+      status: row.status || 'completed',
+      plausibility: row.plausibility || 0,
+    }));
+
+    res.json({ success: true, scenarios });
+  } catch (error: any) {
+    console.error('[API] Scenario history error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+  }
+});
+
+// GET /api/scenarios/:id — get a single scenario by ID
+app.get('/api/scenarios/:id', async (req, res) => {
+  try {
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: 'Supabase not configured' });
+    }
+    const { id } = req.params;
+    const { data, error } = await supabase
+      .from('scenario_analyses')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({ success: false, error: 'Scenario not found' });
+    }
+
+    res.json({ success: true, scenario: data.result_json, meta: {
+      id: data.id,
+      title: data.title,
+      scope: data.scope,
+      severity: data.severity,
+      timeframe: data.timeframe,
+      status: data.status,
+      plausibility: data.plausibility,
+      createdAt: data.created_at,
+    }});
+  } catch (error: any) {
+    console.error('[API] Scenario get error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Internal server error' });
+  }
+});
+
 const server = app.listen(PORT, () => {
   console.log(`🚀 API Server running on http://localhost:${PORT}`);
   console.log(`   Health: http://localhost:${PORT}/health`);
